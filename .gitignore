@@ -1,2 +1,6 @@
 # data
 train_dataset/**
+input/**
+
+# sketches
+sketches/**
