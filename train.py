@@ -488,12 +488,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '--project_name',
         default='MathOCR-iloveslowfood',
-        help='WandB에서 사용할 자신의 프로젝트 이름'
+        help='WandB에서 사용할 자신의 프로젝트 이름. MathOCR-준구의실험교실 등'
     )
     parser.add_argument(
         '--exp_name',
         default='semi-aster',
-        help='실험 이름'
+        help='실험 이름. SATRN-v1, SARTN-Loss변경 등'
     )
     parser.add_argument(
         "-c",
