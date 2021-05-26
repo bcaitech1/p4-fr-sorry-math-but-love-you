@@ -85,12 +85,20 @@ def run_epoch(
     sent_acc = 0
     num_sent_acc = 0
 
+    # for logging
+    losses_log = []
+    wer_log = 0
+    num_wer_log = 0
+    sent_acc_log = 0
+    num_sent_acc_log = 0
+
     with tqdm(
         desc="{} ({})".format(epoch_text, "Train" if train else "Validation"),
         total=len(data_loader.dataset),
         dynamic_ncols=True,
         leave=False,
     ) as pbar:
+
         for d in data_loader:
             input = d["image"].to(device)
 
@@ -128,11 +136,12 @@ def run_epoch(
                 optimizer.step()
 
             losses.append(loss.item())
+            losses_log.append(loss.item())
             
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
             expected_str = id_to_string(expected, data_loader,do_eval=1)
             sequence_str = id_to_string(sequence, data_loader,do_eval=1)
-            wer += word_error_rate(sequence_str,expected_str)
+            wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
             sent_acc += sentence_acc(sequence_str,expected_str)
             num_sent_acc += 1
@@ -173,7 +182,6 @@ def main(config_file):
     options = Flags(config_file).get()
     wandb.config.update(dict(options._asdict())) # logging
     
-
     #set random seed
     # torch.manual_seed(options.seed)
     # np.random.seed(options.seed)
