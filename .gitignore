@@ -4,3 +4,16 @@ input/**
 
 # sketches
 sketches/**
+
+# config files
+*.yaml
+
+# log, chache
+events*
+log.txt
+__pycache__
+.idea
+checkpoints/**
+tensorboard/**
+*.pth
+.DS_Store
