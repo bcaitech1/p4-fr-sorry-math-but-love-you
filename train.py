@@ -19,6 +19,7 @@ from checkpoint import (
     save_checkpoint,
     init_tensorboard,
     write_tensorboard,
+    write_wandb
 )
 from psutil import virtual_memory
 
@@ -460,6 +461,18 @@ def main(config_file):
                 validation_epoch_wer,
                 model,
             )
+            write_wandb(
+                start_epoch + epoch + 1,
+                train_result["grad_norm"],
+                train_result["loss"],
+                train_epoch_symbol_accuracy,
+                train_epoch_sentence_accuracy,
+                train_epoch_wer,
+                validation_result["loss"],
+                validation_epoch_symbol_accuracy,
+                validation_epoch_sentence_accuracy,
+                validation_epoch_wer
+                )
 
 
 if __name__ == "__main__":
