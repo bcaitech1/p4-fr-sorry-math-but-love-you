@@ -46,7 +46,7 @@ def load_vocab(tokens_paths: str) -> Tuple[Dict[str, int], Dict[int, str]]:
     return token_to_id, id_to_token
 
 
-def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tuple[List[str], List[str]]:
+def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
     """Ground Truth 이미지 디렉토리로부터 일부만을 불러온 뒤, split하는 함수
 
     Args:
@@ -58,8 +58,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
             - Defaults to None.
 
     Returns:
-        (1) split할 경우(test_percent != None): 학습용 이미지 경로 리스트, 검증용 이미지 경로 리스트
-        (2) split하지 않을 경우(test_percent == None): 학습용 이미지 경로 리스트
+        (1) split할 경우(test_percent != None): (학습용 이미지 경로, GT) 리스트, (검증용 이미지 경로, GT) 리스트
+        (2) split하지 않을 경우(test_percent == None): (학습용 이미지 경로, GT) 리스트
     """
     root = os.path.join(os.path.dirname(groundtruth), "images")
     with open(groundtruth, "r") as fd:

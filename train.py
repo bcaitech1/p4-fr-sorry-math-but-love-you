@@ -29,7 +29,7 @@ from scheduler import CircularLRBeta
 
 from metrics import word_error_rate,sentence_acc
 
-def id_to_string(tokens, data_loader,do_eval=0):
+def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
         special_ids = [data_loader.dataset.token_to_id["<PAD>"], data_loader.dataset.token_to_id["<SOS>"],
@@ -331,8 +331,6 @@ def main(config_file):
             train=True,
         )
 
-
-
         train_losses.append(train_result["loss"])
         grad_norms.append(train_result["grad_norm"])
         train_epoch_symbol_accuracy = (
@@ -458,7 +456,7 @@ if __name__ == "__main__":
         "-c",
         "--config_file",
         dest="config_file",
-        default="configs/Attention.yaml",
+        default="./configs/Attention.yaml",
         type=str,
         help="Path of configuration file",
     )
