@@ -13,5 +13,5 @@ def get_network(
         model = Attention(FLAGS, train_dataset, model_checkpoint).to(device)
     else:
         raise NotImplementedError
-
+        
     return model
