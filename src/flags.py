@@ -41,7 +41,6 @@ class Flags:
         except:
             d = config_file
 
-
         self.flags = dict_to_namedtuple(d)
 
     def get(self):

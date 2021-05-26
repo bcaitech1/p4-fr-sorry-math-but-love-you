@@ -11,6 +11,8 @@ import torch.optim as optim
 from torchvision import transforms
 import yaml
 from tqdm import tqdm
+import wandb
+
 from checkpoint import (
     default_checkpoint,
     load_checkpoint,
