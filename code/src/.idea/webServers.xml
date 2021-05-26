@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="38f84f60-4242-49dd-bc73-7483f91bb3bd" name="yk">
+        <fileTransfer rootFolder="/home/yk" accessType="SFTP" host="voithru.asuscomm.com" port="30900" sshConfigId="f1f2665d-f9fd-4cd1-809c-741fea4be586" sshConfig="yk@voithru.asuscomm.com:30900 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
