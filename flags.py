@@ -26,15 +26,14 @@ def dict_to_namedtuple(d):
                 d[k] = v
 
     nt = FLAGSTuple(**d)
-
     return nt
+    
 
 
 class Flags:
-    """ Flags object.
-    """
-
+    """ Flags object"""
     def __init__(self, config_file):
+        assert os.path.isfile(config_file), f"there's no '{config_file}'."
         try:
             with open(config_file, 'r') as f:
                 d = yaml.safe_load(f)

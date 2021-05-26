@@ -1,7 +1,30 @@
+import os
+import random
+from psutil import virtual_memory
+import numpy as np
+import torch
 import torch.optim as optim
 
 from networks.Attention import Attention
 
+
+def print_system_envs():
+    num_gpus = torch.cuda.device_count()
+    num_cpus = os.cpu_count()
+    mem_size = virtual_memory().available // (1024 ** 3)
+    print(
+        "[+] System environments\n",
+        "The number of gpus : {}\n".format(num_gpus),
+        "The number of cpus : {}\n".format(num_cpus),
+        "Memory Size : {}G\n".format(mem_size),
+    )
+    
+def set_seed(seed: int=21):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def get_network(
     model_type,

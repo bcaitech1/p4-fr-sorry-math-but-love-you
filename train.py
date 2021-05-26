@@ -23,7 +23,7 @@ from checkpoint import (
 from psutil import virtual_memory
 
 from flags import Flags
-from utils import get_network, get_optimizer
+from utils import get_network, get_optimizer, set_seed, print_system_envs
 from dataset import dataset_loader, START, PAD,load_vocab
 from scheduler import CircularLRBeta
 
@@ -32,8 +32,11 @@ from metrics import word_error_rate,sentence_acc
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
-        special_ids = [data_loader.dataset.token_to_id["<PAD>"], data_loader.dataset.token_to_id["<SOS>"],
-                       data_loader.dataset.token_to_id["<EOS>"]]
+        special_ids = [
+            data_loader.dataset.token_to_id["<PAD>"],
+            data_loader.dataset.token_to_id["<SOS>"],
+            data_loader.dataset.token_to_id["<EOS>"]
+            ]
 
     for example in tokens:
         string = ""
@@ -41,7 +44,7 @@ def id_to_string(tokens, data_loader, do_eval=0):
             for token in example:
                 token = token.item()
                 if token not in special_ids:
-                    if token != -1:
+                    if token != -1: # -1이 뭐지
                         string += data_loader.dataset.id_to_token[token] + " "
         else:
             for token in example:
@@ -75,10 +78,10 @@ def run_epoch(
     grad_norms = []
     correct_symbols = 0
     total_symbols = 0
-    wer=0
-    num_wer=0
-    sent_acc=0
-    num_sent_acc=0
+    wer = 0
+    num_wer = 0
+    sent_acc = 0
+    num_sent_acc = 0
 
     with tqdm(
         desc="{} ({})".format(epoch_text, "Train" if train else "Validation"),
@@ -166,30 +169,33 @@ def main(config_file):
     Train math formula recognition model
     """
     options = Flags(config_file).get()
+    wandb.config.update(dict(options._asdict())) # logging
+    
 
     #set random seed
-    torch.manual_seed(options.seed)
-    np.random.seed(options.seed)
-    random.seed(options.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
+    # torch.manual_seed(options.seed)
+    # np.random.seed(options.seed)
+    # random.seed(options.seed)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
+    set_seed(seed=options.seed)
+    
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
     print("Running {} on device {}\n".format(options.network, device))
+    print_system_envs() # Print system environments
 
-    # Print system environments
-    num_gpus = torch.cuda.device_count()
-    num_cpus = os.cpu_count()
-    mem_size = virtual_memory().available // (1024 ** 3)
-    print(
-        "[+] System environments\n",
-        "The number of gpus : {}\n".format(num_gpus),
-        "The number of cpus : {}\n".format(num_cpus),
-        "Memory Size : {}G\n".format(mem_size),
-    )
+    # num_gpus = torch.cuda.device_count()
+    # num_cpus = os.cpu_count()
+    # mem_size = virtual_memory().available // (1024 ** 3)
+    # print(
+    #     "[+] System environments\n",
+    #     "The number of gpus : {}\n".format(num_gpus),
+    #     "The number of cpus : {}\n".format(num_cpus),
+    #     "Memory Size : {}G\n".format(mem_size),
+    # )
 
     # Load checkpoint and print result
     checkpoint = (
@@ -197,6 +203,7 @@ def main(config_file):
         if options.checkpoint != ""
         else default_checkpoint
     )
+
     model_checkpoint = checkpoint["model"]
     if model_checkpoint:
         print(
@@ -234,7 +241,7 @@ def main(config_file):
         "The number of classes : {}\n".format(len(train_dataset.token_to_id)),
     )
 
-    # Get loss, model
+    # define model
     model = get_network(
         options.network,
         options,
@@ -243,7 +250,11 @@ def main(config_file):
         train_dataset,
     )
     model.train()
+
+    # define loss
     criterion = model.criterion.to(device)
+
+    # define optimizer
     enc_params_to_optimise = [
         param for param in model.encoder.parameters() if param.requires_grad
     ]
@@ -296,11 +307,11 @@ def main(config_file):
     writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
-    train_sentence_accuracy=checkpoint["train_sentence_accuracy"]
-    train_wer=checkpoint["train_wer"]
+    train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
+    train_wer = checkpoint["train_wer"]
     train_losses = checkpoint["train_losses"]
     validation_symbol_accuracy = checkpoint["validation_symbol_accuracy"]
-    validation_sentence_accuracy=checkpoint["validation_sentence_accuracy"]
+    validation_sentence_accuracy = checkpoint["validation_sentence_accuracy"]
     validation_wer=checkpoint["validation_wer"]
     validation_losses = checkpoint["validation_losses"]
     learning_rates = checkpoint["lr"]
@@ -453,6 +464,16 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        '--project_name',
+        default='MathOCR-iloveslowfood',
+        help='WandB에서 사용할 자신의 프로젝트 이름'
+    )
+    parser.add_argument(
+        '--exp_name',
+        default='semi-aster',
+        help='실험 이름'
+    )
+    parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
@@ -461,4 +482,10 @@ if __name__ == "__main__":
         help="Path of configuration file",
     )
     parser = parser.parse_args()
+
+    wandb.init(project=parser.project_name)
+    wandb.run.name = parser.exp_name
+
     main(parser.config_file)
+
+    

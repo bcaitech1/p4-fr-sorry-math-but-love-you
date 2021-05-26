@@ -1,0 +1,49 @@
+2021-05-26 11:50:50,001 INFO    MainThread:24872 [internal.py:wandb_internal():91] W&B internal server running at pid: 24872, started at: 2021-05-26 11:50:50.000992
+2021-05-26 11:50:50,012 DEBUG   SenderThread:24872 [sender.py:send():176] send: header
+2021-05-26 11:50:50,012 INFO    WriterThread:24872 [datastore.py:open_for_write():77] open: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/run-1hkkb7je.wandb
+2021-05-26 11:50:50,013 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: check_version
+2021-05-26 11:50:50,013 DEBUG   SenderThread:24872 [sender.py:send_request():186] send_request: check_version
+2021-05-26 11:50:50,208 DEBUG   SenderThread:24872 [sender.py:send():176] send: run
+2021-05-26 11:50:50,469 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: run_start
+2021-05-26 11:50:50,474 DEBUG   HandlerThread:24872 [meta.py:__init__():39] meta init
+2021-05-26 11:50:50,475 DEBUG   HandlerThread:24872 [meta.py:__init__():53] meta init done
+2021-05-26 11:50:50,475 DEBUG   HandlerThread:24872 [meta.py:probe():210] probe
+2021-05-26 11:50:50,477 INFO    SenderThread:24872 [dir_watcher.py:__init__():168] watching files in: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files
+2021-05-26 11:50:50,477 INFO    SenderThread:24872 [sender.py:_start_run_threads():699] run started: 1hkkb7je with start time 1622029848
+2021-05-26 11:50:50,477 DEBUG   SenderThread:24872 [sender.py:send():176] send: summary
+2021-05-26 11:50:50,478 INFO    SenderThread:24872 [sender.py:_save_file():821] saving file wandb-summary.json with policy end
+2021-05-26 11:50:50,485 DEBUG   HandlerThread:24872 [meta.py:_setup_git():200] setup git
+2021-05-26 11:50:50,506 DEBUG   HandlerThread:24872 [meta.py:_setup_git():207] setup git done
+2021-05-26 11:50:50,506 DEBUG   HandlerThread:24872 [meta.py:_save_pip():57] save pip
+2021-05-26 11:50:50,507 DEBUG   HandlerThread:24872 [meta.py:_save_pip():71] save pip done
+2021-05-26 11:50:50,508 DEBUG   HandlerThread:24872 [meta.py:_save_conda():78] save conda
+2021-05-26 11:50:51,482 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_created():216] file/dir created: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/requirements.txt
+2021-05-26 11:50:51,483 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_created():216] file/dir created: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/wandb-summary.json
+2021-05-26 11:50:51,483 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_created():216] file/dir created: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/conda-environment.yaml
+2021-05-26 11:50:54,902 DEBUG   HandlerThread:24872 [meta.py:_save_conda():86] save conda done
+2021-05-26 11:50:54,903 DEBUG   HandlerThread:24872 [meta.py:probe():252] probe done
+2021-05-26 11:50:55,099 DEBUG   SenderThread:24872 [sender.py:send():176] send: files
+2021-05-26 11:50:55,099 INFO    SenderThread:24872 [sender.py:_save_file():821] saving file wandb-metadata.json with policy now
+2021-05-26 11:50:55,113 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: stop_status
+2021-05-26 11:50:55,113 DEBUG   SenderThread:24872 [sender.py:send_request():186] send_request: stop_status
+2021-05-26 11:50:55,308 DEBUG   SenderThread:24872 [sender.py:send():176] send: run
+2021-05-26 11:50:55,480 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_modified():229] file/dir modified: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/config.yaml
+2021-05-26 11:50:55,481 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_modified():229] file/dir modified: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/conda-environment.yaml
+2021-05-26 11:50:55,481 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_created():216] file/dir created: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/wandb-metadata.json
+2021-05-26 11:50:55,482 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_created():216] file/dir created: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/output.log
+2021-05-26 11:50:55,562 INFO    SenderThread:24872 [sender.py:send_run():600] updated run: 1hkkb7je
+2021-05-26 11:50:55,750 INFO    Thread-17 :24872 [upload_job.py:push():133] Uploaded file /tmp/tmpmbw70xw6wandb/19jdwepj-wandb-metadata.json
+2021-05-26 11:51:10,315 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: stop_status
+2021-05-26 11:51:10,316 DEBUG   SenderThread:24872 [sender.py:send_request():186] send_request: stop_status
+2021-05-26 11:51:18,657 DEBUG   SenderThread:24872 [sender.py:send():176] send: stats
+2021-05-26 11:51:20,129 DEBUG   SenderThread:24872 [sender.py:send():176] send: config
+2021-05-26 11:51:22,496 INFO    Thread-14 :24872 [dir_watcher.py:_on_file_modified():229] file/dir modified: /opt/ml/smbly/wandb/run-20210526_115048-1hkkb7je/files/config.yaml
+2021-05-26 11:51:25,513 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: stop_status
+2021-05-26 11:51:25,514 DEBUG   SenderThread:24872 [sender.py:send_request():186] send_request: stop_status
+2021-05-26 11:51:40,703 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: stop_status
+2021-05-26 11:51:40,704 DEBUG   SenderThread:24872 [sender.py:send_request():186] send_request: stop_status
+2021-05-26 11:51:48,813 DEBUG   SenderThread:24872 [sender.py:send():176] send: stats
+2021-05-26 11:51:55,900 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: stop_status
+2021-05-26 11:51:55,901 DEBUG   SenderThread:24872 [sender.py:send_request():186] send_request: stop_status
+2021-05-26 11:52:11,096 DEBUG   HandlerThread:24872 [handler.py:handle_request():121] handle_request: stop_status
+2021-05-26 11:52:11,096 DEBUG   SenderThread:24872 [sender.py:send_request():186] send_request: stop_status
