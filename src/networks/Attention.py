@@ -11,15 +11,27 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class CNN(nn.Module):
-    def __init__(self, nc, leakyRelu=False):
+    """베이스라인 모델(Semi-ASTER)의 인코더 역할을 수행하는 CNN"""
+
+    def __init__(self, nc: int, leakyRelu=False):
+        """
+        Args:
+            nc (int): 입력 이미지 채널
+            leakyRelu (bool, optional): Leacky ReLu 사용 여부. Defaults to False.
+        """
         super(CNN, self).__init__()
 
-        ks = [3, 3, 3, 3, 3, 3, 2]
-        ps = [1, 1, 1, 1, 1, 1, 0]
-        ss = [1, 1, 1, 1, 1, 1, 1]
-        nm = [64, 128, 256, 256, 512, 512, 512]
+        ks = [3, 3, 3, 3, 3, 3, 2] # kernel size
+        ps = [1, 1, 1, 1, 1, 1, 0] # padding size
+        ss = [1, 1, 1, 1, 1, 1, 1] # strides
+        nm = [64, 128, 256, 256, 512, 512, 512] # output channel list
 
-        def convRelu(i, batchNormalization=False):
+        def convRelu(i, batchNormalization=False) -> nn.Module:
+            """Conv 레이어를 생성하는 함수
+            Args:
+                i (int): ks, ps, ss, nm으로부터 가져올 element의 인덱스
+                batchNormalization (bool, optional): BN 적용 여부. Defaults to False.
+            """
             cnn = nn.Sequential()
             nIn = nc if i == 0 else nm[i - 1]
             nOut = nm[i]
@@ -61,15 +73,32 @@ class CNN(nn.Module):
         return out
 
 class AttentionCell(nn.Module):
-    def __init__(self, src_dim, hidden_dim, embedding_dim, num_layers=1, cell_type='LSTM'):
+    """디코더(AttentionDecoder) 내 Attention 계산에 활용할 attention cell 클래스"""
+
+    def __init__(self, src_dim: int, hidden_dim: int, embedding_dim: int, num_layers=1, cell_type='LSTM'):
+        """
+        Args:
+            src_dim (int): 입력 데이터의 dim
+            hidden_dim (int):
+                - RNN 내에서 활용될 hidden state의 dim
+            embedding_dim (int):
+                - 입력 데이터의 임베딩 결과 dim
+                - 입력 데이터가 RNN 레이어에 입력되기 전에 임베딩 과정을 거침
+            num_layers (int, optional): RNN 레이어 수. Defaults to 1.
+            cell_type (str, optional): RNN 모델 타입. Defaults to 'LSTM'
+                - RNN의 input dim: src_dim + embedding_dim
+        """
         super(AttentionCell, self).__init__()
         self.num_layers = num_layers
 
-        self.i2h = nn.Linear(src_dim, hidden_dim, bias=False)
+        self.i2h = nn.Linear(src_dim, hidden_dim, bias=False) # input dim to hidden dim
+
+        # hidden dim to hidden dim
         self.h2h = nn.Linear(
             hidden_dim, hidden_dim
-        )  # either i2i or h2h should have bias
-        self.score = nn.Linear(hidden_dim, 1, bias=False)
+        )  # either i2i or h2h should have bias <- why?
+
+        self.score = nn.Linear(hidden_dim, 1, bias=False) # to get attention logit
         if num_layers == 1:
             if cell_type == 'LSTM':
                 self.rnn = nn.LSTMCell(src_dim + embedding_dim, hidden_dim)
@@ -100,6 +129,13 @@ class AttentionCell(nn.Module):
         self.hidden_dim = hidden_dim
 
     def forward(self, prev_hidden, src, tgt):   # src: [b, L, c]
+        """
+        input:
+            prev_hidden (torch.Tensor): 이전 state에서의 hidden state. [b, h] 
+            src (torch.Tensor): X_t. [b, L, c]
+            tgt (torch.Tensor): START 토큰 등 RNN의 입력으로 들어가는 텐서
+        output:
+        """
         src_features = self.i2h(src)  # [b, L, h]
         if self.num_layers == 1:
             prev_hidden_proj = self.h2h(prev_hidden[0]).unsqueeze(1)    # [b, 1, h]
@@ -109,7 +145,7 @@ class AttentionCell(nn.Module):
             torch.tanh(src_features + prev_hidden_proj) # [b, L, h]
         )  # [b, L, 1]
         alpha = F.softmax(attention_logit, dim=1)  # [b, L, 1]
-        context = torch.bmm(alpha.permute(0, 2, 1), src).squeeze(1)  # [b, c]
+        context = torch.bmm(alpha.permute(0, 2, 1), src).squeeze(1)  # [b, c], values applied attention
 
         concat_context = torch.cat([context, tgt], 1)  # [b, c+e]
 
