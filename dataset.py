@@ -1,6 +1,7 @@
 import csv
 import os
 import random
+from typing import *
 import torch
 from PIL import Image, ImageOps
 from torch.utils.data import Dataset
@@ -24,7 +25,14 @@ def encode_truth(truth, token_to_id):
     return truth_tokens
 
 
-def load_vocab(tokens_paths):
+def load_vocab(tokens_paths: str) -> Tuple[Dict[str, int], Dict[int, str]]:
+    """Generation 과정에서 활용할 토큰을 불러와 vocab에 추가하는 함수
+    Args:
+        tokens_paths (str): 토큰 정보가 담긴 파일 경로(tokens.txt)
+    Returns:
+        token_to_id: {토큰명:ID} 꼴 딕셔너리
+        id_to_token: {ID:토큰명} 꼴 딕셔너리
+    """
     tokens = []
     tokens.extend(SPECIAL_TOKENS)
     for tokens_file in tokens_paths:
@@ -38,7 +46,21 @@ def load_vocab(tokens_paths):
     return token_to_id, id_to_token
 
 
-def split_gt(groundtruth, proportion=1.0, test_percent=None):
+def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
+    """Ground Truth 이미지 디렉토리로부터 일부만을 불러온 뒤, split하는 함수
+
+    Args:
+        groundtruth (str): GT 디렉토리 경로
+        proportion (float, optional): 디렉토리로부터 불러올 데이터 비율. Defaults to 1.0.
+        test_percent ([type], optional):
+            - 불러온 데이터를 학습/검증 데이터로 split할 비율
+            - 0.3으로 설정 시 30%를 테스트 데이터, 70%를 학습 데이터로 사용
+            - Defaults to None.
+
+    Returns:
+        (1) split할 경우(test_percent != None): (학습용 이미지 경로, GT) 리스트, (검증용 이미지 경로, GT) 리스트
+        (2) split하지 않을 경우(test_percent == None): (학습용 이미지 경로, GT) 리스트
+    """
     root = os.path.join(os.path.dirname(groundtruth), "images")
     with open(groundtruth, "r") as fd:
         data=[]
