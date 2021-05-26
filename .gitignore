@@ -2,6 +2,9 @@
 train_dataset/**
 input/**
 
+# yaml
+*.yaml
+
 # sketches
 sketches/**
 
