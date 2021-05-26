@@ -5,9 +5,6 @@ input/**
 # sketches
 sketches/**
 
-# config files
-*.yaml
-
 # log, chache
 events*
 log.txt
