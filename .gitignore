@@ -17,6 +17,7 @@ checkpoints/**
 tensorboard/**
 *.pth
 .DS_Store
+wandb/**
 
 # etc
 .empty/**
