@@ -1,0 +1,60 @@
+network: SATRN
+input_size:
+  height: 128
+  width: 128
+SATRN:
+  encoder:
+    hidden_dim: 300
+    filter_dim: 600
+    layer_num: 6
+    head_num: 8
+  decoder:
+    src_dim: 300
+    hidden_dim: 128
+    filter_dim: 512
+    layer_num: 3
+    head_num: 8
+Attention:
+  src_dim: 512
+  hidden_dim: 128
+  embedding_dim: 128
+  layer_num: 1
+  cell_type: "LSTM"
+checkpoint: ""
+prefix: "./log/satrn_upstagetotal_70"
+
+data:
+  train:
+    - "/mnt/ssd/data/Upstage/print/train.txt"
+    - "/mnt/ssd/data/Upstage/handwritten/train.txt"
+    # - "/mnt/ssd/data/Aida/gt.txt"
+    # - "/root/data/CROHME/gt.txt"
+    # - "/mnt/ssd/data/test_data/gt.txt"
+  test:
+    - "/mnt/ssd/data/Upstage/print/test.txt"
+    - "/mnt/ssd/data/Upstage/handwritten/test.txt"
+  token_paths:
+    - "/mnt/ssd/data/Upstage/tokens.txt"  # 216 tokens
+    # - "/mnt/ssd/data/Aida/tokens.txt"
+    # - "/root/data/CROHME/tokens.txt"
+    # - "/mnt/ssd/data/test_data/tokens.txt"
+  dataset_proportions:  # proportion of data to take from train (not test)
+    - 1.0
+  random_split: False # if True, random split from train files
+  test_proportions: 0.2 # only if random_split is True
+  crop: True
+  rgb: 1    # 3 for color, 1 for greyscale
+  
+batch_size: 52
+num_workers: 4
+num_epochs: 70
+print_epochs: 1
+dropout_rate: 0.1
+teacher_forcing_ratio: 0.5
+max_grad_norm: 2.0
+seed: 1234
+optimizer:
+  optimizer: 'Adam' # Adam, Adadelta
+  lr: 5e-4 # 1e-4
+  weight_decay: 1e-4
+  is_cycle: True
