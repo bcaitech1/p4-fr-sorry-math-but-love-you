@@ -13,6 +13,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
 import wandb # added
+os.environ["WANDB_LOG_MODEL"] = "true"
+os.environ["WANDB_WATCH"] = "all"
 
 from checkpoint import (
     default_checkpoint,
@@ -24,35 +26,16 @@ from checkpoint import (
 )
 
 from flags import Flags
-from utils import set_seed, print_system_envs
+from utils import (
+    set_seed, 
+    print_system_envs, 
+    get_optimizer, 
+    get_network, 
+    id_to_string
+    )
 from dataset import dataset_loader, START, PAD,load_vocab
 from scheduler import CircularLRBeta
-from optimizer import get_optimizer
-from model import get_network
 from metrics import word_error_rate, sentence_acc
-
-def id_to_string(tokens, data_loader,do_eval=0):
-    result = []
-    if do_eval:
-        special_ids = [data_loader.dataset.token_to_id["<PAD>"], data_loader.dataset.token_to_id["<SOS>"],
-                       data_loader.dataset.token_to_id["<EOS>"]]
-
-    for example in tokens:
-        string = ""
-        if do_eval:
-            for token in example:
-                token = token.item()
-                if token not in special_ids:
-                    if token != -1:
-                        string += data_loader.dataset.id_to_token[token] + " "
-        else:
-            for token in example:
-                token = token.item()
-                if token != -1:
-                    string += data_loader.dataset.id_to_token[token] + " "
-
-        result.append(string)
-    return result
 
 def run_epoch(
     data_loader,
@@ -168,14 +151,8 @@ def main(config_file):
     Train math formula recognition model
     """
     options = Flags(config_file).get()
-    wandb.config.update(dict(options._asdict())) # logging
     
-    #set random seed
-    # torch.manual_seed(options.seed)
-    # np.random.seed(options.seed)
-    # random.seed(options.seed)
-    # torch.backends.cudnn.deterministic = True
-    # torch.backends.cudnn.benchmark = False
+    # set random seed
     set_seed(seed=options.seed)
     
     is_cuda = torch.cuda.is_available()
@@ -183,17 +160,9 @@ def main(config_file):
     device = torch.device(hardware)
     print("--------------------------------")
     print("Running {} on device {}\n".format(options.network, device))
-    print_system_envs() # Print system environments
 
-    # num_gpus = torch.cuda.device_count()
-    # num_cpus = os.cpu_count()
-    # mem_size = virtual_memory().available // (1024 ** 3)
-    # print(
-    #     "[+] System environments\n",
-    #     "The number of gpus : {}\n".format(num_gpus),
-    #     "The number of cpus : {}\n".format(num_cpus),
-    #     "Memory Size : {}G\n".format(mem_size),
-    # )
+    # Print system environments
+    print_system_envs() 
 
     # Load checkpoint and print result
     checkpoint = (
@@ -294,7 +263,10 @@ def main(config_file):
             gamma=options.optimizer.lr_factor,
         )
 
-    # Log
+    # Log for W&B
+    wandb.config.update(dict(options._asdict())) # logging to W&B
+
+    # Log for tensorboard
     if not os.path.exists(options.prefix):
         os.makedirs(options.prefix)
     log_file = open(os.path.join(options.prefix, "log.txt"), "w")
@@ -390,8 +362,8 @@ def main(config_file):
             option_dict = yaml.safe_load(f)
 
         save_checkpoint(
-            {
-                "epoch": start_epoch + epoch + 1,
+            checkpoint={
+                "epoch": start_epoch+epoch+1,
                 "train_losses": train_losses,
                 "train_symbol_accuracy": train_symbol_accuracy,
                 "train_sentence_accuracy": train_sentence_accuracy,
@@ -442,6 +414,7 @@ def main(config_file):
             )
             print(output_string)
             log_file.write(output_string + "\n")
+
             write_tensorboard(
                 writer=writer,
                 epoch=start_epoch+epoch +1,
@@ -454,7 +427,7 @@ def main(config_file):
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                model=model,
+                model=model
             )
             write_wandb(
                 epoch=start_epoch+epoch +1,
@@ -466,7 +439,7 @@ def main(config_file):
                 validation_loss=validation_result["loss"],
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer
+                validation_wer=validation_epoch_wer,
                 )
 
 
@@ -480,7 +453,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--exp_name',
         default='semi-aster',
-        help='실험 이름(SATRN-v1, SARTN-Loss변경 등)'
+        help='실험 이름(SATRN-베이스라인, SARTN-Loss변경 등)'
     )
     parser.add_argument(
         "-c",
@@ -492,10 +465,13 @@ if __name__ == "__main__":
     )
     parser = parser.parse_args()
 
-    wandb.init(project=parser.project_name)
-    wandb.run.name = parser.exp_name
+    # initilaize W&B
+    run = wandb.init(project=parser.project_name, name=parser.exp_name)
 
-    # turn into train phase
+    # train
     main(parser.config_file)
+
+    # fishe W&B
+    run.finish()
 
     

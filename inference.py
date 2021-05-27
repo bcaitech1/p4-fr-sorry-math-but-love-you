@@ -7,12 +7,11 @@ import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
-from train import id_to_string
 from metrics import word_error_rate, sentence_acc
 from checkpoint import load_checkpoint
 from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
 from flags import Flags
-from model import get_network, get_optimizer
+from utils import id_to_string, get_network, get_optimizer
 
 
 def main(parser):
