@@ -107,6 +107,9 @@ def run_epoch(
                 lr_scheduler.step()
                 optimizer.step()
 
+                # log lr 
+                wandb.log({"learning_rate": lr_scheduler.get_lr()})
+
             losses.append(loss.item())
             
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -447,12 +450,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--project_name',
-        default='MathOCR-준구의실험교실',
+        default='Attention',
         help='WandB에서 사용할 자신의 프로젝트 이름(MathOCR-준구의실험교실 등)'
     )
     parser.add_argument(
         '--exp_name',
-        default='ASTER-',
+        default='ASTER-width512',
         help='실험 이름(SATRN-베이스라인, SARTN-Loss변경 등)'
     )
     parser.add_argument(
