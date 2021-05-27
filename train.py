@@ -447,12 +447,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--project_name',
-        default='MathOCR-iloveslowfood',
+        default='MathOCR-준구의실험교실',
         help='WandB에서 사용할 자신의 프로젝트 이름(MathOCR-준구의실험교실 등)'
     )
     parser.add_argument(
         '--exp_name',
-        default='semi-aster',
+        default='ASTER-',
         help='실험 이름(SATRN-베이스라인, SARTN-Loss변경 등)'
     )
     parser.add_argument(
