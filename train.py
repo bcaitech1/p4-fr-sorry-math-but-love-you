@@ -34,6 +34,7 @@ from utils import (
     )
 from dataset import dataset_loader, START, PAD,load_vocab
 from scheduler import CircularLRBeta
+from criterion import get_criterion
 from metrics import word_error_rate, sentence_acc, final_metric
 
 def run_epoch(
@@ -223,8 +224,8 @@ def main(config_file):
     model.train()
 
     # define loss
-    criterion = model.criterion.to(device)
-    criterion = get_criterion(options.loss)
+    # criterion = model.criterion.to(device)
+    criterion = get_criterion(type=options.criterion).to(device)
 
     # define optimizer
     enc_params_to_optimise = [
