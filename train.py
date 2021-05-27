@@ -13,6 +13,8 @@ from torch.cuda.amp import autocast, GradScaler
 import yaml
 from tqdm import tqdm
 import wandb
+import albumentations as a
+from albumentations.pytorch import TensorV2
 
 from checkpoint import (
     default_checkpoint,
@@ -26,7 +28,7 @@ from psutil import virtual_memory
 from flags import Flags
 from utils import get_network, get_optimizer
 from dataset import dataset_loader, START, PAD,load_vocab
-from scheduler import CircularLRBeta
+from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts
 
 from metrics import word_error_rate,sentence_acc
 
@@ -314,6 +316,18 @@ def seed_everything(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+def get_train_transforms():
+    return A.Compose([
+        A.Compose([
+            A.HorizontalFlip(p=1),
+            A.VerticalFlip(p=1)
+        ],p=0.5),
+        TensorV2(),
+    ],p=1.0)
+
+def get_valid_transforms():
+    return TensorV2()
+
 def main(config_file):
     """
     Train math formula recognition model
@@ -373,14 +387,16 @@ def main(config_file):
         )
 
     # Get data
-    transformed = transforms.Compose(
-        [
-            # Resize so all images have the same size
-            transforms.Resize((options.input_size.height, options.input_size.width)),
-            transforms.ToTensor(),
-        ]
-    )
-    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed)
+    # transformed = transforms.Compose(
+    #     [
+    #         # Resize so all images have the same size
+    #         transforms.Resize((options.input_size.height, options.input_size.width)),
+    #         transforms.ToTensor(),
+    #     ]
+    # )
+
+
+    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, train_transform=get_train_transforms(), valid_transform=get_valid_transforms())
     print(
         "[+] Data\n",
         "The number of train samples : {}\n".format(len(train_dataset)),
@@ -416,29 +432,44 @@ def main(config_file):
         ),
     )
 
-    # Get optimizer
-    optimizer = get_optimizer(
-        options.optimizer.optimizer,
-        params_to_optimise,
-        lr=options.optimizer.lr,
-        weight_decay=options.optimizer.weight_decay,
-    )
-    optimizer_state = checkpoint.get("optimizer")
-    if optimizer_state:
-        optimizer.load_state_dict(optimizer_state)
-    for param_group in optimizer.param_groups:
-        param_group["initial_lr"] = options.optimizer.lr
-    if options.optimizer.is_cycle:
-        cycle = len(train_data_loader) * options.num_epochs
-        lr_scheduler = CircularLRBeta(
-            optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
+    # Get optimizer and optimizer
+    if options.scheduler == "CustomCosine":
+        optimizer = get_optimizer(
+            options.optimizer.optimizer,
+            params_to_optimise,
+            lr=0,
+            weight_decay=options.optimizer.weight_decay,
         )
+        optimizer_state = checkpoint.get("optimizer")
+        if optimizer_state:
+            optimizer.load_state_dict(optimizer_state)
+        for param_group in optimizer.param_groups:
+            param_group["initial_lr"] = options.optimizer.lr
+        lr_scheduler = CustomCosineAnnealingWarmUpRestarts(optimizer, T_0=options.num_epochs, T_mult=1, eta_max=options.optimizer.lr, T_up=options.num_epochs//10, gamma=1.)
+        
     else:
-        lr_scheduler = optim.lr_scheduler.StepLR(
-            optimizer,
-            step_size=options.optimizer.lr_epochs,
-            gamma=options.optimizer.lr_factor,
+        optimizer = get_optimizer(
+            options.optimizer.optimizer,
+            params_to_optimise,
+            lr=options.optimizer.lr,
+            weight_decay=options.optimizer.weight_decay,
         )
+        optimizer_state = checkpoint.get("optimizer")
+        if optimizer_state:
+            optimizer.load_state_dict(optimizer_state)
+        for param_group in optimizer.param_groups:
+            param_group["initial_lr"] = options.optimizer.lr
+        if options.optimizer.is_cycle:
+            cycle = len(train_data_loader) * options.num_epochs
+            lr_scheduler = CircularLRBeta(
+                optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
+            )
+        else:
+            lr_scheduler = optim.lr_scheduler.StepLR(
+                optimizer,
+                step_size=options.optimizer.lr_epochs,
+                gamma=options.optimizer.lr_factor,
+            )
 
     # Log
     if not os.path.exists(options.prefix):

@@ -4,6 +4,7 @@ import random
 from typing import *
 import torch
 from PIL import Image, ImageOps
+import cv2
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
@@ -119,6 +120,7 @@ class LoadDataset(Dataset):
         groundtruth,
         tokens_file,
         crop=False,
+        preprocessing=True,
         transform=None,
         rgb=3,
     ):
@@ -133,6 +135,7 @@ class LoadDataset(Dataset):
         """
         super(LoadDataset, self).__init__()
         self.crop = crop
+        self.preprocessing = preprocessing
         self.transform = transform
         self.rgb = rgb
         self.token_to_id, self.id_to_token = load_vocab(tokens_file)
@@ -156,22 +159,31 @@ class LoadDataset(Dataset):
 
     def __getitem__(self, i):
         item = self.data[i]
-        image = Image.open(item["path"])
+        # image = Image.open(item["path"])
         if self.rgb == 3:
-            image = image.convert("RGB")
+            # image = image.convert("RGB")
+            image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
-            image = image.convert("L")
+            # image = image.convert("L")
+            image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
-        if self.crop:
-            # Image needs to be inverted because the bounding box cuts off black pixels,
-            # not white ones.
-            bounding_box = ImageOps.invert(image).getbbox()
-            image = image.crop(bounding_box)
+        # if self.crop:
+        #     # Image needs to be inverted because the bounding box cuts off black pixels,
+        #     # not white ones.
+        #     bounding_box = ImageOps.invert(image).getbbox()
+        #     image = image.crop(bounding_box)
+
+        if self.preprocessing:
+            image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
+            h, w = image.shape
+            if h / w > 2:
+                image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
 
         if self.transform:
-            image = self.transform(image)
+            # image = self.transform(image)
+            image = self.transform(image=image)['image']
 
         return {"path": item["path"], "truth": item["truth"], "image": image}
 
@@ -184,6 +196,7 @@ class LoadEvalDataset(Dataset):
         token_to_id,
         id_to_token,
         crop=False,
+        preprocessing=True,
         transform=None,
         rgb=3,
     ):
@@ -201,6 +214,7 @@ class LoadEvalDataset(Dataset):
         self.rgb = rgb
         self.token_to_id = token_to_id
         self.id_to_token = id_to_token
+        self.preprocessing = preprocessing
         self.transform = transform
         self.data = [
             {
@@ -223,26 +237,35 @@ class LoadEvalDataset(Dataset):
 
     def __getitem__(self, i):
         item = self.data[i]
-        image = Image.open(item["path"])
+        # image = Image.open(item["path"])
         if self.rgb == 3:
-            image = image.convert("RGB")
+            # image = image.convert("RGB")
+            image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
-            image = image.convert("L")
+            # image = image.convert("L")
+            image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
-        if self.crop:
-            # Image needs to be inverted because the bounding box cuts off black pixels,
-            # not white ones.
-            bounding_box = ImageOps.invert(image).getbbox()
-            image = image.crop(bounding_box)
+        # if self.crop:
+        #     # Image needs to be inverted because the bounding box cuts off black pixels,
+        #     # not white ones.
+        #     bounding_box = ImageOps.invert(image).getbbox()
+        #     image = image.crop(bounding_box)
 
+        if self.preprocessing:
+            image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
+            h, w = image.shape
+            if h / w > 2:
+                image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+                
         if self.transform:
-            image = self.transform(image)
+            image = self.transform(image=image)['image']
 
         return {"path": item["path"], "file_path":item["file_path"],"truth": item["truth"], "image": image}
 
-def dataset_loader(options, transformed):
+# def dataset_loader(options, transformed):
+def dataset_loader(options, train_transform, valid_transform):
 
     # Read data
     train_data, valid_data = [], [] 
@@ -266,7 +289,8 @@ def dataset_loader(options, transformed):
 
     # Load data
     train_dataset = LoadDataset(
-        train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        train_data, options.data.token_paths, crop=optionos.data.crop, transform=train_transform, rgb=options.data.rgb
     )
     train_data_loader = DataLoader(
         train_dataset,
@@ -277,7 +301,8 @@ def dataset_loader(options, transformed):
     )
 
     valid_dataset = LoadDataset(
-        valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        valid_data, options.data.token_paths, crop=optionos.data.crop, transform=valid_transform, rgb=options.data.rgb
     )
     valid_data_loader = DataLoader(
         valid_dataset,
