@@ -2,8 +2,8 @@
 train_dataset/**
 input/**
 
-# yaml
-*.yaml
+# model config
+configs/**
 
 # sketches
 sketches/**
@@ -18,7 +18,9 @@ tensorboard/**
 *.pth
 .DS_Store
 wandb/**
+*.yaml
 
 # etc
 .empty/**
 .vscode/**
+.ipynb_checkpoints/**
