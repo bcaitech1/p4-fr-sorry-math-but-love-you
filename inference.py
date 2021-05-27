@@ -1,17 +1,17 @@
-import torch
 import os
-from train import id_to_string
-from metrics import word_error_rate, sentence_acc
-from checkpoint import load_checkpoint
-from torchvision import transforms
-from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
-from flags import Flags
-from utils import get_network, get_optimizer
-import csv
-from torch.utils.data import DataLoader
 import argparse
 import random
 from tqdm import tqdm
+import csv
+import torch
+from torchvision import transforms
+from torch.utils.data import DataLoader
+
+from metrics import word_error_rate, sentence_acc
+from checkpoint import load_checkpoint
+from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
+from flags import Flags
+from utils import id_to_string, get_network, get_optimizer
 
 
 def main(parser):
@@ -88,7 +88,8 @@ def main(parser):
         for path, predicted in zip(d["file_path"], sequence_str):
             results.append((path, predicted))
 
-    with open("submission.txt", "w") as w:
+    os.makedirs(parser.output_dir, exist_ok=True)
+    with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
         for path, predicted in results:
             w.write(path + "\t" + predicted + "\n")
 
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="",
+        default="./log/satrn/checkpoints/0015.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -112,16 +113,29 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=16,
+        default=8,
         type=int,
         help="batch size when doing inference",
     )
+
+    eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
+    file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
     parser.add_argument(
         "--file_path",
         dest="file_path",
-        default="",
+        default=file_path,
         type=str,
         help="file path when doing inference",
     )
+
+    output_dir = os.environ.get('SM_OUTPUT_DATA_DIR', 'submit')
+    parser.add_argument(
+        "--output_dir",
+        dest="output_dir",
+        default=output_dir,
+        type=str,
+        help="output directory",
+    )
+
     parser = parser.parse_args()
     main(parser)

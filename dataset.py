@@ -1,11 +1,10 @@
-import csv
 import os
+import csv
 import random
 from typing import *
-import torch
 from PIL import Image, ImageOps
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
+import torch
+from torch.utils.data import Dataset, DataLoader
 
 START = "<SOS>"
 END = "<EOS>"

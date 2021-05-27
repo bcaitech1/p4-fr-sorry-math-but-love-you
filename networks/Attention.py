@@ -1,9 +1,9 @@
+import math
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import math
-import random
 
 from dataset import START, PAD
 
@@ -97,7 +97,6 @@ class AttentionCell(nn.Module):
         self.h2h = nn.Linear(
             hidden_dim, hidden_dim
         )  # either i2i or h2h should have bias <- why?
-
         self.score = nn.Linear(hidden_dim, 1, bias=False) # to get attention logit
         if num_layers == 1:
             if cell_type == 'LSTM':

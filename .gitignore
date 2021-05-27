@@ -1,9 +1,11 @@
 # data
 train_dataset/**
 input/**
+submission.txt
+submit/**
 
-# yaml
-*.yaml
+# model config
+configs/**
 
 # sketches
 sketches/**
@@ -17,7 +19,10 @@ checkpoints/**
 tensorboard/**
 *.pth
 .DS_Store
+wandb/**
+*.yaml
 
 # etc
 .empty/**
 .vscode/**
+.ipynb_checkpoints/**

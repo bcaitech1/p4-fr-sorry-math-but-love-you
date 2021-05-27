@@ -1,17 +1,20 @@
 import os
 import argparse
-import multiprocessing
-import numpy as np
 import random
 import time
+from tqdm import tqdm
+import yaml
 import shutil
+from psutil import virtual_memory
+import multiprocessing
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
-import yaml
-from tqdm import tqdm
-import wandb
+import wandb # added
+os.environ["WANDB_LOG_MODEL"] = "true"
+os.environ["WANDB_WATCH"] = "all"
 
 from checkpoint import (
     default_checkpoint,
@@ -19,38 +22,20 @@ from checkpoint import (
     save_checkpoint,
     init_tensorboard,
     write_tensorboard,
+    write_wandb # added
 )
-from psutil import virtual_memory
 
 from flags import Flags
-from utils import get_network, get_optimizer
+from utils import (
+    set_seed, 
+    print_system_envs, 
+    get_optimizer, 
+    get_network, 
+    id_to_string
+    )
 from dataset import dataset_loader, START, PAD,load_vocab
 from scheduler import CircularLRBeta
-
-from metrics import word_error_rate,sentence_acc
-
-def id_to_string(tokens, data_loader, do_eval=0):
-    result = []
-    if do_eval:
-        special_ids = [data_loader.dataset.token_to_id["<PAD>"], data_loader.dataset.token_to_id["<SOS>"],
-                       data_loader.dataset.token_to_id["<EOS>"]]
-
-    for example in tokens:
-        string = ""
-        if do_eval:
-            for token in example:
-                token = token.item()
-                if token not in special_ids:
-                    if token != -1:
-                        string += data_loader.dataset.id_to_token[token] + " "
-        else:
-            for token in example:
-                token = token.item()
-                if token != -1:
-                    string += data_loader.dataset.id_to_token[token] + " "
-
-        result.append(string)
-    return result
+from metrics import word_error_rate, sentence_acc
 
 def run_epoch(
     data_loader,
@@ -75,10 +60,10 @@ def run_epoch(
     grad_norms = []
     correct_symbols = 0
     total_symbols = 0
-    wer=0
-    num_wer=0
-    sent_acc=0
-    num_sent_acc=0
+    wer = 0
+    num_wer = 0
+    sent_acc = 0
+    num_sent_acc = 0
 
     with tqdm(
         desc="{} ({})".format(epoch_text, "Train" if train else "Validation"),
@@ -166,14 +151,10 @@ def main(config_file):
     Train math formula recognition model
     """
     options = Flags(config_file).get()
-
-    #set random seed
-    torch.manual_seed(options.seed)
-    np.random.seed(options.seed)
-    random.seed(options.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
+    
+    # set random seed
+    set_seed(seed=options.seed)
+    
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
@@ -181,15 +162,7 @@ def main(config_file):
     print("Running {} on device {}\n".format(options.network, device))
 
     # Print system environments
-    num_gpus = torch.cuda.device_count()
-    num_cpus = os.cpu_count()
-    mem_size = virtual_memory().available // (1024 ** 3)
-    print(
-        "[+] System environments\n",
-        "The number of gpus : {}\n".format(num_gpus),
-        "The number of cpus : {}\n".format(num_cpus),
-        "Memory Size : {}G\n".format(mem_size),
-    )
+    print_system_envs() 
 
     # Load checkpoint and print result
     checkpoint = (
@@ -197,6 +170,7 @@ def main(config_file):
         if options.checkpoint != ""
         else default_checkpoint
     )
+
     model_checkpoint = checkpoint["model"]
     if model_checkpoint:
         print(
@@ -234,7 +208,7 @@ def main(config_file):
         "The number of classes : {}\n".format(len(train_dataset.token_to_id)),
     )
 
-    # Get loss, model
+    # define model
     model = get_network(
         options.network,
         options,
@@ -243,7 +217,11 @@ def main(config_file):
         train_dataset,
     )
     model.train()
+
+    # define loss
     criterion = model.criterion.to(device)
+
+    # define optimizer
     enc_params_to_optimise = [
         param for param in model.encoder.parameters() if param.requires_grad
     ]
@@ -262,7 +240,6 @@ def main(config_file):
         ),
     )
 
-    # Get optimizer
     optimizer = get_optimizer(
         options.optimizer.optimizer,
         params_to_optimise,
@@ -286,7 +263,10 @@ def main(config_file):
             gamma=options.optimizer.lr_factor,
         )
 
-    # Log
+    # Log for W&B
+    wandb.config.update(dict(options._asdict())) # logging to W&B
+
+    # Log for tensorboard
     if not os.path.exists(options.prefix):
         os.makedirs(options.prefix)
     log_file = open(os.path.join(options.prefix, "log.txt"), "w")
@@ -296,11 +276,11 @@ def main(config_file):
     writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
-    train_sentence_accuracy=checkpoint["train_sentence_accuracy"]
-    train_wer=checkpoint["train_wer"]
+    train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
+    train_wer = checkpoint["train_wer"]
     train_losses = checkpoint["train_losses"]
     validation_symbol_accuracy = checkpoint["validation_symbol_accuracy"]
-    validation_sentence_accuracy=checkpoint["validation_sentence_accuracy"]
+    validation_sentence_accuracy = checkpoint["validation_sentence_accuracy"]
     validation_wer=checkpoint["validation_wer"]
     validation_losses = checkpoint["validation_losses"]
     learning_rates = checkpoint["lr"]
@@ -377,13 +357,13 @@ def main(config_file):
         validation_wer.append(validation_epoch_wer)
 
         # Save checkpoint
-        #make config
+        # make config
         with open(config_file, 'r') as f:
             option_dict = yaml.safe_load(f)
 
         save_checkpoint(
-            {
-                "epoch": start_epoch + epoch + 1,
+            checkpoint={
+                "epoch": start_epoch+epoch+1,
                 "train_losses": train_losses,
                 "train_symbol_accuracy": train_symbol_accuracy,
                 "train_sentence_accuracy": train_sentence_accuracy,
@@ -434,24 +414,47 @@ def main(config_file):
             )
             print(output_string)
             log_file.write(output_string + "\n")
+
             write_tensorboard(
-                writer,
-                start_epoch + epoch + 1,
-                train_result["grad_norm"],
-                train_result["loss"],
-                train_epoch_symbol_accuracy,
-                train_epoch_sentence_accuracy,
-                train_epoch_wer,
-                validation_result["loss"],
-                validation_epoch_symbol_accuracy,
-                validation_epoch_sentence_accuracy,
-                validation_epoch_wer,
-                model,
+                writer=writer,
+                epoch=start_epoch+epoch +1,
+                grad_norm=train_result["grad_norm"],
+                train_loss=train_result["loss"],
+                train_symbol_accuracy=train_epoch_symbol_accuracy,
+                train_sentence_accuracy=train_epoch_sentence_accuracy,
+                train_wer=train_epoch_wer,
+                validation_loss=validation_result["loss"],
+                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                validation_wer=validation_epoch_wer,
+                model=model
             )
+            write_wandb(
+                epoch=start_epoch+epoch +1,
+                grad_norm=train_result["grad_norm"],
+                train_loss=train_result["loss"],
+                train_symbol_accuracy=train_epoch_symbol_accuracy,
+                train_sentence_accuracy=train_epoch_sentence_accuracy,
+                train_wer=train_epoch_wer,
+                validation_loss=validation_result["loss"],
+                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                validation_wer=validation_epoch_wer,
+                )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--project_name',
+        default='MathOCR-iloveslowfood',
+        help='WandB에서 사용할 자신의 프로젝트 이름(MathOCR-준구의실험교실 등)'
+    )
+    parser.add_argument(
+        '--exp_name',
+        default='semi-aster',
+        help='실험 이름(SATRN-베이스라인, SARTN-Loss변경 등)'
+    )
     parser.add_argument(
         "-c",
         "--config_file",
@@ -461,4 +464,14 @@ if __name__ == "__main__":
         help="Path of configuration file",
     )
     parser = parser.parse_args()
+
+    # initilaize W&B
+    run = wandb.init(project=parser.project_name, name=parser.exp_name)
+
+    # train
     main(parser.config_file)
+
+    # fishe W&B
+    run.finish()
+
+    
