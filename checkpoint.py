@@ -98,7 +98,7 @@ def write_wandb(
     validation_symbol_accuracy,
     validation_sentence_accuracy,
     validation_wer,
-    scheduler,
+    # scheduler,
 ): 
     wandb.log(
         dict(
@@ -115,5 +115,5 @@ def write_wandb(
             )
             )
 
-    for learning_rate in scheduler.get_lr():
-        wandb.log({"encoder_learning_rate": learning_rate})
+    # for learning_rate in scheduler.get_lr():
+    #     wandb.log({"encoder_learning_rate": learning_rate})

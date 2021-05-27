@@ -107,6 +107,10 @@ def run_epoch(
                 lr_scheduler.step()
                 optimizer.step()
 
+                # log lr
+                for learning_rate in lr_scheduler.get_lr():
+                    wandb.log({"encoder_learning_rate": learning_rate})
+
             losses.append(loss.item())
             
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -443,7 +447,7 @@ def main(config_file):
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                scheduler=lr_scheduler
+                # scheduler=lr_scheduler
                 )
 
 
