@@ -1,17 +1,18 @@
 import os
 import argparse
-import multiprocessing
-import numpy as np
 import random
 import time
+from tqdm import tqdm
+import yaml
 import shutil
+from psutil import virtual_memory
+import multiprocessing
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import transforms
-import yaml
-from tqdm import tqdm
-import wandb
+import wandb # added
 
 from checkpoint import (
     default_checkpoint,
@@ -19,9 +20,8 @@ from checkpoint import (
     save_checkpoint,
     init_tensorboard,
     write_tensorboard,
-    write_wandb
+    write_wandb # added
 )
-from psutil import virtual_memory
 
 from flags import Flags
 from utils import set_seed, print_system_envs
@@ -29,16 +29,13 @@ from dataset import dataset_loader, START, PAD,load_vocab
 from scheduler import CircularLRBeta
 from optimizer import get_optimizer
 from model import get_network
-from metrics import word_error_rate,sentence_acc
+from metrics import word_error_rate, sentence_acc
 
-def id_to_string(tokens, data_loader, do_eval=0):
+def id_to_string(tokens, data_loader,do_eval=0):
     result = []
     if do_eval:
-        special_ids = [
-            data_loader.dataset.token_to_id["<PAD>"],
-            data_loader.dataset.token_to_id["<SOS>"],
-            data_loader.dataset.token_to_id["<EOS>"]
-            ]
+        special_ids = [data_loader.dataset.token_to_id["<PAD>"], data_loader.dataset.token_to_id["<SOS>"],
+                       data_loader.dataset.token_to_id["<EOS>"]]
 
     for example in tokens:
         string = ""
@@ -46,7 +43,7 @@ def id_to_string(tokens, data_loader, do_eval=0):
             for token in example:
                 token = token.item()
                 if token not in special_ids:
-                    if token != -1: # -1이 뭐지
+                    if token != -1:
                         string += data_loader.dataset.id_to_token[token] + " "
         else:
             for token in example:
@@ -85,20 +82,12 @@ def run_epoch(
     sent_acc = 0
     num_sent_acc = 0
 
-    # for logging
-    losses_log = []
-    wer_log = 0
-    num_wer_log = 0
-    sent_acc_log = 0
-    num_sent_acc_log = 0
-
     with tqdm(
         desc="{} ({})".format(epoch_text, "Train" if train else "Validation"),
         total=len(data_loader.dataset),
         dynamic_ncols=True,
         leave=False,
     ) as pbar:
-
         for d in data_loader:
             input = d["image"].to(device)
 
@@ -136,12 +125,11 @@ def run_epoch(
                 optimizer.step()
 
             losses.append(loss.item())
-            losses_log.append(loss.item())
             
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
             expected_str = id_to_string(expected, data_loader,do_eval=1)
             sequence_str = id_to_string(sequence, data_loader,do_eval=1)
-            wer += word_error_rate(sequence_str, expected_str)
+            wer += word_error_rate(sequence_str,expected_str)
             num_wer += 1
             sent_acc += sentence_acc(sequence_str,expected_str)
             num_sent_acc += 1
@@ -283,7 +271,6 @@ def main(config_file):
         ),
     )
 
-    # Get optimizer
     optimizer = get_optimizer(
         options.optimizer.optimizer,
         params_to_optimise,
@@ -398,7 +385,7 @@ def main(config_file):
         validation_wer.append(validation_epoch_wer)
 
         # Save checkpoint
-        #make config
+        # make config
         with open(config_file, 'r') as f:
             option_dict = yaml.safe_load(f)
 
@@ -456,30 +443,30 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
             write_tensorboard(
-                writer,
-                start_epoch + epoch + 1,
-                train_result["grad_norm"],
-                train_result["loss"],
-                train_epoch_symbol_accuracy,
-                train_epoch_sentence_accuracy,
-                train_epoch_wer,
-                validation_result["loss"],
-                validation_epoch_symbol_accuracy,
-                validation_epoch_sentence_accuracy,
-                validation_epoch_wer,
-                model,
+                writer=writer,
+                epoch=start_epoch+epoch +1,
+                grad_norm=train_result["grad_norm"],
+                train_loss=train_result["loss"],
+                train_symbol_accuracy=train_epoch_symbol_accuracy,
+                train_sentence_accuracy=train_epoch_sentence_accuracy,
+                train_wer=train_epoch_wer,
+                validation_loss=validation_result["loss"],
+                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                validation_wer=validation_epoch_wer,
+                model=model,
             )
             write_wandb(
-                start_epoch + epoch + 1,
-                train_result["grad_norm"],
-                train_result["loss"],
-                train_epoch_symbol_accuracy,
-                train_epoch_sentence_accuracy,
-                train_epoch_wer,
-                validation_result["loss"],
-                validation_epoch_symbol_accuracy,
-                validation_epoch_sentence_accuracy,
-                validation_epoch_wer
+                epoch=start_epoch+epoch +1,
+                grad_norm=train_result["grad_norm"],
+                train_loss=train_result["loss"],
+                train_symbol_accuracy=train_epoch_symbol_accuracy,
+                train_sentence_accuracy=train_epoch_sentence_accuracy,
+                train_wer=train_epoch_wer,
+                validation_loss=validation_result["loss"],
+                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                validation_wer=validation_epoch_wer
                 )
 
 
@@ -488,12 +475,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '--project_name',
         default='MathOCR-iloveslowfood',
-        help='WandB에서 사용할 자신의 프로젝트 이름. MathOCR-준구의실험교실 등'
+        help='WandB에서 사용할 자신의 프로젝트 이름(MathOCR-준구의실험교실 등)'
     )
     parser.add_argument(
         '--exp_name',
         default='semi-aster',
-        help='실험 이름. SATRN-v1, SARTN-Loss변경 등'
+        help='실험 이름(SATRN-v1, SARTN-Loss변경 등)'
     )
     parser.add_argument(
         "-c",
@@ -508,6 +495,7 @@ if __name__ == "__main__":
     wandb.init(project=parser.project_name)
     wandb.run.name = parser.exp_name
 
+    # turn into train phase
     main(parser.config_file)
 
     

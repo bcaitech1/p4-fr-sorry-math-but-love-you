@@ -2,8 +2,8 @@ import csv
 import os
 import random
 from typing import *
-import torch
 from PIL import Image, ImageOps
+import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 

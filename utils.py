@@ -4,7 +4,6 @@ from psutil import virtual_memory
 import numpy as np
 import torch
 import torch.optim as optim
-
 from networks.Attention import Attention
 
 
