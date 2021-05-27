@@ -176,7 +176,7 @@ class LoadDataset(Dataset):
         #     image = image.crop(bounding_box)
 
         if self.preprocessing:
-            image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
+            # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
             h, w = image.shape
             if h / w > 2:
                 image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
@@ -254,7 +254,7 @@ class LoadEvalDataset(Dataset):
         #     image = image.crop(bounding_box)
 
         if self.preprocessing:
-            image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
+            # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
             h, w = image.shape
             if h / w > 2:
                 image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
@@ -290,7 +290,7 @@ def dataset_loader(options, train_transform, valid_transform):
     # Load data
     train_dataset = LoadDataset(
         # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
-        train_data, options.data.token_paths, crop=optionos.data.crop, transform=train_transform, rgb=options.data.rgb
+        train_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
     )
     train_data_loader = DataLoader(
         train_dataset,
@@ -302,7 +302,7 @@ def dataset_loader(options, train_transform, valid_transform):
 
     valid_dataset = LoadDataset(
         # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
-        valid_data, options.data.token_paths, crop=optionos.data.crop, transform=valid_transform, rgb=options.data.rgb
+        valid_data, options.data.token_paths, crop=options.data.crop, transform=valid_transform, rgb=options.data.rgb
     )
     valid_data_loader = DataLoader(
         valid_dataset,

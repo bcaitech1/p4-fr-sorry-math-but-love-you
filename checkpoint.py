@@ -27,7 +27,7 @@ def save_checkpoint(checkpoint, dir="./checkpoints", prefix=""):
     # Padded to 4 digits because of lexical sorting of numbers.
     # e.g. 0009.pth
     # filename = "{num:0>4}.pth".format(num=checkpoint["epoch"])
-    filename = f"{checkpoints['network']}_best_model.pth"
+    filename = f"{checkpoint['network']}_best_model.pth"
     if not os.path.exists(os.path.join(prefix, dir)):
         os.makedirs(os.path.join(prefix, dir))
     torch.save(checkpoint, os.path.join(prefix, dir, filename))

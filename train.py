@@ -13,8 +13,8 @@ from torch.cuda.amp import autocast, GradScaler
 import yaml
 from tqdm import tqdm
 import wandb
-import albumentations as a
-from albumentations.pytorch import TensorV2
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 from checkpoint import (
     default_checkpoint,
@@ -70,7 +70,7 @@ def train_one_epoch(data_loader, model, epoch_text, criterion, optimizer, lr_sch
 
     with tqdm(desc=f"{epoch_text} Train", total=len(data_loader.dataset), dynamic_ncols=True, leave=False) as pbar:
         for d in data_loader:
-            input = d["image"].to(device)
+            input = d["image"].to(device).float()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -112,14 +112,15 @@ def train_one_epoch(data_loader, model, epoch_text, criterion, optimizer, lr_sch
             total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
             pbar.update(curr_batch_size)
-        lr_scheduler.step()
+    lr_scheduler.step()
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
-    print("-" * 10 + "GT train")
-    print(*expected[:3], sep="\n")
-    print("-" * 10 + "PR train")
-    print(*sequence[:3], sep="\n")
+    # print("-" * 10 + "GT train")
+    # print(*expected[:3], sep="\n")
+    # print("-" * 10 + "PR train")
+    # print(*sequence[:3], sep="\n")
+    print(f"{lr_scheduler.get_lr()[0]}\n")
 
     result = {
         "loss": np.mean(losses),
@@ -138,7 +139,7 @@ def train_one_epoch(data_loader, model, epoch_text, criterion, optimizer, lr_sch
 
     return result
 
-def valid_one_epoch(data_loader, model, epoch_text, criterion, device):
+def valid_one_epoch(data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio):
     model.eval()
 
     losses = []
@@ -151,16 +152,16 @@ def valid_one_epoch(data_loader, model, epoch_text, criterion, device):
 
     with tqdm(desc=f"{epoch_text} Validation", total=len(data_loader.dataset), dynamic_ncols=True, leave=False) as pbar:
         for d in data_loader:
-            input = d["image"].to(device)
+            input = d["image"].to(device).float()
 
-            cur_batch_size = len(input)
+            curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
 
             expected[expected==-1] = data_loader.dataset.token_to_id[PAD]
 
             output = model(input, expected, False, teacher_forcing_ratio)
 
-            decoded_values = ouput.transpose(1, 2)
+            decoded_values = output.transpose(1, 2)
             _, sequence = torch.topk(decoded_values, 1, dim=1)
             sequence = sequence.squeeze(1)
 
@@ -182,10 +183,10 @@ def valid_one_epoch(data_loader, model, epoch_text, criterion, device):
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
-    print("-" * 10 + "GT valid")
-    print(*expected[:3], sep="\n")
-    print("-" * 10 + "PR valid")
-    print(*sequence[:3], sep="\n")
+    # print("-" * 10 + "GT valid")
+    # print(*expected[:3], sep="\n")
+    # print("-" * 10 + "PR valid")
+    # print(*sequence[:3], sep="\n")
 
     result = {
         "loss": np.mean(losses),
@@ -316,17 +317,21 @@ def seed_everything(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-def get_train_transforms():
+def get_train_transforms(height, width):
     return A.Compose([
+        A.Resize(height, width),
         A.Compose([
             A.HorizontalFlip(p=1),
             A.VerticalFlip(p=1)
         ],p=0.5),
-        TensorV2(),
+        ToTensorV2(p = 1.0),
     ],p=1.0)
 
-def get_valid_transforms():
-    return TensorV2()
+def get_valid_transforms(height, width):
+    return A.Compose([
+        A.Resize(height, width),
+        ToTensorV2(p = 1.0)
+        ])
 
 def main(config_file):
     """
@@ -396,7 +401,7 @@ def main(config_file):
     # )
 
 
-    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, train_transform=get_train_transforms(), valid_transform=get_valid_transforms())
+    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, train_transform=get_train_transforms(options.input_size.height, options.input_size.width), valid_transform=get_valid_transforms(options.input_size.height, options.input_size.width))
     print(
         "[+] Data\n",
         "The number of train samples : {}\n".format(len(train_dataset)),
@@ -553,7 +558,7 @@ def main(config_file):
         #     train=False,
         # )
 
-        validation_result = valid_one_epoch(validation_data_loader, model, epoch_text, criterion, device)
+        validation_result = valid_one_epoch(validation_data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio=options.teacher_forcing_ratio)
 
         validation_losses.append(validation_result["loss"])
         validation_epoch_symbol_accuracy = (
@@ -586,7 +591,7 @@ def main(config_file):
                     "validation_symbol_accuracy": validation_symbol_accuracy,
                     "validation_sentence_accuracy":validation_sentence_accuracy,
                     "validation_wer":validation_wer,
-                    "lr": learning_rates,
+                    "lr": epoch_lr,
                     "grad_norm": grad_norms,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
@@ -652,7 +657,7 @@ if __name__ == "__main__":
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/Attention.yaml",
+        default="/opt/ml/p4-fr-sorry-math-but-love-you/configs/SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )
