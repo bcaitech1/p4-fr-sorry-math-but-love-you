@@ -24,7 +24,6 @@ from checkpoint import (
     write_tensorboard,
     write_wandb # added
 )
-
 from flags import Flags
 from utils import (
     set_seed, 
@@ -35,7 +34,7 @@ from utils import (
     )
 from dataset import dataset_loader, START, PAD,load_vocab
 from scheduler import CircularLRBeta
-from metrics import word_error_rate, sentence_acc
+from metrics import word_error_rate, sentence_acc, final_metric
 
 def run_epoch(
     data_loader,
@@ -108,8 +107,7 @@ def run_epoch(
                 optimizer.step()
 
                 # log lr
-                for learning_rate in lr_scheduler.get_lr():
-                    wandb.log({"encoder_learning_rate": learning_rate})
+                wandb.log({"learning_rate": lr_scheduler.get_lr()})
 
             losses.append(loss.item())
             
@@ -269,7 +267,6 @@ def main(config_file):
             step_size=options.optimizer.lr_epochs,
             gamma=options.optimizer.lr_factor,
         )
-
     # Log for W&B
     wandb.config.update(dict(options._asdict())) # logging to W&B
 
@@ -333,6 +330,8 @@ def main(config_file):
                 train_result["wer"] / train_result["num_wer"]
         )
         train_wer.append(train_epoch_wer)
+        ### 추가추가
+        train_epoch_score = final_metric(sentence_acc=train_epoch_sentence_accuracy, word_error_rate=train_epoch_wer)
         epoch_lr = lr_scheduler.get_lr()  # cycle
 
         # Validation
@@ -362,6 +361,8 @@ def main(config_file):
                 validation_result["wer"] / validation_result["num_wer"]
         )
         validation_wer.append(validation_epoch_wer)
+        # 추가추가
+        validation_epoch_score = final_metric(sentence_acc=validation_epoch_sentence_accuracy, word_error_rate=validation_epoch_wer)
 
         # Save checkpoint
         # make config
@@ -378,6 +379,7 @@ def main(config_file):
                 "validation_losses": validation_losses,
                 "validation_symbol_accuracy": validation_symbol_accuracy,
                 "validation_sentence_accuracy":validation_sentence_accuracy,
+                "validation_score": validation_score,
                 "validation_wer":validation_wer,
                 "lr": learning_rates,
                 "grad_norm": grad_norms,
@@ -443,11 +445,12 @@ def main(config_file):
                 train_symbol_accuracy=train_epoch_symbol_accuracy,
                 train_sentence_accuracy=train_epoch_sentence_accuracy,
                 train_wer=train_epoch_wer,
+                train_score=train_epoch_score, ### 추가추가
                 validation_loss=validation_result["loss"],
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                # scheduler=lr_scheduler
+                validation_score=validation_epoch_score ### 추가추가
                 )
 
 
