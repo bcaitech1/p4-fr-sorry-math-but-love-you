@@ -1,6 +1,7 @@
 import os
 import torch
 from tensorboardX import SummaryWriter
+import wandb
 
 use_cuda = torch.cuda.is_available()
 
@@ -85,4 +86,31 @@ def write_tensorboard(
         if param.grad is not None:
             writer.add_histogram(
                 "decoder/{}/grad".format(name), param.grad.detach().cpu().numpy(), epoch
+            )
+
+def write_wandb(
+    epoch,
+    grad_norm,
+    train_loss,
+    train_symbol_accuracy,
+    train_sentence_accuracy,
+    train_wer,
+    validation_loss,
+    validation_symbol_accuracy,
+    validation_sentence_accuracy,
+    validation_wer,
+): 
+    wandb.log(
+        dict(
+            epoch=epoch,
+            train_loss=train_loss,
+            train_symbol_accuracy=train_symbol_accuracy,
+            train_sentence_accuracy=train_sentence_accuracy,
+            train_wer=train_wer,
+            validation_loss=validation_loss,
+            validation_symbol_accuracy=validation_symbol_accuracy,
+            validation_sentence_accuracy=validation_sentence_accuracy,
+            validation_wer=validation_wer,
+            grad_norm=grad_norm
+            )
             )
