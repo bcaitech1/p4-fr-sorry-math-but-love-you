@@ -154,6 +154,8 @@ def main(config_file):
     
     # set random seed
     set_seed(seed=options.seed)
+
+    
     
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
@@ -220,6 +222,7 @@ def main(config_file):
 
     # define loss
     criterion = model.criterion.to(device)
+    criterion = get_criterion(options.loss)
 
     # define optimizer
     enc_params_to_optimise = [
@@ -447,19 +450,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--project_name',
-        default='MathOCR-iloveslowfood',
+        default='SATRN',
         help='WandB에서 사용할 자신의 프로젝트 이름(MathOCR-준구의실험교실 등)'
     )
     parser.add_argument(
         '--exp_name',
-        default='semi-aster',
+        default='baseline-iloveslowfood',
         help='실험 이름(SATRN-베이스라인, SARTN-Loss변경 등)'
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/Attention.yaml",
+        default="./configs/SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )
