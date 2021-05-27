@@ -21,4 +21,4 @@ def sentence_acc(predicted_outputs, ground_truths):
 	for output,ground_truth in zip(predicted_outputs,ground_truths):
 		if np.array_equal(output,ground_truth):
 			correct_sentences+=1
-	return correct_sentences / len(predicted_outputs)`
+	return correct_sentences / len(predicted_outputs)
