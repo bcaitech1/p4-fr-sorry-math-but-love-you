@@ -104,7 +104,7 @@ def train_one_epoch(data_loader, model, epoch_text, criterion, optimizer, lr_sch
             optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
-            
+
             grad_norm = nn.utils.clip_grad_norm_(
                 optim_params, max_norm=max_grad_norm
             )
@@ -514,7 +514,7 @@ def main(config_file):
 
     scaler = GradScaler()
 
-    best_sentence_acc = 0.0
+    best_score = 0.0
 
     # Train
     for epoch in range(options.num_epochs):
@@ -595,7 +595,7 @@ def main(config_file):
         # make config
         with open(config_file, 'r') as f:
             option_dict = yaml.safe_load(f)
-        if best_sentence_acc < validation_epoch_sentence_accuracy:
+        if best_sentence_acc < 0.9*validation_epoch_sentence_accuracy + 0.1*(1-validation_epoch_wer):
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
