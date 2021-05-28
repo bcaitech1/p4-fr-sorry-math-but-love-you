@@ -352,7 +352,7 @@ def main(config_file):
                 optimizer, patience=options.schduler.patience
             )
         elif options.scheduler.scheduler == "StepLR":
-            lr_scheduler = lr_scheduler = optim.lr_scheduler.StepLR(
+            lr_scheduler = optim.lr_scheduler.StepLR(
                 optimizer,
                 step_size=options.optimizer.lr_epochs,
                 gamma=options.optimizer.lr_factor,
@@ -364,6 +364,8 @@ def main(config_file):
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
+    if checkpoint['scheduler']:
+        lr_scheduler.load_state_dict(checkpoint['scheduler'])
 
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
@@ -486,6 +488,7 @@ def main(config_file):
                     "token_to_id": train_data_loader.dataset.token_to_id,
                     "id_to_token": train_data_loader.dataset.id_to_token,
                     "network": options.network,
+                    "scheduler": lr_scheduler.state_dict(),
                 },
                 prefix=options.prefix,
             )
@@ -560,7 +563,7 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="Attention", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
@@ -571,7 +574,7 @@ if __name__ == "__main__":
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/SATRN.yaml",
+        default="./configs/Attention.yaml",
         type=str,
         help="Path of configuration file",
     )

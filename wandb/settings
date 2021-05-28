@@ -1,0 +1,5 @@
+[default]
+entity = smbly
+project = Attention
+base_url = https://api.wandb.ai
+
