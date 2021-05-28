@@ -380,12 +380,13 @@ def main(config_file):
                 "validation_losses": validation_losses,
                 "validation_symbol_accuracy": validation_symbol_accuracy,
                 "validation_sentence_accuracy":validation_sentence_accuracy,
-                "validation_score": validation_score,
+                "validation_score": validation_epoch_score,
                 "validation_wer":validation_wer,
                 "lr": learning_rates,
                 "grad_norm": grad_norms,
                 "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
+                "scheduler": lr_scheduler, 
                 "configs": option_dict,
                 "token_to_id":train_data_loader.dataset.token_to_id,
                 "id_to_token":train_data_loader.dataset.id_to_token
@@ -446,12 +447,12 @@ def main(config_file):
                 train_symbol_accuracy=train_epoch_symbol_accuracy,
                 train_sentence_accuracy=train_epoch_sentence_accuracy,
                 train_wer=train_epoch_wer,
-                train_score=train_epoch_score, ### 추가추가
+                train_score=train_epoch_score,
                 validation_loss=validation_result["loss"],
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                validation_score=validation_epoch_score ### 추가추가
+                validation_score=validation_epoch_score
                 )
 
 
@@ -464,7 +465,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '--exp_name',
-        default='baseline-iloveslowfood',
+        default='baseline-resume-ep21-iloveslowfood',
         help='실험 이름(SATRN-베이스라인, SARTN-Loss변경 등)'
     )
     parser.add_argument(
