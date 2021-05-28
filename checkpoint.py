@@ -100,7 +100,7 @@ def write_wandb(
     validation_symbol_accuracy,
     validation_sentence_accuracy,
     validation_wer,
-    validation_score,
+    validation_score
 ): 
     wandb.log(
         dict(
@@ -109,12 +109,12 @@ def write_wandb(
             train_symbol_accuracy=train_symbol_accuracy,
             train_sentence_accuracy=train_sentence_accuracy,
             train_wer=train_wer,
-            train_score=train_score, ### 추가추가
+            train_score=train_score,
             validation_loss=validation_loss,
             validation_symbol_accuracy=validation_symbol_accuracy,
             validation_sentence_accuracy=validation_sentence_accuracy,
             validation_wer=validation_wer,
-            validation_score=validation_score, ### 추가추가
+            validation_score=validation_score
             grad_norm=grad_norm
         )
     )
