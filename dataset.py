@@ -11,7 +11,12 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import torch
 from torch.utils.data import Dataset, DataLoader
+<<<<<<< Updated upstream
 
+=======
+import pandas as pd
+import numpy as np
+>>>>>>> Stashed changes
 
 START = "<SOS>"
 END = "<EOS>"
@@ -203,15 +208,10 @@ class LoadDataset(Dataset):
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
 
-        # if self.preprocessing:
-        #     # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
-        #     h, w = image.shape
-        #     if h / w > 2:
-        #         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
 
         if self.transform:
             w, h = image.size
-            if w / h > 2:
+            if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
             # image = self.transform(image)
@@ -294,7 +294,7 @@ class LoadEvalDataset(Dataset):
         if self.transform:
             # image = self.transform(image)
             w, h = image.size
-            if w / h > 2:
+            if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
             image = self.transform(image=image)['image']
