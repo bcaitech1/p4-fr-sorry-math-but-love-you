@@ -112,6 +112,9 @@ def train_one_epoch(
             pbar.update(curr_batch_size)
             lr_scheduler.step()
 
+            # lr logging
+            wandb.log({"learning_rate": lr_scheduler.get_lr()})
+
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
 
