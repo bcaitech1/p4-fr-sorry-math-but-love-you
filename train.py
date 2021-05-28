@@ -331,7 +331,8 @@ def main(config_file):
             optimizer.load_state_dict(optimizer_state)
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
-            T_0=options.num_epochs,
+            # T_0=options.num_epochs,
+            T_0=len(train_data_loader) * options.num_epochs,
             T_mult=1,
             eta_max=options.optimizer.lr,
             T_up=2,
