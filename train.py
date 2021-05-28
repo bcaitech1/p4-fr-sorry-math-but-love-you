@@ -84,7 +84,7 @@ def train_one_epoch(data_loader, model, epoch_text, criterion, optimizer, lr_sch
 
     with tqdm(desc=f"{epoch_text} Train", total=len(data_loader.dataset), dynamic_ncols=True, leave=False) as pbar:
         for d in data_loader:
-            input = d["image"].to(device)
+            input = d["image"].to(device).float()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -167,7 +167,7 @@ def valid_one_epoch(data_loader, model, epoch_text, criterion, device, teacher_f
 
     with tqdm(desc=f"{epoch_text} Validation", total=len(data_loader.dataset), dynamic_ncols=True, leave=False) as pbar:
         for d in data_loader:
-            input = d["image"].to(device)
+            input = d["image"].to(device).float()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -283,6 +283,9 @@ def run_epoch(
                 # cycle
                 lr_scheduler.step()
                 optimizer.step()
+
+                # log lr 
+                wandb.log({"learning_rate": lr_scheduler.get_lr()})
 
             losses.append(loss.item())
             
@@ -514,7 +517,7 @@ def main(config_file):
 
     scaler = GradScaler()
 
-    best_score = 0.0
+    best_sentence_acc = 0.0
 
     # Train
     for epoch in range(options.num_epochs):
@@ -528,20 +531,20 @@ def main(config_file):
         )
 
         # Train
-        train_result = run_epoch(
-            train_data_loader,
-            model,
-            epoch_text,
-            criterion,
-            optimizer,
-            lr_scheduler,
-            options.teacher_forcing_ratio,
-            options.max_grad_norm,
-            device,
-            train=True,
-        )
+        # train_result = run_epoch(
+        #     train_data_loader,
+        #     model,
+        #     epoch_text,
+        #     criterion,
+        #     optimizer,
+        #     lr_scheduler,
+        #     options.teacher_forcing_ratio,
+        #     options.max_grad_norm,
+        #     device,
+        #     train=True,
+        # )
 
-        # train_result = train_one_epoch(train_data_loader, model, epoch_text, criterion, optimizer, lr_scheduler, options.teacher_forcing_ratio, options.max_grad_norm, device, scaler)
+        train_result = train_one_epoch(train_data_loader, model, epoch_text, criterion, optimizer, lr_scheduler, options.teacher_forcing_ratio, options.max_grad_norm, device, scaler)
 
         train_losses.append(train_result["loss"])
         grad_norms.append(train_result["grad_norm"])
@@ -561,20 +564,20 @@ def main(config_file):
         epoch_lr = lr_scheduler.get_lr()  # cycle
 
         # Validation
-        validation_result = run_epoch(
-            validation_data_loader,
-            model,
-            epoch_text,
-            criterion,
-            optimizer,
-            lr_scheduler,
-            options.teacher_forcing_ratio,
-            options.max_grad_norm,
-            device,
-            train=False,
-        )
+        # validation_result = run_epoch(
+        #     validation_data_loader,
+        #     model,
+        #     epoch_text,
+        #     criterion,
+        #     optimizer,
+        #     lr_scheduler,
+        #     options.teacher_forcing_ratio,
+        #     options.max_grad_norm,
+        #     device,
+        #     train=False,
+        # )
 
-        # validation_result = valid_one_epoch(validation_data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio=options.teacher_forcing_ratio)
+        validation_result = valid_one_epoch(validation_data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio=options.teacher_forcing_ratio)
 
         validation_losses.append(validation_result["loss"])
         validation_epoch_symbol_accuracy = (
@@ -618,6 +621,8 @@ def main(config_file):
                 },
                 prefix=options.prefix,
             )
+            best_sentence_acc = 0.9*validation_epoch_sentence_accuracy + 0.1*(1-validation_epoch_wer)
+            print(f"best sentence acc: {best_sentence_acc}")
             print("model is saved")
 
 
@@ -691,7 +696,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '--exp_name',
-        default='validation_fold2',
+        default='valid_fold3_rgb3',
         help='실험 이름(SATRN-베이스라인, SARTN-Loss변경 등)'
     )
     parser.add_argument(

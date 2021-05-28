@@ -1,6 +1,8 @@
 import os
 import csv
 import random
+import numpy as np
+import pandas as pd
 from typing import *
 from PIL import Image, ImageOps
 import cv2
@@ -8,7 +10,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import torch
 from torch.utils.data import Dataset, DataLoader
-import pandas as pd
+
 
 START = "<SOS>"
 END = "<EOS>"
@@ -85,8 +87,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
-    val_image_names = set(df[df['fold']==2]['image_name'].values)
-    train_image_names = set(df[df['fold']!=2]['image_name'].values)
+    val_image_names = set(df[df['fold']==3]['image_name'].values)
+    train_image_names = set(df[df['fold']!=3]['image_name'].values)
     ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]
