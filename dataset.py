@@ -11,12 +11,6 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import torch
 from torch.utils.data import Dataset, DataLoader
-<<<<<<< Updated upstream
-
-=======
-import pandas as pd
-import numpy as np
->>>>>>> Stashed changes
 
 START = "<SOS>"
 END = "<EOS>"
@@ -30,7 +24,7 @@ def encode_truth(truth, token_to_id):
     truth_tokens = truth.split()
     for token in truth_tokens:
         if token not in token_to_id:
-            raise Exception("Truth contains unknown token")
+            raise Exception(f"{token} Truth contains unknown token")
     truth_tokens = [token_to_id[x] for x in truth_tokens]
     if '' in truth_tokens: truth_tokens.remove('')
     return truth_tokens
@@ -72,7 +66,19 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         (1) split할 경우(test_percent != None): (학습용 이미지 경로, GT) 리스트, (검증용 이미지 경로, GT) 리스트
         (2) split하지 않을 경우(test_percent == None): (학습용 이미지 경로, GT) 리스트
     """
+    root = os.path.join(os.path.dirname(groundtruth), "images")
+    ####----------------------
+    print(root)
+    print(os.path.dirname(groundtruth))
+    df = pd.read_csv('/opt/ml/input/data/formula_images_processed/total_df.csv')
+
+    df['image'] = '/opt/ml/input/data/formula_images_processed/images/' + df['image']
+    data = [[df.iloc[i].values.tolist()[1], df.iloc[i].values.tolist()[0]] for i in range(len(df))]
+    return data[:85000], data[85000:]
+
     # root = os.path.join(os.path.dirname(groundtruth), "images")
+    # df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'total_df.csv'))
+
     # with open(groundtruth, "r") as fd:
     #     data=[]
     #     for line in fd:
@@ -88,27 +94,27 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     # else:
     #     return data
 
-    root = os.path.join(os.path.dirname(groundtruth), "images")
-    ####----------------------
-    print(root)
-    print(os.path.dirname(groundtruth))
-    df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
-    val_image_names = set(df[df['fold']==3]['image_name'].values)
-    train_image_names = set(df[df['fold']!=3]['image_name'].values)
-    ####----------------------
-    with open(groundtruth, "r") as fd:
-        data=[]
-        for line in fd:
-            data.append(line.strip().split("\t"))
-        random.shuffle(data)
-        dataset_len = round(len(data) * proportion)
-        data = data[:dataset_len]
-    ####--------------
-        train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
-        val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
-    ####-------------
-        # data = [[os.path.join(root, x[0]), x[1]] for x in data]
-    return train_data, val_data
+    # root = os.path.join(os.path.dirname(groundtruth), "images")
+    # ####----------------------
+    # print(root)
+    # print(os.path.dirname(groundtruth))
+    # df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
+    # val_image_names = set(df[df['fold']==3]['image_name'].values)
+    # train_image_names = set(df[df['fold']!=3]['image_name'].values)
+    # ####----------------------
+    # with open(groundtruth, "r") as fd:
+    #     data=[]
+    #     for line in fd:
+    #         data.append(line.strip().split("\t"))
+    #     random.shuffle(data)
+    #     dataset_len = round(len(data) * proportion)
+    #     data = data[:dataset_len]
+    # ####--------------
+    #     train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
+    #     val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
+    # ####-------------
+    #     # data = [[os.path.join(root, x[0]), x[1]] for x in data]
+    # return train_data, val_data
 
 
 
@@ -323,12 +329,13 @@ def dataset_loader(options, train_transform, valid_transform):
         for i, path in enumerate(options.data.test):
             valid = split_gt(path)
             valid_data += valid
-
+    print(len(train_data))
     # Load data
     train_dataset = LoadDataset(
         # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
         train_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
     )
+    
     train_data_loader = DataLoader(
         train_dataset,
         batch_size=options.batch_size,

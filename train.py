@@ -110,10 +110,10 @@ def train_one_epoch(
             total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
             pbar.update(curr_batch_size)
-            lr_scheduler.step()
+    lr_scheduler.step()
 
-            # lr logging
-            wandb.log({"learning_rate": lr_scheduler.get_lr()})
+    # lr logging
+    wandb.log({"learning_rate": lr_scheduler.get_lr()})
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -201,17 +201,6 @@ def valid_one_epoch(
 
 
 def get_train_transforms(height, width):
-<<<<<<< Updated upstream
-    return A.Compose(
-        [
-            A.Resize(height, width),
-            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
-            ToTensorV2(p=1.0),
-        ],
-        p=1.0,
-    )
-
-=======
     return A.Compose([
         A.Resize(height, width),
         A.Compose([
@@ -220,7 +209,6 @@ def get_train_transforms(height, width):
         ],p=0.5),
         ToTensorV2(p = 1.0),
     ],p=1.0)
->>>>>>> Stashed changes
 
 def get_valid_transforms(height, width):
     return A.Compose([A.Resize(height, width), ToTensorV2(p=1.0)])
@@ -236,7 +224,7 @@ def main(config_file):
     set_seed(seed=options.seed)
 
     is_cuda = torch.cuda.is_available()
-    hardware = "cuda" if is_cuda else "cpu"
+    hardware = "cuda:0" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
     print("Running {} on device {}\n".format(options.network, device))
@@ -274,23 +262,6 @@ def main(config_file):
             "Validation Loss : {:.5f}\n".format(checkpoint["validation_losses"][-1]),
         )
 
-<<<<<<< Updated upstream
-    (
-        train_data_loader,
-        validation_data_loader,
-        train_dataset,
-        valid_dataset,
-    ) = dataset_loader(
-        options,
-        train_transform=get_train_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-        valid_transform=get_valid_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-    )
-    # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed, transformed)
-=======
     # Get data
     # transformed = transforms.Compose(
     #     [
@@ -305,7 +276,6 @@ def main(config_file):
     train_transform=get_train_transforms(options.input_size.height, options.input_size.width), 
     valid_transform=get_valid_transforms(options.input_size.height, options.input_size.width))
     # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed)
->>>>>>> Stashed changes
     print(
         "[+] Data\n",
         "The number of train samples : {}\n".format(len(train_dataset)),
@@ -357,18 +327,14 @@ def main(config_file):
         optimizer_state = checkpoint.get("optimizer")
         if optimizer_state:
             optimizer.load_state_dict(optimizer_state)
-<<<<<<< Updated upstream
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
             T_0=options.num_epochs,
             T_mult=1,
             eta_max=options.optimizer.lr,
-            T_up=2,
+            T_up=options.num_epochs // 10,
             gamma=1.0,
         )
-=======
-        lr_scheduler = CustomCosineAnnealingWarmUpRestarts(optimizer, T_0=options.num_epochs, T_mult=1, eta_max=options.optimizer.lr, T_up=options.num_epochs//10, gamma=1.)
->>>>>>> Stashed changes
     else:
         optimizer = get_optimizer(
             options.optimizer.optimizer,
@@ -435,7 +401,6 @@ def main(config_file):
             pad=len(str(options.num_epochs)),
         )
 
-<<<<<<< Updated upstream
         train_result = train_one_epoch(
             train_data_loader,
             model,
@@ -448,23 +413,6 @@ def main(config_file):
             device,
             scaler,
         )
-=======
-        # Train
-        # train_result = run_epoch(
-        #     train_data_loader,
-        #     model,
-        #     epoch_text,
-        #     criterion,
-        #     optimizer,
-        #     lr_scheduler,
-        #     options.teacher_forcing_ratio,
-        #     options.max_grad_norm,
-        #     device,
-        #     train=True,
-        # )
-
-        train_result = train_one_epoch(train_data_loader, model, epoch_text, criterion, optimizer, lr_scheduler, options.teacher_forcing_ratio, options.max_grad_norm, device, scaler)
->>>>>>> Stashed changes
 
         train_losses.append(train_result["loss"])
         grad_norms.append(train_result["grad_norm"])
@@ -484,7 +432,6 @@ def main(config_file):
         )
         epoch_lr = lr_scheduler.get_lr()  # cycle
 
-<<<<<<< Updated upstream
         validation_result = valid_one_epoch(
             validation_data_loader,
             model,
@@ -493,23 +440,6 @@ def main(config_file):
             device,
             teacher_forcing_ratio=options.teacher_forcing_ratio,
         )
-=======
-        # Validation
-        # validation_result = run_epoch(
-        #     validation_data_loader,
-        #     model,
-        #     epoch_text,
-        #     criterion,
-        #     optimizer,
-        #     lr_scheduler,
-        #     options.teacher_forcing_ratio,
-        #     options.max_grad_norm,
-        #     device,
-        #     train=False,
-        # )
-
-        validation_result = valid_one_epoch(validation_data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio=0)
->>>>>>> Stashed changes
 
         validation_losses.append(validation_result["loss"])
         validation_epoch_symbol_accuracy = (
@@ -532,13 +462,9 @@ def main(config_file):
         # make config
         with open(config_file, "r") as f:
             option_dict = yaml.safe_load(f)
-<<<<<<< Updated upstream
         if best_sentence_acc < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
-=======
-        if best_score < 0.9*validation_epoch_sentence_accuracy + 0.1*(1-validation_epoch_wer):
->>>>>>> Stashed changes
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
@@ -636,7 +562,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="Attention-baseline",
+        default="SATRN_JY",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

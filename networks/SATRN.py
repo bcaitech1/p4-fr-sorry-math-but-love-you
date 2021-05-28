@@ -299,12 +299,12 @@ class PositionalEncoding2D(nn.Module):
         ### Require DEBUG
         b, c, h, w = input.size()
         h_pos_encoding = (
-            self.h_position_encoder[:h, :].unsqueeze(1).to(input.get_device())
+            self.h_position_encoder[:h, :].unsqueeze(1).to(input.device)
         )
         h_pos_encoding = self.h_linear(h_pos_encoding)  # [H, 1, D]
 
         w_pos_encoding = (
-            self.w_position_encoder[:w, :].unsqueeze(0).to(input.get_device())
+            self.w_position_encoder[:w, :].unsqueeze(0).to(input.device)
         )
         w_pos_encoding = self.w_linear(w_pos_encoding)  # [1, W, D]
 
