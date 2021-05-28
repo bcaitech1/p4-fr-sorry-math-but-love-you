@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/satrn/checkpoints/0015.pth",
+        default="./log/satrn/checkpoints/0021.pth",
         type=str,
         help="Path of checkpoint file",
     )
