@@ -118,7 +118,7 @@ class DeepCNN300(nn.Module):
             num_in_features,  # 48
             kernel_size=7,
             stride=2,
-            padding=3,
+            padding=3, # 7//2
             bias=False,
         )
         self.norm0 = nn.BatchNorm2d(num_in_features)
@@ -574,9 +574,9 @@ class SATRN(nn.Module):
             layer_num=FLAGS.SATRN.decoder.layer_num,
         )
 
-        # self.criterion = (
-        #     nn.CrossEntropyLoss()
-        # )  # without ignore_index=train_dataset.token_to_id[PAD]
+        self.criterion = (
+            nn.CrossEntropyLoss()
+        )  # without ignore_index=train_dataset.token_to_id[PAD]
 
         if checkpoint:
             self.load_state_dict(checkpoint)

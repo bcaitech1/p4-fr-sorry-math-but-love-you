@@ -281,9 +281,9 @@ class Attention(nn.Module):
             num_layers=FLAGS.Attention.layer_num,
             cell_type=FLAGS.Attention.cell_type)
 
-        # self.criterion = (
-        #     nn.CrossEntropyLoss()
-        # )
+        self.criterion = (
+            nn.CrossEntropyLoss()
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)

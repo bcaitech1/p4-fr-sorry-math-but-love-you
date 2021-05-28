@@ -27,7 +27,7 @@ from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from dataset import dataset_loader, START, PAD, load_vocab
 from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts
-from criterion import get_criterion
+# from criterion import get_criterion
 from metrics import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
@@ -293,8 +293,8 @@ def main(config_file):
     model.train()
 
     # define loss
-    # criterion = model.criterion.to(device)
-    criterion = get_criterion(type=options.criterion).to(device)
+    criterion = model.criterion.to(device)
+    # criterion = get_criterion(type=options.criterion).to(device)
 
     # define optimizer
     enc_params_to_optimise = [
