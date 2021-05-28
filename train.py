@@ -386,7 +386,6 @@ def main(config_file):
                 "grad_norm": grad_norms,
                 "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
-                "scheduler": lr_scheduler, 
                 "configs": option_dict,
                 "token_to_id":train_data_loader.dataset.token_to_id,
                 "id_to_token":train_data_loader.dataset.id_to_token
@@ -461,7 +460,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--project_name',
         default='SATRN',
-        help='WandB에서 사용할 자신의 프로젝트 이름(MathOCR-준구의실험교실 등)'
+        help='W&B에 표시될 프로젝트명. 모델명으로 통일!'
     )
     parser.add_argument(
         '--exp_name',
