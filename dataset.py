@@ -3,8 +3,12 @@ import csv
 import random
 from typing import *
 from PIL import Image, ImageOps
+import cv2
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 import torch
 from torch.utils.data import Dataset, DataLoader
+import pandas as pd
 
 START = "<SOS>"
 END = "<EOS>"
@@ -60,7 +64,30 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         (1) split할 경우(test_percent != None): (학습용 이미지 경로, GT) 리스트, (검증용 이미지 경로, GT) 리스트
         (2) split하지 않을 경우(test_percent == None): (학습용 이미지 경로, GT) 리스트
     """
+    # root = os.path.join(os.path.dirname(groundtruth), "images")
+    # with open(groundtruth, "r") as fd:
+    #     data=[]
+    #     for line in fd:
+    #         data.append(line.strip().split("\t"))
+    #     random.shuffle(data)
+    #     dataset_len = round(len(data) * proportion)
+    #     data = data[:dataset_len]
+    #     data = [[os.path.join(root, x[0]), x[1]] for x in data]
+    
+    # if test_percent:
+    #     test_len = round(len(data) * test_percent)
+    #     return data[test_len:], data[:test_len]
+    # else:
+    #     return data
+
     root = os.path.join(os.path.dirname(groundtruth), "images")
+    ####----------------------
+    print(root)
+    print(os.path.dirname(groundtruth))
+    df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
+    val_image_names = set(df[df['fold']==2]['image_name'].values)
+    train_image_names = set(df[df['fold']!=2]['image_name'].values)
+    ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]
         for line in fd:
@@ -68,13 +95,13 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         random.shuffle(data)
         dataset_len = round(len(data) * proportion)
         data = data[:dataset_len]
-        data = [[os.path.join(root, x[0]), x[1]] for x in data]
-    
-    if test_percent:
-        test_len = round(len(data) * test_percent)
-        return data[test_len:], data[:test_len]
-    else:
-        return data
+    ####--------------
+        train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
+        val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
+    ####-------------
+        # data = [[os.path.join(root, x[0]), x[1]] for x in data]
+    return train_data, val_data
+
 
 
 def collate_batch(data):
@@ -118,6 +145,7 @@ class LoadDataset(Dataset):
         groundtruth,
         tokens_file,
         crop=False,
+        preprocessing=True,
         transform=None,
         rgb=3,
     ):
@@ -132,6 +160,7 @@ class LoadDataset(Dataset):
         """
         super(LoadDataset, self).__init__()
         self.crop = crop
+        self.preprocessing = preprocessing
         self.transform = transform
         self.rgb = rgb
         self.token_to_id, self.id_to_token = load_vocab(tokens_file)
@@ -158,8 +187,10 @@ class LoadDataset(Dataset):
         image = Image.open(item["path"])
         if self.rgb == 3:
             image = image.convert("RGB")
+            # image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
             image = image.convert("L")
+            # image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
@@ -169,8 +200,19 @@ class LoadDataset(Dataset):
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
 
+        # if self.preprocessing:
+        #     # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
+        #     h, w = image.shape
+        #     if h / w > 2:
+        #         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+
         if self.transform:
-            image = self.transform(image)
+            w, h = image.size
+            if w / h > 2:
+                image = image.rotate(90, expand=True)
+            image = np.array(image)
+            # image = self.transform(image)
+            image = self.transform(image=image)['image']
 
         return {"path": item["path"], "truth": item["truth"], "image": image}
 
@@ -183,6 +225,7 @@ class LoadEvalDataset(Dataset):
         token_to_id,
         id_to_token,
         crop=False,
+        preprocessing=True,
         transform=None,
         rgb=3,
     ):
@@ -200,6 +243,7 @@ class LoadEvalDataset(Dataset):
         self.rgb = rgb
         self.token_to_id = token_to_id
         self.id_to_token = id_to_token
+        self.preprocessing = preprocessing
         self.transform = transform
         self.data = [
             {
@@ -225,8 +269,10 @@ class LoadEvalDataset(Dataset):
         image = Image.open(item["path"])
         if self.rgb == 3:
             image = image.convert("RGB")
+            # image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
             image = image.convert("L")
+            # image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
@@ -236,12 +282,24 @@ class LoadEvalDataset(Dataset):
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
 
+        # if self.preprocessing:
+        #     # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
+        #     h, w = image.shape
+        #     if h / w > 2:
+        #         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+                
         if self.transform:
-            image = self.transform(image)
+            # image = self.transform(image)
+            w, h = image.size
+            if w / h > 2:
+                image = image.rotate(90, expand=True)
+            image = np.array(image)
+            image = self.transform(image=image)['image']
 
         return {"path": item["path"], "file_path":item["file_path"],"truth": item["truth"], "image": image}
 
-def dataset_loader(options, transformed):
+# def dataset_loader(options, transformed):
+def dataset_loader(options, train_transform, valid_transform):
 
     # Read data
     train_data, valid_data = [], [] 
@@ -265,7 +323,8 @@ def dataset_loader(options, transformed):
 
     # Load data
     train_dataset = LoadDataset(
-        train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        train_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
     )
     train_data_loader = DataLoader(
         train_dataset,
@@ -276,7 +335,8 @@ def dataset_loader(options, transformed):
     )
 
     valid_dataset = LoadDataset(
-        valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        valid_data, options.data.token_paths, crop=options.data.crop, transform=valid_transform, rgb=options.data.rgb
     )
     valid_data_loader = DataLoader(
         valid_dataset,
