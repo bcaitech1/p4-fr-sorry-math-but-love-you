@@ -335,7 +335,7 @@ def main(config_file):
             T_0=len(train_data_loader) * options.num_epochs,
             T_mult=1,
             eta_max=options.optimizer.lr,
-            T_up=2,
+            T_up=len(train_data_loader) * (options.num_epochs // 10),
             gamma=1.0,
         )
     else:
