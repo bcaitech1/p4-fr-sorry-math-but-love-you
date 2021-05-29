@@ -11,4 +11,5 @@ tensorboardX==2.2
 torch==1.7.1+cu101        # torch, torchvision은 아래 명령어로 따로 설치
 torchvision==0.8.2+cu101  # pip install torch==1.7.1+cu101 torchvision==0.8.2+cu101 torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
 tqdm==4.28.1
+transformers==4.6.1
 wandb==0.10.31
