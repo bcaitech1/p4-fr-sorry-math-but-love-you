@@ -16,7 +16,7 @@ default_checkpoint = {
     "validation_sentence_accuracy": [],
     "validation_wer": [],
     "lr": [],
-    "grad_norm": [],
+    "grad_norm": [],  
     "model": {},
     "configs":{},
     "token_to_id":{},

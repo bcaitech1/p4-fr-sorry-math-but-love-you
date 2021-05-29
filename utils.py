@@ -1,6 +1,7 @@
 import os
 import random
 from psutil import virtual_memory
+from datetime import datetime
 import numpy as np
 import torch
 import torch.optim as optim
@@ -80,3 +81,6 @@ def set_seed(seed: int=21):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def get_timestamp():
+    return datetime.now().strftime(format='%m%d-%H%M%S')
