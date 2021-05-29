@@ -81,14 +81,16 @@ def train_one_epoch(
 
                 loss = criterion(decoded_values, expected[:, 1:])
 
+            
+            optimizer.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+
             optim_params = [
                 p
                 for param_group in optimizer.param_groups
                 for p in param_group["params"]
             ]
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
 
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
@@ -110,10 +112,14 @@ def train_one_epoch(
             total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
             pbar.update(curr_batch_size)
-    lr_scheduler.step()
+            lr_scheduler.step()
 
-    # lr logging
-    wandb.log({"learning_rate": lr_scheduler.get_lr()})
+            # lr logging
+            if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
+                wandb.log({"learning_rate": lr_scheduler.get_lr()})
+            else:
+                for lr_ in lr_scheduler.get_lr():
+                    wandb.log({"learning_rate": lr_})
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -329,10 +335,10 @@ def main(config_file):
             optimizer.load_state_dict(optimizer_state)
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
-            T_0=options.num_epochs,
+            T_0=options.num_epochs*len(train_data_loader),
             T_mult=1,
             eta_max=options.optimizer.lr,
-            T_up=options.num_epochs // 10,
+            T_up=options.num_epochs*len(train_data_loader)//10,
             gamma=1.0,
         )
     else:
@@ -358,7 +364,7 @@ def main(config_file):
         elif options.scheduler.scheduler == "Cycle":
             for param_group in optimizer.param_groups:
                 param_group["initial_lr"] = options.optimizer.lr
-            cycle = len(train_data_loader) * options.num_epochs
+            cycle = options.num_epochs*len(train_data_loader)
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )

@@ -66,15 +66,15 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         (1) split할 경우(test_percent != None): (학습용 이미지 경로, GT) 리스트, (검증용 이미지 경로, GT) 리스트
         (2) split하지 않을 경우(test_percent == None): (학습용 이미지 경로, GT) 리스트
     """
-    root = os.path.join(os.path.dirname(groundtruth), "images")
-    ####----------------------
-    print(root)
-    print(os.path.dirname(groundtruth))
-    df = pd.read_csv('/opt/ml/input/data/formula_images_processed/total_df.csv')
+    # root = os.path.join(os.path.dirname(groundtruth), "images")
+    # ####----------------------
+    # print(root)
+    # print(os.path.dirname(groundtruth))
+    # df = pd.read_csv('/opt/ml/input/data/formula_images_processed/total_df.csv')
 
-    df['image'] = '/opt/ml/input/data/formula_images_processed/images/' + df['image']
-    data = [[df.iloc[i].values.tolist()[1], df.iloc[i].values.tolist()[0]] for i in range(len(df))]
-    return data[:85000], data[85000:]
+    # df['image'] = '/opt/ml/input/data/formula_images_processed/images/' + df['image']
+    # data = [[df.iloc[i].values.tolist()[1], df.iloc[i].values.tolist()[0]] for i in range(len(df))]
+    # return data[:85000], data[85000:]
 
     # root = os.path.join(os.path.dirname(groundtruth), "images")
     # df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'total_df.csv'))
@@ -94,27 +94,27 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     # else:
     #     return data
 
-    # root = os.path.join(os.path.dirname(groundtruth), "images")
-    # ####----------------------
-    # print(root)
-    # print(os.path.dirname(groundtruth))
-    # df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
-    # val_image_names = set(df[df['fold']==3]['image_name'].values)
-    # train_image_names = set(df[df['fold']!=3]['image_name'].values)
-    # ####----------------------
-    # with open(groundtruth, "r") as fd:
-    #     data=[]
-    #     for line in fd:
-    #         data.append(line.strip().split("\t"))
-    #     random.shuffle(data)
-    #     dataset_len = round(len(data) * proportion)
-    #     data = data[:dataset_len]
-    # ####--------------
-    #     train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
-    #     val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
-    # ####-------------
-    #     # data = [[os.path.join(root, x[0]), x[1]] for x in data]
-    # return train_data, val_data
+    root = os.path.join(os.path.dirname(groundtruth), "images")
+    ####----------------------
+    print(root)
+    print(os.path.dirname(groundtruth))
+    df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
+    val_image_names = set(df[df['fold']==3]['image_name'].values)
+    train_image_names = set(df[df['fold']!=3]['image_name'].values)
+    ####----------------------
+    with open(groundtruth, "r") as fd:
+        data=[]
+        for line in fd:
+            data.append(line.strip().split("\t"))
+        random.shuffle(data)
+        dataset_len = round(len(data) * proportion)
+        data = data[:dataset_len]
+    ####--------------
+        train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
+        val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
+    ####-------------
+        # data = [[os.path.join(root, x[0]), x[1]] for x in data]
+    return train_data, val_data
 
 
 
@@ -341,6 +341,7 @@ def dataset_loader(options, train_transform, valid_transform):
         batch_size=options.batch_size,
         shuffle=True,
         num_workers=options.num_workers,
+        pin_memory=True,
         collate_fn=collate_batch,
     )
 
