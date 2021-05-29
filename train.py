@@ -113,7 +113,11 @@ def train_one_epoch(
             lr_scheduler.step()
 
             # lr logging
-            wandb.log({"learning_rate": lr_scheduler.get_lr()})
+            if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
+                wandb.log({"learning_rate": lr_scheduler.get_lr()})
+            else:
+                for lr_ in lr_scheduler.get_lr():
+                    wandb.log({"learning_rate": lr_})
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -329,13 +333,25 @@ def main(config_file):
         optimizer_state = checkpoint.get("optimizer")
         if optimizer_state:
             optimizer.load_state_dict(optimizer_state)
+
+        # Custom Cosine Annealing 파라미터 명세 볼 만한 곳: https://bit.ly/2SGDhxO
+            # T_0: 한 주기에 대한 스텝 수
+            # T_mult: 주기 반복마다 주기 길이를 T_mult배로 바꿈
+            # eta_max: warm-up을 통해 도달할 최대 LR
+            # T_up: 한 주기 내에서 warm-up을 할 스텝 수
+            # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
+
+        total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
+        t_0 = total_steps // 3 # 주기를 3으로 설정
+        t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
-            T_0=options.num_epochs,
+            T_0=t_0,
             T_mult=1,
             eta_max=options.optimizer.lr,
-            T_up=2,
-            gamma=1.0,
+            T_up=t_up,
+            gamma=0.8,
         )
     else:
         optimizer = get_optimizer(
@@ -563,18 +579,18 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="Attention", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="SATRN-MINIMAL", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
-        default="Attention-baseline",
+        default="SATRN-RGB3-iloveslowfood",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/Attention.yaml",
+        default="./configs/SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )
