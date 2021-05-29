@@ -69,9 +69,9 @@ class PositionalEncoding(nn.Module):
         features = x
         b,c,h,w = x.size()
 
-        h_encoding = torch.tile(self.h_pos_encoding.unsqueeze(0), [b, 1, 1, 1])
+        h_encoding = torch.tile(self.h_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(x.get_device())
         # print(h_encoding.shape)
-        w_encoding = torch.tile(self.w_pos_encoding.unsqueeze(0), [b, 1, 1, 1])
+        w_encoding = torch.tile(self.w_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(x.get_device())
         # print
         x = torch.mean(x, [2, 3])
         x = self.dense0(x)
@@ -241,6 +241,22 @@ class SATRNEncoder(nn.Module):
         out = out.view(b, c, h * w).transpose(1, 2)  # [b, h x w, c]
 
         return out
+
+class Feedforward(nn.Module):
+    def __init__(self, filter_size=2048, hidden_dim=512, dropout=0.1):
+        super(Feedforward, self).__init__()
+
+        self.layers = nn.Sequential(
+            nn.Linear(hidden_dim, filter_size, True),
+            nn.ReLU(True),
+            nn.Dropout(p=dropout),
+            nn.Linear(filter_size, hidden_dim, True),
+            nn.ReLU(True),
+            nn.Dropout(p=dropout),
+        )
+
+    def forward(self, input):
+        return self.layers(input)
 
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, input_size, src_size, filter_size, head_num, dropout_rate=0.2):
@@ -422,7 +438,7 @@ class SATRNDecoder(nn.Module):
 
 class MySATRN(nn.Module):
     def __init__(self, FLAGS, train_dataset, checkpoint=None):
-        super(SATRN, self).__init__()
+        super(MySATRN, self).__init__()
 
         self.encoder = SATRNEncoder(
             input_height=FLAGS.input_size.height,
