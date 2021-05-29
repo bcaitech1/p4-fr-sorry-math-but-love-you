@@ -568,7 +568,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="Attention-baseline",
+        default="jungu",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
