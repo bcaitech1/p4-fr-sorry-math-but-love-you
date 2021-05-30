@@ -8,7 +8,8 @@ Pillow==8.1.1
 scikit-image==0.18.1
 scipy==1.6.3
 tensorboardX==1.5
-torch==1.7.1
-torchvision==0.8.2
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==1.7.1+cu101
+torchvision==0.8.2+cu101
 tqdm==4.28.1
 wandb==0.10.31

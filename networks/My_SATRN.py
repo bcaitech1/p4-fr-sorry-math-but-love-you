@@ -15,25 +15,40 @@ class ShallowCNN(nn.Module):
         super(ShallowCNN, self).__init__()
         self.conv0 = nn.Conv2d(input_channels, hidden_size//2, 3, bias=False, padding=1)
         self.batch_norm0 = nn.BatchNorm2d(hidden_size//2)
-        self.relu = nn.ReLU()
+        self.relu0 = nn.ReLU()
         self.pool0 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         self.conv1 = nn.Conv2d(hidden_size//2, hidden_size, 3, bias=False, padding=1)
         self.batch_norm1 = nn.BatchNorm2d(hidden_size)
+        self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.conv2 = nn.Conv2d(hidden_size, hidden_size ,3, bias=False, padding=1)
+        self.batch_norm2 = nn.BatchNorm2d(hidden_size)
+        self.relu2 = nn.ReLU()
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        torch.nn.init.xavier_normal_(self.conv0.weight)
+        torch.nn.init.xavier_normal_(self.conv1.weight)
+        torch.nn.init.xavier_normal_(self.conv2.weight)
         
     def forward(self, x):
         x = self.conv0(x)
         x = self.batch_norm0(x)
-        x = self.relu(x)
+        x = self.relu0(x)
         x = self.pool0(x)
 
         x = self.conv1(x)
         x = self.batch_norm1(x)
-        x = self.relu(x)
+        x = self.relu1(x)
         x = self.pool1(x)
 
-        return x # (batch, hidden_size, h/4, w/4)
+        x = self.conv2(x)
+        x = self.batch_norm2(x)
+        x = self.relu2(x)
+        x = self.pool2(x)
+
+        return x # (batch, hidden_size, h/8, w/8)
 
 class PositionalEncoding(nn.Module):
     def __init__(self, hidden_size, h=128, w=128, dropout=0.1):
@@ -53,6 +68,9 @@ class PositionalEncoding(nn.Module):
         self.dense1 = nn.Linear(hidden_size//2, hidden_size*2)
         self.sigmoid = nn.Sigmoid()
 
+        torch.nn.init.xavier_normal_(self.dense0.weight)
+        torch.nn.init.xavier_normal_(self.dense1.weight)
+
     def get_position_encoding(self, length, hidden_size, min_timescale=1.0, max_timescale=1.0e4):
         position = torch.arange(length).float()
         num_timescales = [hidden_size // 2]
@@ -69,9 +87,9 @@ class PositionalEncoding(nn.Module):
         features = x
         b,c,h,w = x.size()
 
-        h_encoding = torch.tile(self.h_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(x.get_device())
+        h_encoding = torch.tile(self.h_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(device)
         # print(h_encoding.shape)
-        w_encoding = torch.tile(self.w_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(x.get_device())
+        w_encoding = torch.tile(self.w_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(device)
         # print
         x = torch.mean(x, [2, 3])
         x = self.dense0(x)
@@ -122,6 +140,11 @@ class MultiHeadAttention(nn.Module):
         )
         self.out_linear = nn.Linear(self.head_num * self.head_dim, q_channels)
         self.dropout = nn.Dropout(p=dropout)
+
+        torch.nn.init.xavier_normal_(self.q_linear.weight)
+        torch.nn.init.xavier_normal_(self.k_linear.weight)
+        torch.nn.init.xavier_normal_(self.v_linear.weight)
+        torch.nn.init.xavier_normal_(self.out_linear.weight)
 
     def forward(self, q, k, v, mask=None):
         b, q_len, k_len, v_len = q.size(0), q.size(1), k.size(1), v.size(1)
@@ -174,7 +197,13 @@ class EncoderLayer(nn.Module):
         self.depthwise_norm = nn.BatchNorm2d(filter_size)
         self.conv1 = nn.Conv2d(filter_size, hidden_size, 1, bias=False)
         self.norm1 = nn.BatchNorm2d(hidden_size)
-        self.relu = nn.ReLU()
+        self.relu0 = nn.ReLU()
+        self.relu_depth = nn.ReLU()
+        self.relu1 = nn.ReLU()
+
+        torch.nn.init.xavier_normal_(self.conv0.weight)
+        torch.nn.init.xavier_normal_(self.depthwise.weight)
+        torch.nn.init.xavier_normal_(self.conv1.weight)
 
     def forward(self, x):
         features = x
@@ -190,13 +219,13 @@ class EncoderLayer(nn.Module):
 
         x = self.conv0(x)
         x = self.norm0(x)
-        x = self.relu(x)
+        x = self.relu0(x)
         x = self.depthwise(x)
         x = self.depthwise_norm(x)
-        x = self.relu(x)
+        x = self.relu_depth(x)
         x = self.conv1(x)
         x = self.norm1(x)
-        x = self.relu(x)
+        x = self.relu1(x)
 
         return x + features # (batch, hidden_size, h, w)
 
@@ -216,8 +245,8 @@ class SATRNEncoder(nn.Module):
 
         self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
         self.positional_encoding = PositionalEncoding(hidden_size, 
-                                                    h=input_height//4, 
-                                                    w=input_width//4, 
+                                                    h=input_height//8, 
+                                                    w=input_width//8, 
                                                     dropout=dropout_rate)
         self.attention_layers = nn.ModuleList(
             [
@@ -242,21 +271,41 @@ class SATRNEncoder(nn.Module):
 
         return out
 
+
 class Feedforward(nn.Module):
     def __init__(self, filter_size=2048, hidden_dim=512, dropout=0.1):
         super(Feedforward, self).__init__()
 
-        self.layers = nn.Sequential(
-            nn.Linear(hidden_dim, filter_size, True),
-            nn.ReLU(True),
-            nn.Dropout(p=dropout),
-            nn.Linear(filter_size, hidden_dim, True),
-            nn.ReLU(True),
-            nn.Dropout(p=dropout),
-        )
+        # self.layers = nn.Sequential(
+        #     nn.Linear(hidden_dim, filter_size, True),
+        #     nn.ReLU(True),
+        #     nn.Dropout(p=dropout),
+        #     nn.Linear(filter_size, hidden_dim, True),
+        #     nn.ReLU(True),
+        #     nn.Dropout(p=dropout),
+        # )
+
+        self.linear0 = nn.Linear(hidden_dim, filter_size, True)
+        self.relu0 = nn.ReLU()
+        self.dropout0 = nn.Dropout(p=dropout)
+        self.linear1 = nn.Linear(filter_size, hidden_dim, True)
+        self.relu1 = nn.ReLU()
+        self.dropout1 = nn.Dropout(p=dropout)
+
+        torch.nn.init.xavier_normal_(self.linear0.weight)
+        torch.nn.init.xavier_normal_(self.linear1.weight)
 
     def forward(self, input):
-        return self.layers(input)
+        # return self.layers(input)
+
+        x = self.linear0(input)
+        x = self.relu0(x)
+        x = self.dropout0(x)
+        x = self.linear1(x)
+        x = self.relu1(x)
+        x = self.dropout1(x)
+
+        return x
 
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, input_size, src_size, filter_size, head_num, dropout_rate=0.2):
