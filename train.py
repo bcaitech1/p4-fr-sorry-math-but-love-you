@@ -72,14 +72,14 @@ def train_one_epoch(
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            with autocast():
-                output = model(input, expected, True, teacher_forcing_ratio)
+            # with autocast():
+            output = model(input, expected, True, teacher_forcing_ratio)  # batch_size x num_steps x num_classes
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+            decoded_values = output.transpose(1, 2)  # batch_size x num_classes x num_steps
+            _, sequence = torch.topk(decoded_values, 1, dim=1)
+            sequence = sequence.squeeze(1)
 
-                loss = criterion(decoded_values, expected[:, 1:])
+            loss = criterion(decoded_values, expected[:, 1:])
 
             optim_params = [
                 p
@@ -87,16 +87,17 @@ def train_one_epoch(
                 for p in param_group["params"]
             ]
             optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
+            loss.backward()
+            # scaler.scale(loss).backward()
+            # scaler.unscale_(optimizer)
 
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             # cycle
-            scaler.step(optimizer)
-            scaler.update()
-
+            # scaler.step(optimizer)
+            # scaler.update()
+            optimizer.step()
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -166,14 +167,14 @@ def valid_one_epoch(
             expected = d["truth"]["encoded"].to(device)
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-            with autocast():
-                output = model(input, expected, False, teacher_forcing_ratio)
+            # with autocast():
+            output = model(input, expected, False, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+            decoded_values = output.transpose(1, 2)
+            _, sequence = torch.topk(decoded_values, 1, dim=1)
+            sequence = sequence.squeeze(1)
 
-                loss = criterion(decoded_values, expected[:, 1:])
+            loss = criterion(decoded_values, expected[:, 1:])
 
             losses.append(loss.item())
 
@@ -342,15 +343,15 @@ def main(config_file):
             # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
         total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        t_0 = total_steps // 3 # 주기를 3으로 설정
+        t_0 = total_steps // 1 # 주기를 3으로 설정
         t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
-            T_0=len(train_data_loader) * options.num_epochs,
+            T_0=t_0,
             T_mult=1,
             eta_max=options.optimizer.lr,
-            T_up=len(train_data_loader) * (options.num_epochs // 10),
+            T_up=t_up,
             gamma=1.0,
         )
     else:
@@ -408,7 +409,7 @@ def main(config_file):
 
     scaler = GradScaler()
 
-    best_sentence_acc = 0.0
+    best_score = 0.0
 
     # Train
     for epoch in range(options.num_epochs):
@@ -482,7 +483,7 @@ def main(config_file):
         # make config
         with open(config_file, "r") as f:
             option_dict = yaml.safe_load(f)
-        if best_sentence_acc < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+        if best_score < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
             save_checkpoint(
@@ -508,10 +509,10 @@ def main(config_file):
                 },
                 prefix=options.prefix,
             )
-            best_sentence_acc = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+            best_score = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
                 1 - validation_epoch_wer
             )
-            print(f"best sentence acc: {best_sentence_acc}")
+            print(f"best score: {best_score}")
             print("model is saved")
 
         # Summary
@@ -579,7 +580,7 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN-MINIMAL", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
