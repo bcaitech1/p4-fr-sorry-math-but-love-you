@@ -588,7 +588,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN-RGB3-data0.3-iloveslowfood",
+        default="SATRN-RGB1-data0.3-iloveslowfood",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

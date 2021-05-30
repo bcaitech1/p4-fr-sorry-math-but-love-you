@@ -83,6 +83,7 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     else:
         return data
 
+    # Author: Junchul Choi
     # root = os.path.join(os.path.dirname(groundtruth), "images")
     # ####----------------------
     # print(root)
