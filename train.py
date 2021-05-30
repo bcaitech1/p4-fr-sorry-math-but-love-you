@@ -333,6 +333,18 @@ def main(config_file):
         optimizer_state = checkpoint.get("optimizer")
         if optimizer_state:
             optimizer.load_state_dict(optimizer_state)
+
+        # Custom Cosine Annealing 파라미터 명세 볼 만한 곳: https://bit.ly/2SGDhxO
+            # T_0: 한 주기에 대한 스텝 수
+            # T_mult: 주기 반복마다 주기 길이를 T_mult배로 바꿈
+            # eta_max: warm-up을 통해 도달할 최대 LR
+            # T_up: 한 주기 내에서 warm-up을 할 스텝 수
+            # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
+
+        total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
+        t_0 = total_steps // 3 # 주기를 3으로 설정
+        t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
             T_0=options.num_epochs*len(train_data_loader),
@@ -356,7 +368,7 @@ def main(config_file):
                 optimizer, patience=options.schduler.patience
             )
         elif options.scheduler.scheduler == "StepLR":
-            lr_scheduler = lr_scheduler = optim.lr_scheduler.StepLR(
+            lr_scheduler = optim.lr_scheduler.StepLR(
                 optimizer,
                 step_size=options.optimizer.lr_epochs,
                 gamma=options.optimizer.lr_factor,
@@ -368,6 +380,8 @@ def main(config_file):
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
+    if checkpoint['scheduler']:
+        lr_scheduler.load_state_dict(checkpoint['scheduler'])
 
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
@@ -490,6 +504,7 @@ def main(config_file):
                     "token_to_id": train_data_loader.dataset.token_to_id,
                     "id_to_token": train_data_loader.dataset.id_to_token,
                     "network": options.network,
+                    "scheduler": lr_scheduler.state_dict(),
                 },
                 prefix=options.prefix,
             )
@@ -564,7 +579,7 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="SATRN-MINIMAL", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",

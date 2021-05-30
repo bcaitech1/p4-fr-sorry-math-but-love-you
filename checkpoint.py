@@ -21,6 +21,8 @@ default_checkpoint = {
     "configs":{},
     "token_to_id":{},
     "id_to_token":{},
+    "scheduler":{},
+    "scheduler_name":""
 }
 
 
