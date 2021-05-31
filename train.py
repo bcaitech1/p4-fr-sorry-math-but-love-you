@@ -343,7 +343,7 @@ def main(config_file):
             # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
         total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        t_0 = total_steps // 1 # 주기를 3으로 설정
+        t_0 = total_steps // 3 # 주기를 3으로 설정
         t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
@@ -352,7 +352,7 @@ def main(config_file):
             T_mult=1,
             eta_max=options.optimizer.lr,
             T_up=t_up,
-            gamma=1.0,
+            gamma=0.8,
         )
     else:
         optimizer = get_optimizer(
