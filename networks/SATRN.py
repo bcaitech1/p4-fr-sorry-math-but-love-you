@@ -7,7 +7,8 @@ import random
 
 from dataset import START, PAD
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = 'cpu'
 
 
 class BottleneckBlock(nn.Module):
@@ -242,7 +243,7 @@ class Feedforward(nn.Module):
             nn.Linear(filter_size, hidden_dim, True),
             nn.ReLU(True),
             nn.Dropout(p=dropout),
-        )
+        ) # 일부러 차원을 높였다가 낮추는건가?
 
     def forward(self, input):
         return self.layers(input)
@@ -296,15 +297,21 @@ class PositionalEncoding2D(nn.Module):
         return position_encoder  # (Max_len, In_channel)
 
     def forward(self, input):
-        ### Require DEBUG
+        ### Require DEBUG <- 개극혐;
         b, c, h, w = input.size()
+        # h_pos_encoding = (
+        #     self.h_position_encoder[:h, :].unsqueeze(1).to(input.get_device())
+        # )
         h_pos_encoding = (
-            self.h_position_encoder[:h, :].unsqueeze(1).to(input.get_device())
+            self.h_position_encoder[:h, :].unsqueeze(1).to(device)
         )
         h_pos_encoding = self.h_linear(h_pos_encoding)  # [H, 1, D]
 
+        # w_pos_encoding = (
+        #     self.w_position_encoder[:w, :].unsqueeze(0).to(input.get_device())
+        # )
         w_pos_encoding = (
-            self.w_position_encoder[:w, :].unsqueeze(0).to(input.get_device())
+            self.w_position_encoder[:w, :].unsqueeze(0).to(device)
         )
         w_pos_encoding = self.w_linear(w_pos_encoding)  # [1, W, D]
 
@@ -312,7 +319,6 @@ class PositionalEncoding2D(nn.Module):
         w_pos_encoding = w_pos_encoding.expand(h, -1, -1)   # h, w, c/2
 
         pos_encoding = torch.cat([h_pos_encoding, w_pos_encoding], dim=2)  # [H, W, 2*D]
-
         pos_encoding = pos_encoding.permute(2, 0, 1)  # [2*D, H, W]
 
         out = input + pos_encoding.unsqueeze(0)
@@ -397,19 +403,19 @@ class TransformerDecoderLayer(nn.Module):
         self.feedforward_norm = nn.LayerNorm(normalized_shape=input_size)
 
     def forward(self, tgt, tgt_prev, src, tgt_mask):
+        # Train
+        if tgt_prev == None:  
+            att = self.self_attention_layer(q=tgt, k=tgt, v=tgt, mask=tgt_mask)
+            out = self.self_attention_norm(att+tgt) # element-wise addition
 
-        if tgt_prev == None:  # Train
-            att = self.self_attention_layer(tgt, tgt, tgt, tgt_mask)
-            out = self.self_attention_norm(att + tgt)
-
-            att = self.attention_layer(tgt, src, src)
-            out = self.attention_norm(att + out)
+            att = self.attention_layer(q=tgt, k=src, v=src)
+            out = self.attention_norm(att+out)
 
             ff = self.feedforward_layer(out)
-            out = self.feedforward_norm(ff + out)
+            out = self.feedforward_norm(ff+out)
         else:
             tgt_prev = torch.cat([tgt_prev, tgt], 1)
-            att = self.self_attention_layer(tgt, tgt_prev, tgt_prev, tgt_mask)
+            att = self.self_attention_layer(q=tgt, k=tgt_prev, v=tgt_prev, mask=tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
             att = self.attention_layer(tgt, src, src)
@@ -512,7 +518,7 @@ class TransformerDecoder(nn.Module):
     def forward(
         self, src, text, is_train=True, batch_max_length=50, teacher_forcing_ratio=1.0
     ):
-
+        # teacher forcing
         if is_train and random.random() < teacher_forcing_ratio:
             tgt = self.text_embedding(text)
             tgt = self.pos_encoder(tgt)
@@ -520,11 +526,13 @@ class TransformerDecoder(nn.Module):
             for layer in self.attention_layers:
                 tgt = layer(tgt, None, src, tgt_mask)
             out = self.generator(tgt)
+
+        # no teacher forcing
         else:
             out = []
             num_steps = batch_max_length - 1
             target = torch.LongTensor(src.size(0)).fill_(self.st_id).to(device) # [START] token
-            features = [None] * self.layer_num
+            features = [None] * self.layer_num # 
 
             for t in range(num_steps):
                 target = target.unsqueeze(1)

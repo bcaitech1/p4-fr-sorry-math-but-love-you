@@ -11,18 +11,15 @@ from metrics import word_error_rate, sentence_acc
 from checkpoint import load_checkpoint
 from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
 from flags import Flags
-from utils import id_to_string, get_network, get_optimizer
+from utils import id_to_string, get_network, get_optimizer, set_seed
 
 
 def main(parser):
     is_cuda = torch.cuda.is_available()
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
-    torch.manual_seed(options.seed)
-    random.seed(options.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
+    set_seed(options.seed)
+    
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
@@ -80,11 +77,29 @@ def main(parser):
         input = d["image"].to(device)
         expected = d["truth"]["encoded"].to(device)
 
+        # Greedy Decoding
         output = model(input, expected, False, 0.0)
         decoded_values = output.transpose(1, 2)
         _, sequence = torch.topk(decoded_values, 1, dim=1)
         sequence = sequence.squeeze(1)
         sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+
+        # Beam Search
+        # sequence = model.beam_search(
+        #     input=input, 
+        #     data_loader=test_data_loader,
+        #     topk=1
+        #     beam_width=10,
+        #     max_sequence=parser.max_sequence,
+        #     )
+        # sequence_str = id_to_string(sequence, test_data, do_eval=1)
+
+        input: torch.Tensor,
+        data_loader: DataLoader,
+        topk: int=1, # 상위 몇 개의 결과를 얻을 것인지
+        beam_width: int = 10, # 각 스텝마다 몇 개의 후보군을 선별할지
+        max_sequence: int=230
+        
         for path, predicted in zip(d["file_path"], sequence_str):
             results.append((path, predicted))
 

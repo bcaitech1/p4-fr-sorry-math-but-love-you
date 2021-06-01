@@ -25,6 +25,7 @@ from checkpoint import (
 )
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
+from utils import get_timestamp ### 
 from dataset import dataset_loader, START, PAD, load_vocab
 from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts
 # from criterion import get_criterion
@@ -72,14 +73,14 @@ def train_one_epoch(
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            with autocast():
-                output = model(input, expected, True, teacher_forcing_ratio)
+            # with autocast():
+            output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+            decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+            _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
+            sequence = sequence.squeeze(1) # [B, MAX_LEN], Metric 측정을 위해
 
-                loss = criterion(decoded_values, expected[:, 1:])
+            loss = criterion(decoded_values, expected[:, 1:]) # [SOS] 이후부터
 
             optim_params = [
                 p
@@ -87,16 +88,17 @@ def train_one_epoch(
                 for p in param_group["params"]
             ]
             optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
+            loss.backward()
+            # scaler.scale(loss).backward()
+            # scaler.unscale_(optimizer)
 
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             # cycle
-            scaler.step(optimizer)
-            scaler.update()
-
+            # scaler.step(optimizer)
+            # scaler.update()
+            optimizer.step()
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -166,14 +168,14 @@ def valid_one_epoch(
             expected = d["truth"]["encoded"].to(device)
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-            with autocast():
-                output = model(input, expected, False, teacher_forcing_ratio)
+            # with autocast():
+            output = model(input, expected, False, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+            decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+            _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+            sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
-                loss = criterion(decoded_values, expected[:, 1:])
+            loss = criterion(decoded_values, expected[:, 1:])
 
             losses.append(loss.item())
 
@@ -224,6 +226,7 @@ def main(config_file):
     Train math formula recognition model
     """
     options = Flags(config_file).get()
+    timestamp = get_timestamp()
 
     # set random seed
     set_seed(seed=options.seed)
@@ -342,8 +345,8 @@ def main(config_file):
             # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
         total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        t_0 = total_steps // 3 # 주기를 3으로 설정
-        t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+        t_0 = total_steps // 1 # 주기를 3으로 설정
+        t_up = int(t_0*0.2) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
@@ -485,6 +488,7 @@ def main(config_file):
         if best_sentence_acc < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
+            prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
@@ -506,7 +510,8 @@ def main(config_file):
                     "network": options.network,
                     "scheduler": lr_scheduler.state_dict(),
                 },
-                prefix=options.prefix,
+                # prefix=options.prefix,
+                prefix=prefix,
             )
             best_sentence_acc = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
                 1 - validation_epoch_wer
@@ -579,18 +584,19 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN-MINIMAL", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="DEBUG-iloveslowfood", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN-RGB3-iloveslowfood",
+        # default="SATRN-RGB3-IM2LATEX-TOKEN576-iloveslowfood",
+        default='check-prob-output',
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/SATRN.yaml",
+        default="./configs/SATRN-im2latex.yaml",
         type=str,
         help="Path of configuration file",
     )
