@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import math
 import random
+import timm
 
 from dataset import START, PAD
 
@@ -160,6 +161,28 @@ class DeepCNN300(nn.Module):
         out_before_trans2 = self.trans2_relu(self.trans2_norm(out))
         out_A = self.trans2_conv(out_before_trans2)
         return out_A  # 128 x (16x16)
+
+class CustomCNN(nn.Module):
+    def __init__(self, input_channel, output_channel):
+        super(CustomCNN, self).__init__()
+        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=False)
+        self.conv_stem= nn.Conv2d(input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
+        self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        self.act1 = nn.SiLU(inplace=True)
+        self.eff_block = m.blocks
+        self.conv_last = nn.Conv2d(256, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.bn2 = nn.BatchNorm2d(output_channel, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        self.act2 = nn.SiLU(inplace=True)
+
+    def forward(self, x):
+
+        x = self.conv_stem(x)
+        x = self.act1(self.bn1(x))
+        x = self.eff_block(x)
+        x = self.conv_last(x)
+        x = self.act2(self.bn2(x))
+
+        return x 
 
 
 class ScaledDotProductAttention(nn.Module):
@@ -341,11 +364,16 @@ class TransformerEncoderFor2DFeatures(nn.Module):
     ):
         super(TransformerEncoderFor2DFeatures, self).__init__()
 
-        self.shallow_cnn = DeepCNN300(
+        # self.shallow_cnn = DeepCNN300(
+        #     input_size,
+        #     num_in_features=48,
+        #     output_channel=hidden_dim,
+        #     dropout_rate=dropout_rate,
+        # )
+
+        self.shallow_cnn = CustomCNN(
             input_size,
-            num_in_features=48,
-            output_channel=hidden_dim,
-            dropout_rate=dropout_rate,
+            hidden_dim
         )
         self.positional_encoding = PositionalEncoding2D(hidden_dim)
         self.attention_layers = nn.ModuleList(

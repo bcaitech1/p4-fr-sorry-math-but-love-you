@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import math
 import random
+import timm
 
 from dataset import START, PAD
 
@@ -50,6 +51,28 @@ class ShallowCNN(nn.Module):
 
         return x # (batch, hidden_size, h/8, w/8)
 
+class CustomCNN(nn.Module):
+    def __init__(self, input_channel, output_channel):
+        super(CustomCNN, self).__init__()
+        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
+        self.conv_stem= nn.Conv2d(input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
+        self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        self.act1 = nn.SiLU(inplace=True)
+        self.eff_block = m.blocks
+        self.conv_last = nn.Conv2d(256, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.bn2 = nn.BatchNorm2d(output_channel)
+        self.act2 = nn.SiLU(inplace=True)
+
+    def forward(self, x):
+
+        x = self.conv_stem(x)
+        x = self.act1(self.bn1(x))
+        x = self.eff_block(x)
+        x = self.conv_last(x)
+        x = self.act2(self.bn2(x))
+
+        return x #[b, c, h/32, w/32]
+
 class PositionalEncoding(nn.Module):
     def __init__(self, hidden_size, h=128, w=128, dropout=0.1):
         super(PositionalEncoding, self).__init__()
@@ -83,13 +106,19 @@ class PositionalEncoding(nn.Module):
 
         return signal
     
+    def tiling(self, arr, b, c, h, w):
+        arr_numpy = arr.numpy()
+        arr_tile = np.tile(arr_numpy,(b,c,h,w))
+
+        return torch.from_numpy(arr_tile)
+    
     def forward(self, x):
         features = x
         b,c,h,w = x.size()
 
-        h_encoding = torch.tile(self.h_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(device)
+        h_encoding = self.tiling(self.h_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(device)
         # print(h_encoding.shape)
-        w_encoding = torch.tile(self.w_pos_encoding.unsqueeze(0), [b, 1, 1, 1]).to(device)
+        w_encoding = self.tiling(self.w_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(device)
         # print
         x = torch.mean(x, [2, 3])
         x = self.dense0(x)
@@ -243,10 +272,11 @@ class SATRNEncoder(nn.Module):
     ):
         super(SATRNEncoder, self).__init__()
 
-        self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
+        # self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
+        self.shallow_cnn = CustomCNN(input_channel, hidden_size)
         self.positional_encoding = PositionalEncoding(hidden_size, 
-                                                    h=input_height//8, 
-                                                    w=input_width//8, 
+                                                    h=input_height//32, 
+                                                    w=input_width//32, 
                                                     dropout=dropout_rate)
         self.attention_layers = nn.ModuleList(
             [
