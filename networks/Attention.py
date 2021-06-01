@@ -340,24 +340,25 @@ class Attention(nn.Module):
 
     def beam_search(
         self,
-        input: torch.Tensor, # 이미지로부터 얻은 피쳐맵 [B, ]
+        input: torch.Tensor, # 이미지로부터 얻은 피쳐맵
         sos_token_id: int,
         eos_token_id: int,
         topk: int=1, # 상위 몇 개의 결과를 얻을 것인지
         beam_width: int = 10, # 각 스텝마다 몇 개의 후보군을 선별할지
+        max_sequence: int=None
     ):
         batch_size = len(input)
-        encoder_output = self.encoder(input)
+        encoder_output = self.encoder(input) # [B, C, H, W]
         b, c, h, w = encoder_output.size()
-        src = encoder_output.view(b, c, h*w).transpose(1, 2)
+        src = encoder_output.view(b, c, h*w).transpose(1, 2) # [B, C, HxW] => [B, HxW, C]
 
-        hidden = self.get_initialized_hidden_states(batch_size=batch_size)
+        hidden = self.get_initialized_hidden_states(batch_size=batch_size) # [B, HIDDEN]x2
 
         decoded_batch = []
         for data_idx in range(batch_size):
-            current_src = src[data_idx, :, :].unsqueeze(0)
-            current_hidden = [h[data_idx].unsqueeze(0) for h in hidden]
-            current_input = torch.LongTensor([sos_token_id])
+            current_src = src[data_idx, :, :].unsqueeze(0) # [1, HxW, C]
+            current_hidden = [h[data_idx].unsqueeze(0) for h in hidden] # [1, HIDDEN]x2
+            current_input = torch.LongTensor([sos_token_id]) # [1]
 
             end_nodes = []
             number_required = min((topk + 1), topk - len(end_nodes))  # 최대 생성 횟수
@@ -375,16 +376,19 @@ class Attention(nn.Module):
             )
             nodes.put((-node.eval(), node))  # 최대힙: 확률 높은 토큰을 추출하기 위함
 
-            qsize = 1
+            # qsize = 1
+            num_steps = 1
             while True:
-                if qsize > 4000:
+                # if qsize > max_sequence*beam_width:
+                #     break
+                if num_steps > max_sequence*beam_width:
                     break
 
                 score, n = nodes.get()  # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
                 current_input = n.token_id  # 토큰 ID
                 current_hidden = n.hidden_state  # hidden state
 
-                # 종료 토큰 생성(종료 토큰 & 이전 노드 존재)
+                # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
                 if n.token_id.item() == eos_token_id and n.prev_node != None:
                     end_nodes.append((score, n))
                     if len(end_nodes) >= number_required:
@@ -406,8 +410,8 @@ class Attention(nn.Module):
                 # 모델의 로짓을 확률화
                 log_prob_step = F.log_softmax(prob_step, dim=-1)  # [1, VOCAB_SIZE]
                 log_prob, indices = torch.topk(log_prob_step, beam_width)
-                next_nodes = []
 
+                next_nodes = []
                 for new_k in range(beam_width):
                     decoded_t = indices[0][new_k].view(-1)
                     log_p = log_prob[0][new_k].item()
@@ -425,7 +429,7 @@ class Attention(nn.Module):
                 for i in range(len(next_nodes)):
                     score, next_node = next_nodes[i]
                     nodes.put((score, next_node))
-                qsize += len(next_nodes) - 1
+                num_steps += len(next_nodes) - 1
 
             if len(end_nodes) == 0:
                 end_nodes = [nodes.get() for _ in range(topk)]
