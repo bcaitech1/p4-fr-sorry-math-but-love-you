@@ -343,7 +343,7 @@ def main(config_file):
             # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
         total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        t_0 = total_steps // 3 # 주기를 3으로 설정
+        t_0 = total_steps // 1 # 주기를 3으로 설정
         t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
@@ -361,9 +361,9 @@ def main(config_file):
             lr=options.optimizer.lr,
             weight_decay=options.optimizer.weight_decay,
         )
-        optimizer_state = checkpoint.get("optimizer")
-        if optimizer_state:
-            optimizer.load_state_dict(optimizer_state)
+        # optimizer_state = checkpoint.get("optimizer")
+        # if optimizer_state:
+        #     optimizer.load_state_dict(optimizer_state)
         if options.scheduler.scheduler == "ReduceLROnPlateau":
             lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, patience=options.schduler.patience
@@ -381,8 +381,8 @@ def main(config_file):
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
-    if checkpoint['scheduler']:
-        lr_scheduler.load_state_dict(checkpoint['scheduler'])
+    # if checkpoint['scheduler']:
+    #     lr_scheduler.load_state_dict(checkpoint['scheduler'])
 
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
@@ -580,7 +580,7 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="Augmentations", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
@@ -591,7 +591,7 @@ if __name__ == "__main__":
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/SATRN.yaml",
+        default="./configs/Attention.yaml",
         type=str,
         help="Path of configuration file",
     )
