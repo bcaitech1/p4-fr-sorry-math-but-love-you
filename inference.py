@@ -77,11 +77,25 @@ def main(parser):
         input = d["image"].to(device)
         expected = d["truth"]["encoded"].to(device)
 
+        # Greedy Decoding
         output = model(input, expected, False, 0.0)
         decoded_values = output.transpose(1, 2)
         _, sequence = torch.topk(decoded_values, 1, dim=1)
         sequence = sequence.squeeze(1)
         sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+
+        # Beam Search
+        # sequence = model.beam_search(
+        #     input=input, 
+        #     data_loader=test_data_loader,
+        #     max_sequence=parser.max_sequence,
+        #     beam_width=10,
+        #     topk=1
+        #     )
+        # sequence_str = id_to_string(sequence, test_data, do_eval=1)
+        
+
+        
         for path, predicted in zip(d["file_path"], sequence_str):
             results.append((path, predicted))
 
