@@ -94,8 +94,6 @@ def main(parser):
         #     )
         # sequence_str = id_to_string(sequence, test_data, do_eval=1)
         
-
-        
         for path, predicted in zip(d["file_path"], sequence_str):
             results.append((path, predicted))
 

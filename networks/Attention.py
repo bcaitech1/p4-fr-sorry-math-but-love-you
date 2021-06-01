@@ -7,6 +7,7 @@ from copy import deepcopy
 import numpy as np
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
 # sys.path.insert(0, 'opt/ml/code')
@@ -340,12 +341,30 @@ class Attention(nn.Module):
 
     def beam_search(
         self,
-        input: torch.Tensor, # 이미지로부터 얻은 피쳐맵
-        data_loader,
+        input: torch.Tensor,
+        data_loader: DataLoader,
         topk: int=1, # 상위 몇 개의 결과를 얻을 것인지
         beam_width: int = 10, # 각 스텝마다 몇 개의 후보군을 선별할지
-        max_sequence: int=None
+        max_sequence: int=230
     ):
+        """빔서치 디코딩을 수행하는 함수. inference시에만 활용
+
+        Args:
+            input (Tensor): DataLoader로부터 얻은 input batch
+            data_loader (DataLoader): inference에 활용되는 DataLoader. 스페셜 토큰 ID 정보를 얻기 위함
+            beam_width(int): 스텝마다 확률이 높게 측정된 토큰을 상위 몇 개 추릴 것인지 설정
+                - Greedy Decoding에 비해 (beam_width)배 만큼 추론 시간 소요
+            topk (int, optional): 각 샘플 당 몇 개의 문장을 생성할 지. Defaults to 1
+                - NOTE. 현재 top1에 대해서만 구현됨
+            max_sequence(int): 최대 몇 step까지 생성할지 설정
+
+        Returns:
+            Tensor: id_to_string에 입력 가능한 형태의 텐서 [B, MAX_SEQUENCE]
+        
+        References.
+            - budzianowski, PyTorch-Beam-Search, https://github.com/budzianowski/PyTorch-Beam-Search-Decoding
+            - 312shaun, Pytorch-seq2seq-Beam-Search, https://github.com/312shan/Pytorch-seq2seq-Beam-Search
+        """
         sos_token_id = data_loader.dataset.token_to_id['<SOS>']
         eos_token_id = data_loader.dataset.token_to_id['<EOS>']
         pad_token_id = data_loader.dataset.token_to_id['<PAD>']
