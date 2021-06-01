@@ -17,3 +17,44 @@ class BeamSearchNode(object):
 
     def __gt__(self, other):
         return self.len > other.len
+
+
+def beam_search_ens(models: list, num_steps: int=230):
+    
+    batch
+    for idx in range(num_steps):
+        logit_list = []
+        for model in models:
+            model.cuda()
+
+            dict = model.beam_search(asdfasdfas, step=idx)
+
+            hidden_state = dict.get('hidden_state', None)
+
+            if hidden_state is None: # SATRN
+
+
+            
+            Attention hidden_state - LSTM
+            SATRN - None
+            logit_list.append(logit)
+            model.cpu()
+        
+        logit = mean()
+
+        asdfasdfasdfasdf
+        asd
+        Falsesdf
+        as
+        dfa
+        sdf
+
+        asd
+        filterasdf
+        asdf
+        a
+        sdf
+        asdf
+
+    outut
+    return output

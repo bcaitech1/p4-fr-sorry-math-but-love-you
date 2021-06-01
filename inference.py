@@ -88,11 +88,17 @@ def main(parser):
         # sequence = model.beam_search(
         #     input=input, 
         #     data_loader=test_data_loader,
-        #     max_sequence=parser.max_sequence,
-        #     beam_width=10,
         #     topk=1
+        #     beam_width=10,
+        #     max_sequence=parser.max_sequence,
         #     )
         # sequence_str = id_to_string(sequence, test_data, do_eval=1)
+
+        input: torch.Tensor,
+        data_loader: DataLoader,
+        topk: int=1, # 상위 몇 개의 결과를 얻을 것인지
+        beam_width: int = 10, # 각 스텝마다 몇 개의 후보군을 선별할지
+        max_sequence: int=230
         
         for path, predicted in zip(d["file_path"], sequence_str):
             results.append((path, predicted))

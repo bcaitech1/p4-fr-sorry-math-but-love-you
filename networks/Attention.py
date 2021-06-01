@@ -10,7 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
-# sys.path.insert(0, 'opt/ml/code')
+sys.path.insert(0, '../')
 from dataset import START, PAD
 from beam_search import BeamSearchNode
 
@@ -346,6 +346,7 @@ class Attention(nn.Module):
         topk: int=1, # 상위 몇 개의 결과를 얻을 것인지
         beam_width: int = 10, # 각 스텝마다 몇 개의 후보군을 선별할지
         max_sequence: int=230
+        # step: int=None
     ):
         """빔서치 디코딩을 수행하는 함수. inference시에만 활용
 
@@ -486,6 +487,7 @@ class Attention(nn.Module):
                 decoded_sample = decoded_sample[:max_sequence]
             outputs.append(decoded_sample)
         outputs = torch.tensor(outputs)
+
         return outputs
 
 
