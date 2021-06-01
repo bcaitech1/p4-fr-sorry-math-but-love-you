@@ -209,7 +209,7 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
+            # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
