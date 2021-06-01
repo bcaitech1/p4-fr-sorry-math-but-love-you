@@ -377,7 +377,7 @@ class Attention(nn.Module):
 
             qsize = 1
             while True:
-                if qsize > 2000:
+                if qsize > 4000:
                     break
 
                 score, n = nodes.get()  # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
@@ -436,7 +436,6 @@ class Attention(nn.Module):
             ):  # 가장 마지막 노드에서 역추적
                 utterance = []
                 utterance.append(n.token_id.cpu())
-                print(n.token_id)
                 # back trace
                 while n.prev_node != None:
                     n = n.prev_node

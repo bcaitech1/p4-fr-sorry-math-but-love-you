@@ -11,18 +11,15 @@ from metrics import word_error_rate, sentence_acc
 from checkpoint import load_checkpoint
 from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
 from flags import Flags
-from utils import id_to_string, get_network, get_optimizer
+from utils import id_to_string, get_network, get_optimizer, set_seed
 
 
 def main(parser):
     is_cuda = torch.cuda.is_available()
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
-    torch.manual_seed(options.seed)
-    random.seed(options.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
+    set_seed(options.seed)
+    
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
