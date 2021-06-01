@@ -211,6 +211,8 @@ def get_train_transforms(height, width):
         [
             A.Resize(height, width),
             A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
+            # A.RandomScale(scale_limit=0.1, interpolation=1, always_apply=False, p=0.5),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -346,7 +348,7 @@ def main(config_file):
 
         total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
         t_0 = total_steps // 1 # 주기를 3으로 설정
-        t_up = int(t_0*0.2) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+        t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
@@ -584,19 +586,19 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="DEBUG-iloveslowfood", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="Augmentations", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
         # default="SATRN-RGB3-IM2LATEX-TOKEN576-iloveslowfood",
-        default='check-prob-output',
+        default='Normalization',
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/SATRN-im2latex.yaml",
+        default="./configs/Attention.yaml",
         type=str,
         help="Path of configuration file",
     )
