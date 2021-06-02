@@ -13,6 +13,7 @@ import torch.nn.functional as F
 sys.path.insert(0, '../')
 from dataset import START, PAD
 from beam_search import BeamSearchNode
+from criterion import LabelSmoothingLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -322,6 +323,7 @@ class Attention(nn.Module):
         )
 
         self.criterion = nn.CrossEntropyLoss()
+        # self.criterion = LabelSmoothingLoss(classes=len(train_dataset.id_to_token), smoothing=0.1)
 
         if checkpoint:
             self.load_state_dict(checkpoint)
@@ -375,14 +377,13 @@ class Attention(nn.Module):
         b, c, h, w = encoder_output.size()
         src = encoder_output.view(b, c, h*w).transpose(1, 2) # [B, C, HxW] => [B, HxW, C]
 
+
+        decoded_batch = []
         with torch.no_grad():
             hidden = self.get_initialized_hidden_states(batch_size=batch_size) # [B, HIDDEN]x2
 
-            decoded_batch = []
+            # 문장 단위 생성
             for data_idx in range(batch_size):
-                current_src = src[data_idx, :, :].unsqueeze(0) # [1, HxW, C]
-                current_hidden = [h[data_idx].unsqueeze(0) for h in hidden] # [1, HIDDEN]x2
-                current_input = torch.LongTensor([sos_token_id]) # [1]
 
                 end_nodes = []
                 number_required = min((topk + 1), topk - len(end_nodes))  # 최대 생성 횟수
@@ -391,6 +392,9 @@ class Attention(nn.Module):
                 nodes = PriorityQueue()
 
                 # 시작 토큰 초기화
+                current_src = src[data_idx, :, :].unsqueeze(0) # [B=1, HxW, C]
+                current_input = torch.LongTensor([sos_token_id]) # [1]
+                current_hidden = [h[data_idx].unsqueeze(0) for h in hidden] # [B=1, HIDDEN]x2
                 node = BeamSearchNode(
                     hidden_state=deepcopy(current_hidden),
                     prev_node=None,
@@ -398,15 +402,19 @@ class Attention(nn.Module):
                     log_prob=0,
                     length=1,
                 )
-                nodes.put((-node.eval(), node))  # 최대힙: 확률 높은 토큰을 추출하기 위함
+                score = -node.eval()
+
+                # 최대힙: 확률 높은 토큰을 추출하기 위함
+                nodes.put((score, node))  
                 
                 num_steps = 0
                 while True:
                     if num_steps >= (max_sequence-1)*beam_width:
                         break
 
-                    score, n = nodes.get()  # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
-                    current_input = n.token_id  # 토큰 ID
+                    # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
+                    score, n = nodes.get()  
+                    current_input = n.token_id  # 토큰 ID # [B=1]
                     current_hidden = n.hidden_state  # hidden state
 
                     # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
@@ -417,27 +425,26 @@ class Attention(nn.Module):
                         else:
                             continue
 
-                    # Attention 모델의 디코딩 과정
-                    input_embedded = self.decoder.embedding(current_input.to(device))
+                    #------디코딩------
+                    input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
+
+                    # Hidden state 갱신
                     current_hidden, alpha = self.decoder.attention_cell(
                         prev_hidden=current_hidden, src=current_src, tgt=input_embedded
-                    )
+                    ) # hidden state 갱신
                     prob_step = self.decoder.generator(
                         current_hidden[0]
                     )  # [1, VOCAB_SIZE] (num_layers=1) ***앙상블에 필요한 로짓
-                    _, next_input = prob_step.max(dim=1)  # [1], 현 스텝 최고확률의 토큰ID
-                    decoder_input = next_input # 다음 토큰으로 사용
 
                     # 모델의 로짓을 확률화
                     log_prob_step = F.log_softmax(prob_step, dim=-1)  # [1, VOCAB_SIZE]
                     log_prob, indices = torch.topk(log_prob_step, beam_width)
 
-                    # [?]
+                    # 다음 state에 활용할 {beam_width}개 후보 노드를 put
                     next_nodes = []
                     for new_k in range(beam_width):
                         decoded_t = indices[0][new_k].view(-1)
                         log_p = log_prob[0][new_k].item()
-
                         node = BeamSearchNode(
                             hidden_state=deepcopy(current_hidden),
                             prev_node=n,
@@ -461,10 +468,10 @@ class Attention(nn.Module):
                 utterances = []
                 for score, n in sorted(
                     end_nodes, key=operator.itemgetter(0)
-                ):  # 가장 마지막 노드에서 역추적
+                ):  
                     utterance = []
                     utterance.append(n.token_id.item())
-                    # back trace
+                    # 가장 마지막 노드에서 역추적
                     while n.prev_node != None:
                         n = n.prev_node
                         utterance.append(n.token_id.item())
