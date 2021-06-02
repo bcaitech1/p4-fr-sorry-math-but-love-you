@@ -209,7 +209,9 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
+            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.2),
+            # A.CLAHE(p=0.2),
+            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -217,7 +219,14 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-    return A.Compose([A.Resize(height, width), ToTensorV2(p=1.0)])
+    return A.Compose(
+        [
+            A.Resize(height, width),
+            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
+            ToTensorV2(p=1.0),
+        ],
+        p=1.0,
+    )
 
 
 def main(config_file):
