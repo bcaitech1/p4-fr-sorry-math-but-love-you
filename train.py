@@ -224,7 +224,7 @@ def get_train_transforms(height, width):
 def get_valid_transforms(height, width):
     return A.Compose([
         A.Resize(height, width), 
-        # A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
+        A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
         ToTensorV2(p=1.0)]
         )
 
