@@ -14,8 +14,9 @@ from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
 
 
-def validation(parser):
+def validate(parser):
     from dataset import collate_batch, LoadDataset, split_gt
+    import time
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
@@ -76,6 +77,7 @@ def validation(parser):
     sent_acc = 0
     num_sent_acc = 0
 
+    start = time.time()
     with torch.no_grad():
         with tqdm(
             desc=f"Validation",
@@ -91,24 +93,24 @@ def validation(parser):
                 expected[expected == -1] = valid_data_loader.dataset.token_to_id[PAD]
 
                 # Beam Search
-                # sequence = model.beam_search(
-                #     input=input,
-                #     data_loader=valid_data_loader,
-                #     topk=1,
-                #     beam_width=5,
-                #     max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
-                # )
+                sequence = model.beam_search(
+                    input=input,
+                    data_loader=valid_data_loader,
+                    topk=1,
+                    beam_width=10,
+                    max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+                )
 
                 # Greedy Decoding
-                output = model(
-                    input=input, 
-                    expected=expected, 
-                    is_train=False,
-                    teacher_forcing_ratio=0.0
-                    )
-                decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+                # output = model(
+                #     input=input, 
+                #     expected=expected, 
+                #     is_train=False,
+                #     teacher_forcing_ratio=0.0
+                #     )
+                # decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+                # _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+                # sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
                 expected_str = id_to_string(expected, valid_data_loader, do_eval=1)
@@ -121,10 +123,11 @@ def validation(parser):
                 total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
                 pbar.update(curr_batch_size)
-
+    inference_time = (time.time() - start) / 60 # minutes
     valid_sentence_accuracy = sent_acc / num_sent_acc
     valid_wer = wer / num_wer
     valid_score = final_metric(sentence_acc=valid_sentence_accuracy, word_error_rate=valid_wer)
+    print(f'INFERENCE TIME: {inference_time}')
     print(f'SCORE: {valid_score} SENTENCE ACC: {valid_sentence_accuracy} WER: {valid_wer}')
 
 
@@ -261,4 +264,4 @@ if __name__ == "__main__":
 
     parser = parser.parse_args()
     # main(parser)
-    validation(parser)
+    validate(parser)

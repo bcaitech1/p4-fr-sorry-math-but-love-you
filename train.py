@@ -211,16 +211,10 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-<<<<<<< HEAD
             # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
             # A.RandomScale(scale_limit=0.1, interpolation=1, always_apply=False, p=0.5),
             # A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
-            # A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
-=======
-            # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.2),
-            # A.CLAHE(p=0.2),
-            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
->>>>>>> upstream/master
+            A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -228,22 +222,11 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-<<<<<<< HEAD
     return A.Compose([
         A.Resize(height, width), 
         A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
         ToTensorV2(p=1.0)]
         )
-=======
-    return A.Compose(
-        [
-            A.Resize(height, width),
-            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
-            ToTensorV2(p=1.0),
-        ],
-        p=1.0,
-    )
->>>>>>> upstream/master
 
 
 def main(config_file):
