@@ -15,8 +15,9 @@ from utils import id_to_string, get_network, get_optimizer, set_seed
 
 
 def validate(parser):
-    from dataset import collate_batch, LoadDataset, split_gt
     import time
+    from dataset import collate_batch, LoadDataset, split_gt
+
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
@@ -132,9 +133,9 @@ def validate(parser):
 
 
 def main(parser):
+    is_cuda = torch.cuda.is_available()
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
-    is_cuda = torch.cuda.is_available()
     set_seed(options.seed)
     
     hardware = "cuda" if is_cuda else "cpu"
@@ -242,7 +243,24 @@ if __name__ == "__main__":
         type=int,
         help="batch size when doing inference",
     )
+    #-----------------------
+    parser.add_argument(
+        "--decode_type",
+        dest="decode_type",
+        default='greedy',
+        type=str,
+        help="디코딩 방식 설정. 'greedy', 'beam'",
+    )
 
+    parser.add_argument(
+        "--beam_width",
+        dest="beam_width",
+        default=5,
+        type=int,
+        help="빔서치 사용 시 스텝별 후보 수 설정",
+    )
+    #-----------------------
+    
     eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
     file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
     parser.add_argument(
