@@ -73,9 +73,9 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             with autocast():
-                output = model(input, expected, True, teacher_forcing_ratio)  # batch_size x num_steps x num_classes
+                output = model(input, expected, True, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2)  # batch_size x num_classes x num_steps
+                decoded_values = output.transpose(1, 2)
                 _, sequence = torch.topk(decoded_values, 1, dim=1)
                 sequence = sequence.squeeze(1)
 
