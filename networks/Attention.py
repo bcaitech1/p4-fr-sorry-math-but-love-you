@@ -421,18 +421,18 @@ class Attention(nn.Module):
                     input_embedded = self.decoder.embedding(current_input.to(device))
                     current_hidden, alpha = self.decoder.attention_cell(
                         prev_hidden=current_hidden, src=current_src, tgt=input_embedded
-                    )
+                    ) # hidden state 갱신
                     prob_step = self.decoder.generator(
                         current_hidden[0]
                     )  # [1, VOCAB_SIZE] (num_layers=1) ***앙상블에 필요한 로짓
-                    _, next_input = prob_step.max(dim=1)  # [1], 현 스텝 최고확률의 토큰ID
-                    current_input = next_input # 다음 토큰으로 사용
+                    # _, next_input = prob_step.max(dim=1)  # [1], 현 스텝 최고확률의 토큰ID
+                    # current_input = next_input # 다음 토큰으로 사용
 
                     # 모델의 로짓을 확률화
                     log_prob_step = F.log_softmax(prob_step, dim=-1)  # [1, VOCAB_SIZE]
                     log_prob, indices = torch.topk(log_prob_step, beam_width)
 
-                    # [?]
+                    # 다음 state에 활용할 {beam_width}개 후보 노드를 put
                     next_nodes = []
                     for new_k in range(beam_width):
                         decoded_t = indices[0][new_k].view(-1)
