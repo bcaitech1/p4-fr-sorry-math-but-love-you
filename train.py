@@ -72,14 +72,14 @@ def train_one_epoch(
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            # with autocast():
-            output = model(input, expected, True, teacher_forcing_ratio)  # batch_size x num_steps x num_classes
+            with autocast():
+                output = model(input, expected, True, teacher_forcing_ratio)  # batch_size x num_steps x num_classes
 
-            decoded_values = output.transpose(1, 2)  # batch_size x num_classes x num_steps
-            _, sequence = torch.topk(decoded_values, 1, dim=1)
-            sequence = sequence.squeeze(1)
+                decoded_values = output.transpose(1, 2)  # batch_size x num_classes x num_steps
+                _, sequence = torch.topk(decoded_values, 1, dim=1)
+                sequence = sequence.squeeze(1)
 
-            loss = criterion(decoded_values, expected[:, 1:])
+                loss = criterion(decoded_values, expected[:, 1:])
 
             optim_params = [
                 p
@@ -87,17 +87,15 @@ def train_one_epoch(
                 for p in param_group["params"]
             ]
             optimizer.zero_grad()
-            loss.backward()
-            # scaler.scale(loss).backward()
-            # scaler.unscale_(optimizer)
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
 
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             # cycle
-            # scaler.step(optimizer)
-            # scaler.update()
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -167,14 +165,14 @@ def valid_one_epoch(
             expected = d["truth"]["encoded"].to(device)
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-            # with autocast():
-            output = model(input, expected, False, teacher_forcing_ratio)
+            with autocast():
+                output = model(input, expected, False, teacher_forcing_ratio)
 
-            decoded_values = output.transpose(1, 2)
-            _, sequence = torch.topk(decoded_values, 1, dim=1)
-            sequence = sequence.squeeze(1)
+                decoded_values = output.transpose(1, 2)
+                _, sequence = torch.topk(decoded_values, 1, dim=1)
+                sequence = sequence.squeeze(1)
 
-            loss = criterion(decoded_values, expected[:, 1:])
+                loss = criterion(decoded_values, expected[:, 1:])
 
             losses.append(loss.item())
 
@@ -370,9 +368,9 @@ def main(config_file):
             lr=options.optimizer.lr,
             weight_decay=options.optimizer.weight_decay,
         )
-        # optimizer_state = checkpoint.get("optimizer")
-        # if optimizer_state:
-        #     optimizer.load_state_dict(optimizer_state)
+        optimizer_state = checkpoint.get("optimizer")
+        if optimizer_state:
+            optimizer.load_state_dict(optimizer_state)
         if options.scheduler.scheduler == "ReduceLROnPlateau":
             lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, patience=options.schduler.patience
@@ -390,8 +388,8 @@ def main(config_file):
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
-    # if checkpoint['scheduler']:
-    #     lr_scheduler.load_state_dict(checkpoint['scheduler'])
+    if checkpoint['scheduler']:
+        lr_scheduler.load_state_dict(checkpoint['scheduler'])
 
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
@@ -593,14 +591,14 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="jungu",
+        default="exp_name",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/Attention.yaml",
+        default="./configs/SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )
