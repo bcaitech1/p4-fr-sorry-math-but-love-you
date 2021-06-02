@@ -435,14 +435,13 @@ class PositionEncoder1D(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def generate_encoder(self, in_channels, max_len):
-        pos = torch.arange(max_len).float().unsqueeze(1)
+        pos = torch.arange(max_len).float().unsqueeze(1) # [MAX_LEN, 1]
+        i = torch.arange(in_channels).float().unsqueeze(0) # [1, IN_CHANNELS]
+        angle_rates = 1 / torch.pow(10000, (2 * (i // 2)) / in_channels) # [1, IN_CHANNELS]
 
-        i = torch.arange(in_channels).float().unsqueeze(0)
-        angle_rates = 1 / torch.pow(10000, (2 * (i // 2)) / in_channels)
-
-        position_encoder = pos * angle_rates
-        position_encoder[:, 0::2] = torch.sin(position_encoder[:, 0::2])
-        position_encoder[:, 1::2] = torch.cos(position_encoder[:, 1::2])
+        position_encoder = pos * angle_rates # [MAX_LEN, IN_CHANNELS], broad-casting
+        position_encoder[:, 0::2] = torch.sin(position_encoder[:, 0::2]) # 짝수번째 - SIN
+        position_encoder[:, 1::2] = torch.cos(position_encoder[:, 1::2]) # 홀수번째 - COS
 
         return position_encoder
 
@@ -592,10 +591,10 @@ class SATRN(nn.Module):
     def forward(self, input, expected, is_train, teacher_forcing_ratio):
         enc_result = self.encoder(input)
         dec_result = self.decoder(
-            enc_result,
-            expected[:, :-1],
-            is_train,
-            expected.size(1),
-            teacher_forcing_ratio,
+            src=enc_result,
+            text=expected[:, :-1],
+            is_train=is_train,
+            batch_max_length=expected.size(1),
+            teacher_forcing_ratio=teacher_forcing_ratio,
         )
         return dec_result
