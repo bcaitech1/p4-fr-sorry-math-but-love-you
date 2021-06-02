@@ -95,7 +95,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default=["/opt/ml/code/log/satrn/checkpoints/0021.pth"],
+        default=["/opt/ml/code/log/my_satrn/checkpoints/MySATRN_best_model.pth"],
         nargs='*',
         help="Path of checkpoint file",
     )

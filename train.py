@@ -346,11 +346,19 @@ def main(config_file):
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
+<<<<<<< HEAD
             T_0=options.num_epochs*len(train_data_loader),
             T_mult=1,
             eta_max=options.optimizer.lr,
             T_up=options.num_epochs*len(train_data_loader)//10,
             gamma=1.0,
+=======
+            T_0=t_0,
+            T_mult=1,
+            eta_max=options.optimizer.lr,
+            T_up=t_up,
+            gamma=0.8,
+>>>>>>> 8b3808b24beda109b0fdf63965ecaf80d9e74b9c
         )
     else:
         optimizer = get_optimizer(
@@ -379,11 +387,14 @@ def main(config_file):
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
+<<<<<<< HEAD
         elif options.scheduler.scheduler == "CosineAnnealingWarmRestarts":
             lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
                 optimizer, 
                 T_0=options.num_epochs*len(train_data_loader)
             )
+=======
+>>>>>>> 8b3808b24beda109b0fdf63965ecaf80d9e74b9c
     if checkpoint['scheduler']:
         lr_scheduler.load_state_dict(checkpoint['scheduler'])
 
@@ -582,11 +593,15 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="SATRN-MINIMAL", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
+<<<<<<< HEAD
         default="SATRN_JY_implement_20epoch_256_512",
+=======
+        default="SATRN-RGB3-iloveslowfood",
+>>>>>>> 8b3808b24beda109b0fdf63965ecaf80d9e74b9c
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

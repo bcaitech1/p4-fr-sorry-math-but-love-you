@@ -7,6 +7,7 @@ import torch.optim as optim
 from networks.Attention import Attention
 from networks.SATRN import SATRN
 from networks.My_SATRN import MySATRN
+from networks.SWIN import SWIN
 
 def get_network(
     model_type,
@@ -18,11 +19,14 @@ def get_network(
     model = None
     if model_type == "Attention":
         model = Attention(FLAGS, train_dataset, model_checkpoint).to(device)
-
     elif model_type == 'SATRN':
         model = SATRN(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == 'MySATRN':
         model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
+    elif model_type == 'SWIN':
+        model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
+        checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
+        model.encoder.load_state_dict(checkpoint['model'], strict=False)
     else:
         raise NotImplementedError
 

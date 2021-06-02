@@ -54,12 +54,12 @@ class ShallowCNN(nn.Module):
 class CustomCNN(nn.Module):
     def __init__(self, input_channel, output_channel):
         super(CustomCNN, self).__init__()
-        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
+        m = timm.create_model('tf_efficientnetv2_m_in21ft1k', pretrained=True)
         self.conv_stem= nn.Conv2d(input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
         self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
         self.act1 = nn.SiLU(inplace=True)
         self.eff_block = m.blocks
-        self.conv_last = nn.Conv2d(256, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.conv_last = nn.Conv2d(512, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bn2 = nn.BatchNorm2d(output_channel)
         self.act2 = nn.SiLU(inplace=True)
 
