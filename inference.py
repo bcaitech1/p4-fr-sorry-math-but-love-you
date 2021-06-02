@@ -111,6 +111,14 @@ def validate(parser):
                         beam_width=parser.beam_width,
                         max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
                     )
+                elif parser.decode_type == 'greedy-ensemble':
+                    raise NotImplementedError
+                
+                elif parser.decode_type == 'beam-ensemble':
+                    raise NotImplementedError
+                
+                else:
+                    raise NotImplementedError
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
                 expected_str = id_to_string(expected, valid_data_loader, do_eval=1)
@@ -205,6 +213,14 @@ def main(parser):
                     beam_width=parser.beam_width,
                     max_sequence=parser.max_sequence,
                     )
+            elif parser.decode_type == 'greedy-ensemble':
+                    raise NotImplementedError
+                
+            elif parser.decode_type == 'beam-ensemble':
+                raise NotImplementedError
+            
+            else:
+                raise NotImplementedError
 
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
             
@@ -246,7 +262,7 @@ if __name__ == "__main__":
         dest="decode_type",
         default='greedy',
         type=str,
-        help="디코딩 방식 설정. 'greedy', 'beam'",
+        help="디코딩 방식 설정. 'greedy', 'beam', 'greedy-ensemble', 'beam-ensemble'",
     )
 
     parser.add_argument(
