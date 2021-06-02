@@ -199,7 +199,6 @@ def main(parser):
                 sequence = sequence.squeeze(1)
 
             elif parser.decode_type == 'beam':
-                # Beam Search
                 sequence = model.beam_search(
                     input=input, 
                     data_loader=test_data_loader,
@@ -223,7 +222,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        # default="./log/satrn/checkpoints/0021.pth",
         default="./configs/Attention_best_model.pth",
         type=str,
         help="Path of checkpoint file",
