@@ -6,6 +6,8 @@ import csv
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 from metrics import word_error_rate, sentence_acc
 from checkpoint import load_checkpoint
@@ -15,35 +17,24 @@ from utils import id_to_string, get_network, get_optimizer
 
 
 def main(parser):
-    is_cuda = torch.cuda.is_available()
-    checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
-    options = Flags(checkpoint["configs"]).get()
-    torch.manual_seed(options.seed)
-    random.seed(options.seed)
+    torch.manual_seed(21)
+    random.seed(21)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+    is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
-    print("--------------------------------")
-    print("Running {} on device {}\n".format(options.network, device))
-
-    model_checkpoint = checkpoint["model"]
-    if model_checkpoint:
-        print(
-            "[+] Checkpoint\n",
-            "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
-        )
-    print(options.input_size.height)
-
-    transformed = transforms.Compose(
-        [
-            transforms.Resize((options.input_size.height, options.input_size.width)),
-            transforms.ToTensor(),
-        ]
-    )
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
+
+    transformed = A.Compose([
+        A.Resize(256, 512, p=1.),
+        ToTensorV2(),
+    ])
+    
+    token_to_id_ = load_checkpoint(parser.checkpoint[0], cuda=is_cuda)['token_to_id']
+    id_to_token_ = load_checkpoint(parser.checkpoint[0], cuda=is_cuda)['id_to_token']
 
     root = os.path.join(os.path.dirname(parser.file_path), "images")
     with open(parser.file_path, "r") as fd:
@@ -51,37 +42,42 @@ def main(parser):
         data = list(reader)
     test_data = [[os.path.join(root, x[0]), x[0], dummy_gt] for x in data]
     test_dataset = LoadEvalDataset(
-        test_data, checkpoint["token_to_id"], checkpoint["id_to_token"], crop=False, transform=transformed,
-        rgb=options.data.rgb
+        test_data, token_to_id_, id_to_token_, crop=False, transform=transformed,
+        rgb=3
     )
     test_data_loader = DataLoader(
         test_dataset,
         batch_size=parser.batch_size,
         shuffle=False,
-        num_workers=options.num_workers,
+        num_workers=8,
         collate_fn=collate_eval_batch,
     )
 
-    print(
-        "[+] Data\n",
-        "The number of test samples : {}\n".format(len(test_dataset)),
-    )
+    models = []
 
-    model = get_network(
-        options.network,
-        options,
-        model_checkpoint,
-        device,
-        test_dataset,
-    )
-    model.eval()
+    for parser_checkpoint in parser.checkpoint:
+        checkpoint = load_checkpoint(parser_checkpoint, cuda=is_cuda)
+        options = Flags(checkpoint["configs"]).get()
+        model_checkpoint = checkpoint["model"]
+        model = get_network(options.network, options, model_checkpoint, device, test_dataset)
+        model.eval()
+        models.append(model)
+    
+    print("--------------------------------")
+    print("Running {} on device {}\n".format(options.network, device))
+
     results = []
     for d in tqdm(test_data_loader):
-        input = d["image"].to(device)
+        input = d["image"].to(device).float()
         expected = d["truth"]["encoded"].to(device)
-
-        output = model(input, expected, False, 0.0)
-        decoded_values = output.transpose(1, 2)
+        decoded_values = None
+        for model in models:
+            output = model(input, expected, False, 0.0)
+            if decoded_values is None:
+                decoded_values = output.transpose(1, 2)
+            else:
+                decoded_values += ouput.transpose(1, 2)
+        decoded_values /= len(models)
         _, sequence = torch.topk(decoded_values, 1, dim=1)
         sequence = sequence.squeeze(1)
         sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
@@ -99,8 +95,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/satrn/checkpoints/0021.pth",
-        type=str,
+        default=["/opt/ml/code/log/satrn/checkpoints/0021.pth"],
+        nargs='*',
         help="Path of checkpoint file",
     )
     parser.add_argument(
