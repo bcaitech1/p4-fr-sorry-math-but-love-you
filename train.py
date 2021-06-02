@@ -211,9 +211,6 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
-            # A.RandomScale(scale_limit=0.1, interpolation=1, always_apply=False, p=0.5),
-            # A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
             A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
             ToTensorV2(p=1.0),
         ],
@@ -596,7 +593,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="exp_name",
+        default="LSLoss + Norm ",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

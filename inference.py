@@ -5,6 +5,8 @@ from tqdm import tqdm
 import csv
 import torch
 from torch.utils.data import DataLoader
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
@@ -158,7 +160,8 @@ def main(parser):
         )
     print(options.input_size.height)
 
-    transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
+    # transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
+    transformed = A.Compose([A.Resize(256, 512, p=1.), ToTensorV2()])
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
@@ -238,7 +241,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./configs/Attention_best_model.pth",
+        default="./log/MySATRN_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
