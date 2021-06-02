@@ -96,7 +96,7 @@ def train_one_epoch(
             # cycle
             scaler.step(optimizer)
             scaler.update()
-            
+
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
