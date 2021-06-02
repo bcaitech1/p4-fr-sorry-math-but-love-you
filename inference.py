@@ -15,8 +15,9 @@ from utils import id_to_string, get_network, get_optimizer, set_seed
 
 
 def validate(parser):
-    from dataset import collate_batch, LoadDataset, split_gt
     import time
+    from dataset import collate_batch, LoadDataset, split_gt
+
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
@@ -92,25 +93,32 @@ def validate(parser):
                 expected = d["truth"]["encoded"].to(device)
                 expected[expected == -1] = valid_data_loader.dataset.token_to_id[PAD]
 
-                # Beam Search
-                sequence = model.beam_search(
-                    input=input,
-                    data_loader=valid_data_loader,
-                    topk=1,
-                    beam_width=10,
-                    max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
-                )
+                if parser.decode_type == 'greedy':
+                    output = model(
+                        input=input, 
+                        expected=expected, 
+                        is_train=False,
+                        teacher_forcing_ratio=0.0
+                        )
+                    decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+                    _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+                    sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
-                # Greedy Decoding
-                # output = model(
-                #     input=input, 
-                #     expected=expected, 
-                #     is_train=False,
-                #     teacher_forcing_ratio=0.0
-                #     )
-                # decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                # _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                # sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+                elif parser.decode_type == 'beam':
+                    sequence = model.beam_search(
+                        input=input,
+                        data_loader=valid_data_loader,
+                        beam_width=parser.beam_width,
+                        max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+                    )
+                elif parser.decode_type == 'greedy-ensemble':
+                    raise NotImplementedError
+                
+                elif parser.decode_type == 'beam-ensemble':
+                    raise NotImplementedError
+                
+                else:
+                    raise NotImplementedError
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
                 expected_str = id_to_string(expected, valid_data_loader, do_eval=1)
@@ -132,9 +140,9 @@ def validate(parser):
 
 
 def main(parser):
+    is_cuda = torch.cuda.is_available()
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
-    is_cuda = torch.cuda.is_available()
     set_seed(options.seed)
     
     hardware = "cuda" if is_cuda else "cpu"
@@ -192,21 +200,28 @@ def main(parser):
             input = d["image"].float().to(device)
             expected = d["truth"]["encoded"].to(device)
 
-            # Greedy Decoding
-            # output = model(input, expected, False, 0.0)
-            # decoded_values = output.transpose(1, 2)
-            # _, sequence = torch.topk(decoded_values, 1, dim=1)
-            # sequence = sequence.squeeze(1)
-            # sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+            if parser.decode_type == 'greedy':
+                output = model(input, expected, False, 0.0)
+                decoded_values = output.transpose(1, 2)
+                _, sequence = torch.topk(decoded_values, 1, dim=1)
+                sequence = sequence.squeeze(1)
 
-            # Beam Search
-            sequence = model.beam_search(
-                input=input, 
-                data_loader=test_data_loader,
-                topk=1,
-                beam_width=10,
-                max_sequence=parser.max_sequence,
-                )
+            elif parser.decode_type == 'beam':
+                sequence = model.beam_search(
+                    input=input, 
+                    data_loader=test_data_loader,
+                    beam_width=parser.beam_width,
+                    max_sequence=parser.max_sequence,
+                    )
+            elif parser.decode_type == 'greedy-ensemble':
+                    raise NotImplementedError
+                
+            elif parser.decode_type == 'beam-ensemble':
+                raise NotImplementedError
+            
+            else:
+                raise NotImplementedError
+
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
             
             for path, predicted in zip(d["file_path"], sequence_str):
@@ -223,7 +238,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        # default="./log/satrn/checkpoints/0021.pth",
         default="./configs/Attention_best_model.pth",
         type=str,
         help="Path of checkpoint file",
@@ -242,6 +256,23 @@ if __name__ == "__main__":
         type=int,
         help="batch size when doing inference",
     )
+    #-----------------------
+    parser.add_argument(
+        "--decode_type",
+        dest="decode_type",
+        default='greedy',
+        type=str,
+        help="디코딩 방식 설정. 'greedy', 'beam', 'greedy-ensemble', 'beam-ensemble'",
+    )
+
+    parser.add_argument(
+        "--beam_width",
+        dest="beam_width",
+        default=5,
+        type=int,
+        help="빔서치 사용 시 스텝별 후보 수 설정",
+    )
+    #-----------------------
 
     eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
     file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
@@ -263,5 +294,5 @@ if __name__ == "__main__":
     )
 
     parser = parser.parse_args()
-    # main(parser)
-    validate(parser)
+    main(parser)
+    # validate(parser)
