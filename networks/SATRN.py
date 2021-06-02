@@ -430,8 +430,8 @@ class PositionEncoder1D(nn.Module):
     def __init__(self, in_channels, max_len=500, dropout=0.1):
         super(PositionEncoder1D, self).__init__()
 
-        self.position_encoder = self.generate_encoder(in_channels, max_len)
-        self.position_encoder = self.position_encoder.unsqueeze(0)
+        self.position_encoder = self.generate_encoder(in_channels, max_len) # [MAX_LEN, IN_CHANNELS]
+        self.position_encoder = self.position_encoder.unsqueeze(0) # [1, MAX_LEN, IN_CHANNELS]
         self.dropout = nn.Dropout(p=dropout)
 
     def generate_encoder(self, in_channels, max_len):
@@ -440,17 +440,29 @@ class PositionEncoder1D(nn.Module):
         angle_rates = 1 / torch.pow(10000, (2 * (i // 2)) / in_channels) # [1, IN_CHANNELS]
 
         position_encoder = pos * angle_rates # [MAX_LEN, IN_CHANNELS], broad-casting
-        position_encoder[:, 0::2] = torch.sin(position_encoder[:, 0::2]) # 짝수번째 - SIN
-        position_encoder[:, 1::2] = torch.cos(position_encoder[:, 1::2]) # 홀수번째 - COS
+        position_encoder[:, 0::2] = torch.sin(position_encoder[:, 0::2]) # {2i}th - SIN
+        position_encoder[:, 1::2] = torch.cos(position_encoder[:, 1::2]) # {2i+1}th - COS
 
         return position_encoder
 
-    def forward(self, x, point=-1):
+    def forward(self, x, point=-1): # [?]
+        """input 텐서(x)에 PE 벡터를 적용하는 함수. Sinusoidal PE를 통해 x의 길이에 관계 없이 unique한 위치 정보를 전달
+
+        Args:
+            x (torch.Tensor): PE를 적용
+            point (int, optional):
+                - -1 입력: 인풋 텐서 길이에 맞게 슬라이싱하여 PE 적용
+                - 특정 인덱스 입력: 특정 PE 벡터를 가져와 인풋 텐서에 적용
+                - Defaults to -1.
+
+        Returns:
+            [type]: [description]
+        """
         if point == -1:
             out = x + self.position_encoder[:, : x.size(1), :].to(x.get_device())
             out = self.dropout(out)
         else:
-            out = x + self.position_encoder[:, point, :].unsqueeze(1).to(x.get_device())
+            out = x + self.position_encoder[:, point, :].unsqueeze(1).to(x.get_device()) # [1, 1, IN_CHANNELS]
         return out
 
 
@@ -534,8 +546,8 @@ class TransformerDecoder(nn.Module):
             features = [None] * self.layer_num # 
 
             for t in range(num_steps):
-                target = target.unsqueeze(1)
-                tgt = self.text_embedding(target)
+                target = target.unsqueeze(1) # [1, B]
+                tgt = self.text_embedding(target) # [1, B]
                 tgt = self.pos_encoder(tgt, point=t)
                 tgt_mask = self.order_mask(t + 1)
                 tgt_mask = tgt_mask[:, -1].unsqueeze(1)  # [1, (l+1)]

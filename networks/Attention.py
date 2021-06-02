@@ -426,7 +426,7 @@ class Attention(nn.Module):
                         current_hidden[0]
                     )  # [1, VOCAB_SIZE] (num_layers=1) ***앙상블에 필요한 로짓
                     _, next_input = prob_step.max(dim=1)  # [1], 현 스텝 최고확률의 토큰ID
-                    decoder_input = next_input # 다음 토큰으로 사용
+                    current_input = next_input # 다음 토큰으로 사용
 
                     # 모델의 로짓을 확률화
                     log_prob_step = F.log_softmax(prob_step, dim=-1)  # [1, VOCAB_SIZE]
