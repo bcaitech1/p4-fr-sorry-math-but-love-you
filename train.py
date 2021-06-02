@@ -44,7 +44,6 @@ def train_one_epoch(
     teacher_forcing_ratio,
     max_grad_norm,
     device,
-    scaler,
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -57,7 +56,7 @@ def train_one_epoch(
     num_wer = 0
     sent_acc = 0
     num_sent_acc = 0
-
+    
     with tqdm(
         desc=f"{epoch_text} Train",
         total=len(data_loader.dataset),
@@ -72,30 +71,29 @@ def train_one_epoch(
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            with autocast():
-                output = model(input, expected, True, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+            output = model(input, expected, True, teacher_forcing_ratio)
 
-                loss = criterion(decoded_values, expected[:, 1:])
+            decoded_values = output.transpose(1, 2)
+            _, sequence = torch.topk(decoded_values, 1, dim=1)
+            sequence = sequence.squeeze(1)
+
+            loss = criterion(decoded_values, expected[:, 1:])
+
+            optimizer.zero_grad()
+            loss.backward()
 
             optim_params = [
                 p
                 for param_group in optimizer.param_groups
                 for p in param_group["params"]
             ]
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
 
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             # cycle
-            scaler.step(optimizer)
-            scaler.update()
+            optimizer.step()
 
             losses.append(loss.item())
 
@@ -166,14 +164,14 @@ def valid_one_epoch(
             expected = d["truth"]["encoded"].to(device)
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-            with autocast():
-                output = model(input, expected, False, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+            output = model(input, expected, False, teacher_forcing_ratio)
 
-                loss = criterion(decoded_values, expected[:, 1:])
+            decoded_values = output.transpose(1, 2)
+            _, sequence = torch.topk(decoded_values, 1, dim=1)
+            sequence = sequence.squeeze(1)
+
+            loss = criterion(decoded_values, expected[:, 1:])
 
             losses.append(loss.item())
 
@@ -205,18 +203,20 @@ def valid_one_epoch(
 
 
 def get_train_transforms(height, width):
-    return A.Compose(
-        [
-            A.Resize(height, width),
-            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
-            ToTensorV2(p=1.0),
-        ],
-        p=1.0,
-    )
-
+    return A.Compose([
+        A.Resize(height, width),
+        A.Compose([
+            A.HorizontalFlip(p=1),
+            A.VerticalFlip(p=1),
+        ],p=0.1),
+        ToTensorV2(p = 1.0),
+    ],p=1.0)
 
 def get_valid_transforms(height, width):
-    return A.Compose([A.Resize(height, width), ToTensorV2(p=1.0)])
+    return A.Compose([
+        A.Resize(height, width), 
+        ToTensorV2(p=1.0)
+        ])
 
 
 def main(config_file):
@@ -229,7 +229,7 @@ def main(config_file):
     set_seed(seed=options.seed)
 
     is_cuda = torch.cuda.is_available()
-    hardware = "cuda" if is_cuda else "cpu"
+    hardware = "cuda:0" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
     print("Running {} on device {}\n".format(options.network, device))
@@ -267,21 +267,20 @@ def main(config_file):
             "Validation Loss : {:.5f}\n".format(checkpoint["validation_losses"][-1]),
         )
 
-    (
-        train_data_loader,
-        validation_data_loader,
-        train_dataset,
-        valid_dataset,
-    ) = dataset_loader(
-        options,
-        train_transform=get_train_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-        valid_transform=get_valid_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-    )
-    # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed, transformed)
+    # Get data
+    # transformed = transforms.Compose(
+    #     [
+    #         # Resize so all images have the same size
+    #         transforms.Resize((options.input_size.height, options.input_size.width)),
+    #         transforms.ToTensor(),
+    #     ]
+    # )
+
+
+    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, 
+    train_transform=get_train_transforms(options.input_size.height, options.input_size.width), 
+    valid_transform=get_valid_transforms(options.input_size.height, options.input_size.width))
+    # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed)
     print(
         "[+] Data\n",
         "The number of train samples : {}\n".format(len(train_dataset)),
@@ -347,11 +346,11 @@ def main(config_file):
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
-            T_0=t_0,
+            T_0=options.num_epochs*len(train_data_loader),
             T_mult=1,
             eta_max=options.optimizer.lr,
-            T_up=t_up,
-            gamma=0.8,
+            T_up=options.num_epochs*len(train_data_loader)//10,
+            gamma=1.0,
         )
     else:
         optimizer = get_optimizer(
@@ -376,9 +375,14 @@ def main(config_file):
         elif options.scheduler.scheduler == "Cycle":
             for param_group in optimizer.param_groups:
                 param_group["initial_lr"] = options.optimizer.lr
-            cycle = len(train_data_loader) * options.num_epochs
+            cycle = options.num_epochs*len(train_data_loader)
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
+            )
+        elif options.scheduler.scheduler == "CosineAnnealingWarmRestarts":
+            lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer, 
+                T_0=options.num_epochs*len(train_data_loader)
             )
     if checkpoint['scheduler']:
         lr_scheduler.load_state_dict(checkpoint['scheduler'])
@@ -431,7 +435,6 @@ def main(config_file):
             options.teacher_forcing_ratio,
             options.max_grad_norm,
             device,
-            scaler,
         )
 
         train_losses.append(train_result["loss"])
@@ -546,20 +549,20 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
-            write_tensorboard(
-                writer=writer,
-                epoch=start_epoch + epoch + 1,
-                grad_norm=train_result["grad_norm"],
-                train_loss=train_result["loss"],
-                train_symbol_accuracy=train_epoch_symbol_accuracy,
-                train_sentence_accuracy=train_epoch_sentence_accuracy,
-                train_wer=train_epoch_wer,
-                validation_loss=validation_result["loss"],
-                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer,
-                model=model,
-            )
+            # write_tensorboard(
+            #     writer=writer,
+            #     epoch=start_epoch + epoch + 1,
+            #     grad_norm=train_result["grad_norm"],
+            #     train_loss=train_result["loss"],
+            #     train_symbol_accuracy=train_epoch_symbol_accuracy,
+            #     train_sentence_accuracy=train_epoch_sentence_accuracy,
+            #     train_wer=train_epoch_wer,
+            #     validation_loss=validation_result["loss"],
+            #     validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+            #     validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+            #     validation_wer=validation_epoch_wer,
+            #     model=model,
+            # )
             write_wandb(
                 epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
@@ -579,18 +582,18 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN-MINIMAL", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN-RGB3-iloveslowfood",
+        default="SATRN_JY_implement_effnetv2M_256_512",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/SATRN.yaml",
+        default="/opt/ml/p4-fr-sorry-math-but-love-you/configs/My_SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )
