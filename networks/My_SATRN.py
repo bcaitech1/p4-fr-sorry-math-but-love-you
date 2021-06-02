@@ -59,7 +59,7 @@ class CustomCNN(nn.Module):
         self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
         self.act1 = nn.SiLU(inplace=True)
         self.eff_block = m.blocks
-        self.conv_last = nn.Conv2d(512, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.conv_last = nn.Conv2d(256, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
         self.bn2 = nn.BatchNorm2d(output_channel)
         self.act2 = nn.SiLU(inplace=True)
 
