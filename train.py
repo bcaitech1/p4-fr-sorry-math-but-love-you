@@ -211,10 +211,16 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
+<<<<<<< HEAD
             # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
             # A.RandomScale(scale_limit=0.1, interpolation=1, always_apply=False, p=0.5),
             # A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
             # A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
+=======
+            # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.2),
+            # A.CLAHE(p=0.2),
+            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
+>>>>>>> upstream/master
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -222,11 +228,22 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
+<<<<<<< HEAD
     return A.Compose([
         A.Resize(height, width), 
         A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
         ToTensorV2(p=1.0)]
         )
+=======
+    return A.Compose(
+        [
+            A.Resize(height, width),
+            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
+            ToTensorV2(p=1.0),
+        ],
+        p=1.0,
+    )
+>>>>>>> upstream/master
 
 
 def main(config_file):
@@ -419,7 +436,7 @@ def main(config_file):
 
     scaler = GradScaler()
 
-    best_sentence_acc = 0.0
+    best_score = 0.0
 
     # Train
     for epoch in range(options.num_epochs):
@@ -493,7 +510,7 @@ def main(config_file):
         # make config
         with open(config_file, "r") as f:
             option_dict = yaml.safe_load(f)
-        if best_sentence_acc < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+        if best_score < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
             prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
@@ -521,10 +538,10 @@ def main(config_file):
                 # prefix=options.prefix,
                 prefix=prefix,
             )
-            best_sentence_acc = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+            best_score = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
                 1 - validation_epoch_wer
             )
-            print(f"best sentence acc: {best_sentence_acc}")
+            print(f"best score: {best_score}")
             print("model is saved")
 
         # Summary
@@ -596,8 +613,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        # default="SATRN-RGB3-IM2LATEX-TOKEN576-iloveslowfood",
-        default='LabelSmoothingLoss',
+        default="exp_name",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

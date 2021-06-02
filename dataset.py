@@ -212,8 +212,7 @@ class LoadDataset(Dataset):
 
         if self.transform:
             w, h = image.size
-            # if h / w > 2:
-            if w / h > 2: # for test beam search
+            if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
             # image = self.transform(image)
@@ -296,8 +295,7 @@ class LoadEvalDataset(Dataset):
         if self.transform:
             # image = self.transform(image)
             w, h = image.size
-            # if h / w > 2:
-            if w / h > 2: # for test beam search
+            if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
             image = self.transform(image=image)['image']
