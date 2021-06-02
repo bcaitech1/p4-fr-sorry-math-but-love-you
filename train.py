@@ -155,41 +155,42 @@ def valid_one_epoch(
     sent_acc = 0
     num_sent_acc = 0
 
-    with tqdm(
-        desc=f"{epoch_text} Validation",
-        total=len(data_loader.dataset),
-        dynamic_ncols=True,
-        leave=False,
-    ) as pbar:
-        for d in data_loader:
-            input = d["image"].to(device).float()
+    with torch.no_grad():
+        with tqdm(
+            desc=f"{epoch_text} Validation",
+            total=len(data_loader.dataset),
+            dynamic_ncols=True,
+            leave=False,
+        ) as pbar:
+            for d in data_loader:
+                input = d["image"].to(device).float()
 
-            curr_batch_size = len(input)
-            expected = d["truth"]["encoded"].to(device)
+                curr_batch_size = len(input)
+                expected = d["truth"]["encoded"].to(device)
 
-            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-            # with autocast():
-            output = model(input, expected, False, teacher_forcing_ratio)
+                expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
+                # with autocast():
+                output = model(input, expected, False, teacher_forcing_ratio)
 
-            decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-            _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-            sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+                decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+                _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+                sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
-            loss = criterion(decoded_values, expected[:, 1:])
+                loss = criterion(decoded_values, expected[:, 1:])
 
-            losses.append(loss.item())
+                losses.append(loss.item())
 
-            expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader, do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
-            wer += word_error_rate(sequence_str, expected_str)
-            num_wer += 1
-            sent_acc += sentence_acc(sequence_str, expected_str)
-            num_sent_acc += 1
-            correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
-            total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
+                expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
+                expected_str = id_to_string(expected, data_loader, do_eval=1)
+                sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+                wer += word_error_rate(sequence_str, expected_str)
+                num_wer += 1
+                sent_acc += sentence_acc(sequence_str, expected_str)
+                num_sent_acc += 1
+                correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
+                total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
-            pbar.update(curr_batch_size)
+                pbar.update(curr_batch_size)
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -210,9 +211,10 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
+            # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
             # A.RandomScale(scale_limit=0.1, interpolation=1, always_apply=False, p=0.5),
-            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            # A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+            # A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -220,7 +222,11 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-    return A.Compose([A.Resize(height, width), ToTensorV2(p=1.0)])
+    return A.Compose([
+        A.Resize(height, width), 
+        # A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
+        ToTensorV2(p=1.0)]
+        )
 
 
 def main(config_file):
@@ -591,7 +597,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--exp_name",
         # default="SATRN-RGB3-IM2LATEX-TOKEN576-iloveslowfood",
-        default='Normalization',
+        default='LabelSmoothingLoss',
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

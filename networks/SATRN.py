@@ -646,9 +646,9 @@ class SATRN(nn.Module):
         max_sequence: int=230
         ):
         # 사용할 토큰
-        sos_token_id = train_data_loader.dataset.token_to_id['<SOS>']
-        eos_token_id = train_data_loader.dataset.token_to_id['<EOS>']
-        pad_token_id = train_data_loader.dataset.token_to_id['<PAD>']
+        sos_token_id = data_loader.dataset.token_to_id['<SOS>']
+        eos_token_id = data_loader.dataset.token_to_id['<EOS>']
+        pad_token_id = data_loader.dataset.token_to_id['<PAD>']
 
         batch_size = len(input)
         src = self.encoder(input) # [B, HxW, C]

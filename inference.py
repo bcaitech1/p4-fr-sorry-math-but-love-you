@@ -4,12 +4,12 @@ import random
 from tqdm import tqdm
 import csv
 import torch
-from torchvision import transforms
 from torch.utils.data import DataLoader
 
 from metrics import word_error_rate, sentence_acc
 from checkpoint import load_checkpoint
 from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
+from train import get_valid_transforms
 from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
 
@@ -33,12 +33,7 @@ def main(parser):
         )
     print(options.input_size.height)
 
-    transformed = transforms.Compose(
-        [
-            transforms.Resize((options.input_size.height, options.input_size.width)),
-            transforms.ToTensor(),
-        ]
-    )
+    transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
@@ -73,35 +68,32 @@ def main(parser):
     )
     model.eval()
     results = []
-    for d in tqdm(test_data_loader):
-        input = d["image"].to(device)
-        expected = d["truth"]["encoded"].to(device)
+    
 
-        # Greedy Decoding
-        output = model(input, expected, False, 0.0)
-        decoded_values = output.transpose(1, 2)
-        _, sequence = torch.topk(decoded_values, 1, dim=1)
-        sequence = sequence.squeeze(1)
-        sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+    with torch.no_grad():
+        for d in tqdm(test_data_loader):
+            input = d["image"].float().to(device)
+            expected = d["truth"]["encoded"].to(device)
 
-        # Beam Search
-        # sequence = model.beam_search(
-        #     input=input, 
-        #     data_loader=test_data_loader,
-        #     topk=1
-        #     beam_width=10,
-        #     max_sequence=parser.max_sequence,
-        #     )
-        # sequence_str = id_to_string(sequence, test_data, do_eval=1)
+            # Greedy Decoding
+            # output = model(input, expected, False, 0.0)
+            # decoded_values = output.transpose(1, 2)
+            # _, sequence = torch.topk(decoded_values, 1, dim=1)
+            # sequence = sequence.squeeze(1)
+            # sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
 
-        input: torch.Tensor,
-        data_loader: DataLoader,
-        topk: int=1, # 상위 몇 개의 결과를 얻을 것인지
-        beam_width: int = 10, # 각 스텝마다 몇 개의 후보군을 선별할지
-        max_sequence: int=230
-        
-        for path, predicted in zip(d["file_path"], sequence_str):
-            results.append((path, predicted))
+            # Beam Search
+            sequence = model.beam_search(
+                input=input, 
+                data_loader=test_data_loader,
+                topk=1,
+                beam_width=10,
+                max_sequence=parser.max_sequence,
+                )
+            sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+            
+            for path, predicted in zip(d["file_path"], sequence_str):
+                results.append((path, predicted))
 
     os.makedirs(parser.output_dir, exist_ok=True)
     with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
@@ -114,7 +106,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/satrn/checkpoints/0021.pth",
+        # default="./log/satrn/checkpoints/0021.pth",
+        default="./configs/SATRN_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -128,7 +121,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=8,
+        default=16,
         type=int,
         help="batch size when doing inference",
     )

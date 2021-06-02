@@ -13,6 +13,7 @@ import torch.nn.functional as F
 sys.path.insert(0, '../')
 from dataset import START, PAD
 from beam_search import BeamSearchNode
+from criterion import LabelSmoothingLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -322,6 +323,7 @@ class Attention(nn.Module):
         )
 
         self.criterion = nn.CrossEntropyLoss()
+        # self.criterion = LabelSmoothingLoss(classes=len(train_dataset.id_to_token), smoothing=0.1)
 
         if checkpoint:
             self.load_state_dict(checkpoint)
