@@ -93,25 +93,24 @@ def validate(parser):
                 expected = d["truth"]["encoded"].to(device)
                 expected[expected == -1] = valid_data_loader.dataset.token_to_id[PAD]
 
-                # Beam Search
-                sequence = model.beam_search(
-                    input=input,
-                    data_loader=valid_data_loader,
-                    topk=1,
-                    beam_width=10,
-                    max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
-                )
+                if parser.decode_type == 'greedy':
+                    output = model(
+                        input=input, 
+                        expected=expected, 
+                        is_train=False,
+                        teacher_forcing_ratio=0.0
+                        )
+                    decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+                    _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+                    sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
-                # Greedy Decoding
-                # output = model(
-                #     input=input, 
-                #     expected=expected, 
-                #     is_train=False,
-                #     teacher_forcing_ratio=0.0
-                #     )
-                # decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                # _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                # sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+                elif parser.decode_type == 'beam':
+                    sequence = model.beam_search(
+                        input=input,
+                        data_loader=valid_data_loader,
+                        beam_width=parser.beam_width,
+                        max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+                    )
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
                 expected_str = id_to_string(expected, valid_data_loader, do_eval=1)
@@ -193,21 +192,21 @@ def main(parser):
             input = d["image"].float().to(device)
             expected = d["truth"]["encoded"].to(device)
 
-            # Greedy Decoding
-            # output = model(input, expected, False, 0.0)
-            # decoded_values = output.transpose(1, 2)
-            # _, sequence = torch.topk(decoded_values, 1, dim=1)
-            # sequence = sequence.squeeze(1)
-            # sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+            if parser.decode_type == 'greedy':
+                output = model(input, expected, False, 0.0)
+                decoded_values = output.transpose(1, 2)
+                _, sequence = torch.topk(decoded_values, 1, dim=1)
+                sequence = sequence.squeeze(1)
 
-            # Beam Search
-            sequence = model.beam_search(
-                input=input, 
-                data_loader=test_data_loader,
-                topk=1,
-                beam_width=10,
-                max_sequence=parser.max_sequence,
-                )
+            elif parser.decode_type == 'beam':
+                # Beam Search
+                sequence = model.beam_search(
+                    input=input, 
+                    data_loader=test_data_loader,
+                    beam_width=parser.beam_width,
+                    max_sequence=parser.max_sequence,
+                    )
+
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
             
             for path, predicted in zip(d["file_path"], sequence_str):
@@ -260,7 +259,7 @@ if __name__ == "__main__":
         help="빔서치 사용 시 스텝별 후보 수 설정",
     )
     #-----------------------
-    
+
     eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
     file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
     parser.add_argument(
@@ -281,5 +280,5 @@ if __name__ == "__main__":
     )
 
     parser = parser.parse_args()
-    # main(parser)
-    validate(parser)
+    main(parser)
+    # validate(parser)
