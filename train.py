@@ -208,7 +208,9 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
+            # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.2),
+            # A.CLAHE(p=0.2),
+            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -216,7 +218,14 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-    return A.Compose([A.Resize(height, width), ToTensorV2(p=1.0)])
+    return A.Compose(
+        [
+            A.Resize(height, width),
+            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
+            ToTensorV2(p=1.0),
+        ],
+        p=1.0,
+    )
 
 
 def main(config_file):
@@ -342,7 +351,7 @@ def main(config_file):
             # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
         total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        t_0 = total_steps // 3 # 주기를 3으로 설정
+        t_0 = total_steps // 1 # 주기를 3으로 설정
         t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
@@ -408,7 +417,7 @@ def main(config_file):
 
     scaler = GradScaler()
 
-    best_sentence_acc = 0.0
+    best_score = 0.0
 
     # Train
     for epoch in range(options.num_epochs):
@@ -482,7 +491,7 @@ def main(config_file):
         # make config
         with open(config_file, "r") as f:
             option_dict = yaml.safe_load(f)
-        if best_sentence_acc < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+        if best_score < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
             save_checkpoint(
@@ -508,10 +517,10 @@ def main(config_file):
                 },
                 prefix=options.prefix,
             )
-            best_sentence_acc = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+            best_score = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
                 1 - validation_epoch_wer
             )
-            print(f"best sentence acc: {best_sentence_acc}")
+            print(f"best score: {best_score}")
             print("model is saved")
 
         # Summary
@@ -579,11 +588,11 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN-MINIMAL", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="Augmentations", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN-RGB3-iloveslowfood",
+        default="exp_name",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
