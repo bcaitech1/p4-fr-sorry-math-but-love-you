@@ -81,21 +81,21 @@ def train_one_epoch(
 
                 loss = criterion(decoded_values, expected[:, 1:])
 
-            optim_params = [
-                p
-                for param_group in optimizer.param_groups
-                for p in param_group["params"]
-            ]
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
+                optim_params = [
+                    p
+                    for param_group in optimizer.param_groups
+                    for p in param_group["params"]
+                ]
+                optimizer.zero_grad()
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
 
-            grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
-            grad_norms.append(grad_norm)
+                grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
+                grad_norms.append(grad_norm)
 
-            # cycle
-            scaler.step(optimizer)
-            scaler.update()
+                # cycle
+                scaler.step(optimizer)
+                scaler.update()
 
             losses.append(loss.item())
 
@@ -153,20 +153,22 @@ def valid_one_epoch(
     sent_acc = 0
     num_sent_acc = 0
 
-    with tqdm(
-        desc=f"{epoch_text} Validation",
-        total=len(data_loader.dataset),
-        dynamic_ncols=True,
-        leave=False,
-    ) as pbar:
-        for d in data_loader:
-            input = d["image"].to(device).float()
+    with torch.no_grad():
+        with tqdm(
+            desc=f"{epoch_text} Validation",
+            total=len(data_loader.dataset),
+            dynamic_ncols=True,
+            leave=False,
+        ) as pbar:
 
-            curr_batch_size = len(input)
-            expected = d["truth"]["encoded"].to(device)
+            for d in data_loader:
+                input = d["image"].to(device).float()
 
-            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-            with autocast():
+                curr_batch_size = len(input)
+                expected = d["truth"]["encoded"].to(device)
+
+                expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
+                
                 output = model(input, expected, False, teacher_forcing_ratio)
 
                 decoded_values = output.transpose(1, 2)
@@ -175,19 +177,19 @@ def valid_one_epoch(
 
                 loss = criterion(decoded_values, expected[:, 1:])
 
-            losses.append(loss.item())
+                losses.append(loss.item())
 
-            expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader, do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
-            wer += word_error_rate(sequence_str, expected_str)
-            num_wer += 1
-            sent_acc += sentence_acc(sequence_str, expected_str)
-            num_sent_acc += 1
-            correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
-            total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
+                expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
+                expected_str = id_to_string(expected, data_loader, do_eval=1)
+                sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+                wer += word_error_rate(sequence_str, expected_str)
+                num_wer += 1
+                sent_acc += sentence_acc(sequence_str, expected_str)
+                num_sent_acc += 1
+                correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
+                total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
-            pbar.update(curr_batch_size)
+                pbar.update(curr_batch_size)
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -592,7 +594,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="Base",
+        default="jungu",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
