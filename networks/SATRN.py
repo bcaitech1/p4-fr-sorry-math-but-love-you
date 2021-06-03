@@ -810,39 +810,3 @@ class SATRN(nn.Module):
         outputs = torch.tensor(outputs)
 
         return outputs
-
-
-
-# just for debug
-if __name__ == '__main__':
-    from flags import Flags
-    from dataset import dataset_loader
-    from train import get_train_transforms, get_valid_transforms
-    from utils import set_seed
-    CONFIG_PATH = "./configs/SATRN-dev.yaml"
-    options = Flags(CONFIG_PATH).get()
-    set_seed(seed=options.seed)
-
-    # get data
-    (
-        train_data_loader,
-        validation_data_loader,
-        train_dataset,
-        valid_dataset,
-    ) = dataset_loader(
-        options=options,
-        train_transform=get_train_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-        valid_transform=get_valid_transforms(
-            options.input_size.height, options.input_size.width
-            ),
-            )
-
-    model = SATRN(options, train_dataset)
-    model.cuda()
-    model.eval()
-    batch = next(iter(train_data_loader))
-    input = batch['image'].float().to(device)
-
-    model.beam_search(input=input, data_loader=train_data_loader)

@@ -8,6 +8,7 @@ import torch.optim as optim
 from networks.Attention import Attention
 from networks.SATRN import SATRN
 from networks.SWIN import SWIN
+from networks.My_SATRN import MySATRN
 
 def get_network(
     model_type,

@@ -4,7 +4,7 @@ from queue import PriorityQueue
 
 
 def decode(
-    models,
+    model,
     input: torch.Tensor, 
     data_loader: DataLoader=None, 
     expected: torch.Tensor=None, 
@@ -14,7 +14,7 @@ def decode(
     """디코딩을 수행하는 함수. NOTE: inference/validation에만 활용!
 
     Args:
-        models (torch.nn.Module): 단일 모델 추론 시 단일 모델을, 앙상블 시 모델로 구성된 리스트를 입력
+        model (torch.nn.Module):
         input (torch.Tensor): 이미지 input
         data_loader (DataLoader, optional):
             - Beam-Search를 활용할 경우 필요한 argument
@@ -25,7 +25,6 @@ def decode(
         decode_type (str, optional): 디코딩 타입 설정. Defaults to 'greedy'.
             - 'greedy': 그리디 디코딩
             - 'beam': 빔서치
-            - 'greedy'
         beam_width (int, optional): [description]. Defaults to 3.
             - 빔서치 활용 시 채택할 beam size
 
@@ -34,7 +33,7 @@ def decode(
     """
 
     if decode_type == 'greedy':
-        output = models(
+        output = model(
             input=input, 
             expected=expected, 
             is_train=False,
@@ -45,17 +44,12 @@ def decode(
         sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
     elif decode_type == 'beam':
-        sequence = models.beam_search(
+        sequence = model.beam_search(
             input=input,
             data_loader=data_loader,
             beam_width=beam_width,
             max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
         )
-    elif decode_type == 'greedy-ensemble':
-        raise NotImplementedError
-    
-    elif decode_type == 'beam-ensemble':
-        raise NotImplementedError
     else:
         raise NotImplementedError
 

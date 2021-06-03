@@ -14,6 +14,7 @@ from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
 from train import get_valid_transforms
 from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
+from decoding import decode
 
 
 def validate(parser):
@@ -54,6 +55,7 @@ def validate(parser):
     valid_data_loader = DataLoader(
         valid_dataset,
         batch_size=options.batch_size,
+        # batch_size=128,
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
@@ -95,32 +97,41 @@ def validate(parser):
                 expected = d["truth"]["encoded"].to(device)
                 expected[expected == -1] = valid_data_loader.dataset.token_to_id[PAD]
 
-                if parser.decode_type == 'greedy':
-                    output = model(
-                        input=input, 
-                        expected=expected, 
-                        is_train=False,
-                        teacher_forcing_ratio=0.0
-                        )
-                    decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                    _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                    sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
-
-                elif parser.decode_type == 'beam':
-                    sequence = model.beam_search(
-                        input=input,
-                        data_loader=valid_data_loader,
-                        beam_width=parser.beam_width,
-                        max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+                sequence = decode(
+                    model=model, 
+                    input=input, 
+                    data_loader=valid_data_loader, 
+                    expected=expected, 
+                    decode_type=parser.decode_type, 
+                    beam_width=parser.beam_width
                     )
-                elif parser.decode_type == 'greedy-ensemble':
-                    raise NotImplementedError
+
+                # if parser.decode_type == 'greedy':
+                #     output = model(
+                #         input=input, 
+                #         expected=expected, 
+                #         is_train=False,
+                #         teacher_forcing_ratio=0.0
+                #         )
+                #     decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+                #     _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+                #     sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+
+                # elif parser.decode_type == 'beam':
+                #     sequence = model.beam_search(
+                #         input=input,
+                #         data_loader=valid_data_loader,
+                #         beam_width=parser.beam_width,
+                #         max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+                #     )
+                # elif parser.decode_type == 'greedy-ensemble':
+                #     raise NotImplementedError
                 
-                elif parser.decode_type == 'beam-ensemble':
-                    raise NotImplementedError
+                # elif parser.decode_type == 'beam-ensemble':
+                #     raise NotImplementedError
                 
-                else:
-                    raise NotImplementedError
+                # else:
+                #     raise NotImplementedError
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
                 expected_str = id_to_string(expected, valid_data_loader, do_eval=1)
@@ -139,6 +150,7 @@ def validate(parser):
     valid_score = final_metric(sentence_acc=valid_sentence_accuracy, word_error_rate=valid_wer)
     print(f'INFERENCE TIME: {inference_time}')
     print(f'SCORE: {valid_score} SENTENCE ACC: {valid_sentence_accuracy} WER: {valid_wer}')
+
 
 
 def main(parser):
@@ -196,34 +208,24 @@ def main(parser):
     )
     model.eval()
     results = []
-    
+    if parser.decode_type == 'beam':
+        print(parser.decode_type, parser.beam_width)
+    elif parser.decode_type == 'greedy':
+        print(parser.decode_type)
 
     with torch.no_grad():
         for d in tqdm(test_data_loader):
             input = d["image"].float().to(device)
             expected = d["truth"]["encoded"].to(device)
 
-            if parser.decode_type == 'greedy':
-                output = model(input, expected, False, 0.0)
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
-
-            elif parser.decode_type == 'beam':
-                sequence = model.beam_search(
+            sequence = decode(
+                    model=model, 
                     input=input, 
-                    data_loader=test_data_loader,
-                    beam_width=parser.beam_width,
-                    max_sequence=parser.max_sequence,
+                    data_loader=test_data_loader, 
+                    expected=expected,
+                    decode_type=parser.decode_type, 
+                    beam_width=parser.beam_width
                     )
-            elif parser.decode_type == 'greedy-ensemble':
-                    raise NotImplementedError
-                
-            elif parser.decode_type == 'beam-ensemble':
-                raise NotImplementedError
-            
-            else:
-                raise NotImplementedError
 
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
             
@@ -255,7 +257,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=16,
+        default=128,
         type=int,
         help="batch size when doing inference",
     )
@@ -263,15 +265,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default='greedy',
+        default='beam',
         type=str,
-        help="디코딩 방식 설정. 'greedy', 'beam', 'greedy-ensemble', 'beam-ensemble'",
+        help="디코딩 방식 설정. 'greedy', 'beam'",
     )
 
     parser.add_argument(
         "--beam_width",
         dest="beam_width",
-        default=5,
+        default=3,
         type=int,
         help="빔서치 사용 시 스텝별 후보 수 설정",
     )
@@ -297,5 +299,5 @@ if __name__ == "__main__":
     )
 
     parser = parser.parse_args()
-    main(parser)
-    # validate(parser)
+    # main(parser)
+    validate(parser)
