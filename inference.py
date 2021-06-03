@@ -5,6 +5,8 @@ from tqdm import tqdm
 import csv
 import torch
 from torch.utils.data import DataLoader
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
@@ -12,6 +14,7 @@ from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
 from train import get_valid_transforms
 from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
+from decoding import decode
 
 
 def validate(parser):
@@ -19,8 +22,7 @@ def validate(parser):
     from dataset import collate_batch, LoadDataset, split_gt
 
     is_cuda = torch.cuda.is_available()
-    hardware = "cuda" if is_cuda else "cpu"
-    device = torch.device(hardware)
+    device = torch.device("cuda" if is_cuda else "cpu")
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
     set_seed(options.seed)
@@ -33,8 +35,8 @@ def validate(parser):
             "[+] Checkpoint\n",
             "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
         )
-    print(options.input_size.height)
 
+    # Load data
     valid_transform = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
 
     valid_data = []
@@ -46,7 +48,6 @@ def validate(parser):
         valid_data += valid
 
     valid_dataset = LoadDataset(
-        # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
         valid_data, options.data.token_paths, crop=options.data.crop, transform=valid_transform, rgb=options.data.rgb
     )
     valid_data_loader = DataLoader(
@@ -62,6 +63,7 @@ def validate(parser):
         "The number of test samples : {}\n".format(len(valid_dataset)),
     )
 
+    # Load model
     model = get_network(
         options.network,
         options,
@@ -77,7 +79,8 @@ def validate(parser):
     num_wer = 0
     sent_acc = 0
     num_sent_acc = 0
-
+    
+    # Infernce
     start = time.time()
     with torch.no_grad():
         with tqdm(
@@ -93,32 +96,41 @@ def validate(parser):
                 expected = d["truth"]["encoded"].to(device)
                 expected[expected == -1] = valid_data_loader.dataset.token_to_id[PAD]
 
-                if parser.decode_type == 'greedy':
-                    output = model(
-                        input=input, 
-                        expected=expected, 
-                        is_train=False,
-                        teacher_forcing_ratio=0.0
-                        )
-                    decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                    _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                    sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
-
-                elif parser.decode_type == 'beam':
-                    sequence = model.beam_search(
-                        input=input,
-                        data_loader=valid_data_loader,
-                        beam_width=parser.beam_width,
-                        max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+                sequence = decode(
+                    model=model, 
+                    input=input, 
+                    data_loader=valid_data_loader, 
+                    expected=expected, 
+                    method=parser.decode_type, 
+                    beam_width=parser.beam_width
                     )
-                elif parser.decode_type == 'greedy-ensemble':
-                    raise NotImplementedError
+
+                # if parser.decode_type == 'greedy':
+                #     output = model(
+                #         input=input, 
+                #         expected=expected, 
+                #         is_train=False,
+                #         teacher_forcing_ratio=0.0
+                #         )
+                #     decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+                #     _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+                #     sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+
+                # elif parser.decode_type == 'beam':
+                #     sequence = model.beam_search(
+                #         input=input,
+                #         data_loader=valid_data_loader,
+                #         beam_width=parser.beam_width,
+                #         max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+                #     )
+                # elif parser.decode_type == 'greedy-ensemble':
+                #     raise NotImplementedError
                 
-                elif parser.decode_type == 'beam-ensemble':
-                    raise NotImplementedError
+                # elif parser.decode_type == 'beam-ensemble':
+                #     raise NotImplementedError
                 
-                else:
-                    raise NotImplementedError
+                # else:
+                #     raise NotImplementedError
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
                 expected_str = id_to_string(expected, valid_data_loader, do_eval=1)
@@ -131,12 +143,15 @@ def validate(parser):
                 total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
                 pbar.update(curr_batch_size)
+
+    # Validation
     inference_time = (time.time() - start) / 60 # minutes
     valid_sentence_accuracy = sent_acc / num_sent_acc
     valid_wer = wer / num_wer
     valid_score = final_metric(sentence_acc=valid_sentence_accuracy, word_error_rate=valid_wer)
     print(f'INFERENCE TIME: {inference_time}')
     print(f'SCORE: {valid_score} SENTENCE ACC: {valid_sentence_accuracy} WER: {valid_wer}')
+
 
 
 def main(parser):
@@ -158,7 +173,8 @@ def main(parser):
         )
     print(options.input_size.height)
 
-    transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
+    # transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
+    transformed = A.Compose([A.Resize(256, 512, p=1.), ToTensorV2()])
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
@@ -193,34 +209,24 @@ def main(parser):
     )
     model.eval()
     results = []
-    
+    if parser.decode_type == 'beam':
+        print(parser.decode_type, parser.beam_width)
+    elif parser.decode_type == 'greedy':
+        print(parser.decode_type)
 
     with torch.no_grad():
         for d in tqdm(test_data_loader):
             input = d["image"].float().to(device)
             expected = d["truth"]["encoded"].to(device)
 
-            if parser.decode_type == 'greedy':
-                output = model(input, expected, False, 0.0)
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
-
-            elif parser.decode_type == 'beam':
-                sequence = model.beam_search(
+            sequence = decode(
+                    model=model, 
                     input=input, 
-                    data_loader=test_data_loader,
-                    beam_width=parser.beam_width,
-                    max_sequence=parser.max_sequence,
+                    data_loader=test_data_loader, 
+                    expected=expected,
+                    method=parser.decode_type, 
+                    beam_width=parser.beam_width
                     )
-            elif parser.decode_type == 'greedy-ensemble':
-                    raise NotImplementedError
-                
-            elif parser.decode_type == 'beam-ensemble':
-                raise NotImplementedError
-            
-            else:
-                raise NotImplementedError
 
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
             
@@ -238,7 +244,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./configs/Attention_best_model.pth",
+        default="./log/MySATRN_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -252,7 +258,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=16,
+        default=128,
         type=int,
         help="batch size when doing inference",
     )
@@ -260,15 +266,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default='greedy',
+        default='beam',
         type=str,
-        help="디코딩 방식 설정. 'greedy', 'beam', 'greedy-ensemble', 'beam-ensemble'",
+        help="디코딩 방식 설정. 'greedy', 'beam'",
     )
 
     parser.add_argument(
         "--beam_width",
         dest="beam_width",
-        default=5,
+        default=3,
         type=int,
         help="빔서치 사용 시 스텝별 후보 수 설정",
     )
@@ -294,5 +300,5 @@ if __name__ == "__main__":
     )
 
     parser = parser.parse_args()
-    main(parser)
-    # validate(parser)
+    # main(parser)
+    validate(parser)

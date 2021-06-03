@@ -322,8 +322,8 @@ class Attention(nn.Module):
             cell_type=FLAGS.Attention.cell_type,
         )
 
-        self.criterion = nn.CrossEntropyLoss()
-        # self.criterion = LabelSmoothingLoss(classes=len(train_dataset.id_to_token), smoothing=0.1)
+        # self.criterion = nn.CrossEntropyLoss()
+        self.criterion = LabelSmoothingLoss(classes=len(train_dataset.id_to_token), smoothing=0.1)
 
         if checkpoint:
             self.load_state_dict(checkpoint)
