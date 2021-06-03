@@ -22,8 +22,7 @@ def validate(parser):
     from dataset import collate_batch, LoadDataset, split_gt
 
     is_cuda = torch.cuda.is_available()
-    hardware = "cuda" if is_cuda else "cpu"
-    device = torch.device(hardware)
+    device = torch.device("cuda" if is_cuda else "cpu")
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
     set_seed(options.seed)
@@ -36,8 +35,8 @@ def validate(parser):
             "[+] Checkpoint\n",
             "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
         )
-    print(options.input_size.height)
 
+    # Load data
     valid_transform = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
 
     valid_data = []
@@ -49,13 +48,11 @@ def validate(parser):
         valid_data += valid
 
     valid_dataset = LoadDataset(
-        # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
         valid_data, options.data.token_paths, crop=options.data.crop, transform=valid_transform, rgb=options.data.rgb
     )
     valid_data_loader = DataLoader(
         valid_dataset,
         batch_size=options.batch_size,
-        # batch_size=128,
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
@@ -66,6 +63,7 @@ def validate(parser):
         "The number of test samples : {}\n".format(len(valid_dataset)),
     )
 
+    # Load model
     model = get_network(
         options.network,
         options,
@@ -81,7 +79,8 @@ def validate(parser):
     num_wer = 0
     sent_acc = 0
     num_sent_acc = 0
-
+    
+    # Infernce
     start = time.time()
     with torch.no_grad():
         with tqdm(
@@ -144,6 +143,8 @@ def validate(parser):
                 total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
                 pbar.update(curr_batch_size)
+
+    # Validation
     inference_time = (time.time() - start) / 60 # minutes
     valid_sentence_accuracy = sent_acc / num_sent_acc
     valid_wer = wer / num_wer

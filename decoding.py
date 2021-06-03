@@ -55,6 +55,7 @@ def decode(
 
     return sequence
 
+
 class BeamSearchNode(object):
     def __init__(self, hidden_state, prev_node, token_id, log_prob, length):
         self.hidden_state = hidden_state
