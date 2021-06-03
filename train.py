@@ -210,7 +210,7 @@ def get_train_transforms(height, width):
             A.Resize(height, width),
             # A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.2),
             # A.CLAHE(p=0.2),
-            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], p=1.0),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -221,7 +221,7 @@ def get_valid_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            A.Normalize(mean=[0.6280586, 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833], p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], p=1.0),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -588,11 +588,11 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="Augmentations", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="SATRN-decoder_test", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
-        default="exp_name",
+        default="Base",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
