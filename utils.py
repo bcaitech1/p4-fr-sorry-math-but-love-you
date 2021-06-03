@@ -32,7 +32,6 @@ def get_network(
 def get_optimizer(optimizer, params, lr, weight_decay=None):
     if optimizer == "Adam":
         optimizer = optim.Adam(params, lr=lr)
-
     elif optimizer == "Adadelta":
         optimizer = optim.Adadelta(params, lr=lr, weight_decay=weight_decay)
     elif optimizer == "AdamW":
@@ -55,10 +54,10 @@ def print_system_envs():
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
+        eos_id = data_loader.dataset.token_to_id["<EOS>"]
         special_ids = [
             data_loader.dataset.token_to_id["<PAD>"],
-            data_loader.dataset.token_to_id["<SOS>"],
-            data_loader.dataset.token_to_id["<EOS>"]
+            data_loader.dataset.token_to_id["<SOS>"]
             ]
 
     for example in tokens:
@@ -69,6 +68,8 @@ def id_to_string(tokens, data_loader, do_eval=0):
                 if token not in special_ids:
                     if token != -1:
                         string += data_loader.dataset.id_to_token[token] + " "
+                elif token == eos_id:
+                    break
         else:
             for token in example:
                 token = token.item()
