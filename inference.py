@@ -60,7 +60,7 @@ def validate(parser):
 
     print(
         "[+] Data\n",
-        "The number of test samples : {}\n".format(len(valid_dataset)),
+        "The number of test samples : {}".format(len(valid_dataset)),
     )
 
     # Load model
@@ -81,6 +81,10 @@ def validate(parser):
     num_sent_acc = 0
     
     # Infernce
+    print(
+        "[+] Decoding Type\n",
+        parser.decode_type,
+    )
     start = time.time()
     with torch.no_grad():
         with tqdm(
@@ -103,34 +107,7 @@ def validate(parser):
                     expected=expected, 
                     method=parser.decode_type, 
                     beam_width=parser.beam_width
-                    )
-
-                # if parser.decode_type == 'greedy':
-                #     output = model(
-                #         input=input, 
-                #         expected=expected, 
-                #         is_train=False,
-                #         teacher_forcing_ratio=0.0
-                #         )
-                #     decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                #     _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                #     sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
-
-                # elif parser.decode_type == 'beam':
-                #     sequence = model.beam_search(
-                #         input=input,
-                #         data_loader=valid_data_loader,
-                #         beam_width=parser.beam_width,
-                #         max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
-                #     )
-                # elif parser.decode_type == 'greedy-ensemble':
-                #     raise NotImplementedError
-                
-                # elif parser.decode_type == 'beam-ensemble':
-                #     raise NotImplementedError
-                
-                # else:
-                #     raise NotImplementedError
+                )
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
                 expected_str = id_to_string(expected, valid_data_loader, do_eval=1)
@@ -209,11 +186,10 @@ def main(parser):
     )
     model.eval()
     results = []
-    if parser.decode_type == 'beam':
-        print(parser.decode_type, parser.beam_width)
-    elif parser.decode_type == 'greedy':
-        print(parser.decode_type)
-
+    print(
+        "[+] Decoding Type\n",
+        parser.decode_type,
+    )
     with torch.no_grad():
         for d in tqdm(test_data_loader):
             input = d["image"].float().to(device)

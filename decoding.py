@@ -25,9 +25,8 @@ def decode(
         method (str, optional): 디코딩 타입 설정. Defaults to 'greedy'.
             - 'greedy': 그리디 디코딩
             - 'beam': 빔서치
-        beam_width (int, optional): [description]. Defaults to 3.
-            - 빔서치 활용 시 채택할 beam size
-
+        beam_width (int, optional): 빔서치 활용 시 채택할 beam size. Defaults to 3.
+        
     Returns:
         squence (torch.Tensor): id_to_string에 입력 가능한 output sequence 텐서
     """
@@ -51,7 +50,7 @@ def decode(
             max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
         )
     else:
-        raise NotImplementedError, f"There's no '{method}' type yet."
+        raise NotImplementedError(f"There's no '{method}' type yet.")
 
     return sequence
 

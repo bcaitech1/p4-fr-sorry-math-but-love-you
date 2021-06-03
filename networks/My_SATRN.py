@@ -619,8 +619,6 @@ class MySATRN(nn.Module):
                     current_input = n.token_id # [B=1]
                     current_hidden = n.hidden_state
                     current_point = n.len - 1 # P.E 적용 시 활용
-                    assert current_input.ndim == 1
-                    assert len(current_hidden) == self.decoder.layer_num
 
                     # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
                     if n.token_id.item() == eos_token_id and n.prev_node != None:
@@ -631,25 +629,11 @@ class MySATRN(nn.Module):
                             continue
                         
                     current_input = current_input.unsqueeze(1) # [B=1, 1]
-                    assert current_input.ndim == 2
                     
                     tgt = self.decoder.text_embedding(texts=current_input.to(input.get_device())) # [B=1, 1, HIDDEN]
-                    assert tgt.size(-1) == self.decoder.hidden_dim # [B=1, 1, HIDDEN]
-                    assert tgt.ndim == 3 # TODO. DEBUG
-                    
                     tgt = self.decoder.pos_encoder(x=tgt, point=current_point) # [B=1, 1, HIDDEN]
-                    assert tgt.size(-1) == self.decoder.hidden_dim
-                    assert tgt.ndim == 3
-
                     tgt_mask = self.decoder.order_mask(length=current_point+1) # [B=1, LEN, LEN]
-                    assert tgt_mask.ndim == 3
-                    assert tgt_mask.size(-1) == current_point+1
-                    assert tgt_mask.size(-2) == current_point+1
-
                     tgt_mask = tgt_mask[:, -1].unsqueeze(1) # [B=1, 1, LEN]
-                    assert tgt_mask.ndim == 3
-                    assert tgt_mask.size(-1) == current_point+1
-                    assert tgt_mask.size(-2) == 1
 
                     # 어텐션 레이어 통과
                     for l, layer in enumerate(self.decoder.attention_layers):
@@ -659,27 +643,18 @@ class MySATRN(nn.Module):
                             src=current_src, 
                             tgt_mask=tgt_mask
                             ) # [1, 1, HIDDEN]
-                        assert tgt.ndim == 3
-                        assert tgt.size(-1) == self.decoder.hidden_dim
 
                         # Hidden state 갱신
                         # 첫 state: [1, 1, HIDDEN]
                         # 이후: [B=1, 1, HIDDEN] -> [B=1, 2, HIDDEN] -> [B=1, 3, HIDDEN] -> ...
                         current_hidden[l] = (tgt if current_hidden[l] is None else torch.cat([current_hidden[l], tgt], dim=1))
-                        assert current_hidden[l].ndim == 3
 
                     # 확률화하기 전 모델의 로짓
                     prob_step = self.decoder.generator(tgt) # [B=1, 1, VOCAB_SIZE]
-                    assert prob_step.ndim == 3
-                    assert prob_step.size(-1) == self.decoder.num_classes
 
                     # 모델의 로짓을  확률화
                     log_prob_step = F.log_softmax(prob_step, dim=-1) # [B=1, 1, VOCAB_SIZE]
                     log_prob, indices = torch.topk(log_prob_step, beam_width)
-                    assert indices.ndim == 3
-                    assert indices.size(-1) == beam_width
-                    assert log_prob.ndim == 3
-                    assert log_prob.size(-1) == beam_width
 
                     # 다음 state에 활용할 {beam_width}개 후보 노드를 우선순위큐에 삽입
                     next_nodes = []
