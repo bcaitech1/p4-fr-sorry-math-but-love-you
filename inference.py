@@ -101,7 +101,7 @@ def validate(parser):
                     input=input, 
                     data_loader=valid_data_loader, 
                     expected=expected, 
-                    decode_type=parser.decode_type, 
+                    method=parser.decode_type, 
                     beam_width=parser.beam_width
                     )
 
@@ -224,7 +224,7 @@ def main(parser):
                     input=input, 
                     data_loader=test_data_loader, 
                     expected=expected,
-                    decode_type=parser.decode_type, 
+                    method=parser.decode_type, 
                     beam_width=parser.beam_width
                     )
 

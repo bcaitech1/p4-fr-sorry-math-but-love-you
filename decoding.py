@@ -8,7 +8,7 @@ def decode(
     input: torch.Tensor, 
     data_loader: DataLoader=None, 
     expected: torch.Tensor=None, 
-    decode_type: str='greedy', 
+    method: str='greedy', 
     beam_width: int=3
     ) -> torch.Tensor:
     """디코딩을 수행하는 함수. NOTE: inference/validation에만 활용!
@@ -22,7 +22,7 @@ def decode(
         expected (torch.Tensor, optional):
             - Validation에서 디코딩할 경우 필요한 argument: Validation 단계에서는 max_length를 ground-truth를 바탕으로 설정하기 때문
             - Defaults to None.
-        decode_type (str, optional): 디코딩 타입 설정. Defaults to 'greedy'.
+        method (str, optional): 디코딩 타입 설정. Defaults to 'greedy'.
             - 'greedy': 그리디 디코딩
             - 'beam': 빔서치
         beam_width (int, optional): [description]. Defaults to 3.
@@ -32,7 +32,7 @@ def decode(
         squence (torch.Tensor): id_to_string에 입력 가능한 output sequence 텐서
     """
 
-    if decode_type == 'greedy':
+    if method == 'greedy':
         output = model(
             input=input, 
             expected=expected, 
@@ -43,7 +43,7 @@ def decode(
         _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
         sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
-    elif decode_type == 'beam':
+    elif method == 'beam':
         sequence = model.beam_search(
             input=input,
             data_loader=data_loader,
@@ -51,7 +51,7 @@ def decode(
             max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
         )
     else:
-        raise NotImplementedError
+        raise NotImplementedError, f"There's no '{method}' type yet."
 
     return sequence
 
