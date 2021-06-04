@@ -27,8 +27,9 @@ from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp ### 
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
+from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts
 from metrics import word_error_rate, sentence_acc, final_metric
+from scheduler import TeacherForcingScheduler
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
@@ -41,11 +42,11 @@ def train_one_epoch(
     criterion,
     optimizer,
     lr_scheduler,
-    # tf_scheduler, # NOTE. tf-scheduler
     teacher_forcing_ratio,
     max_grad_norm,
     device,
     scaler,
+    tf_scheduler
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -67,7 +68,7 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
-            # tf_ratio = tf_scheduler.step() # NOTE. tf-scheduler
+            tf_ratio = tf_scheduler.step()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -75,8 +76,7 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
-            output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
-            # output = model(input, expected, True, tf_ratio) # NOTE. tf-scheduler
+            output = model(input, expected, True, tf_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
             decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
@@ -118,16 +118,16 @@ def train_one_epoch(
 
             # lr logging
             if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
-                wandb.log({"learning_rate": lr_scheduler.get_lr()})
+                wandb.log({
+                    "learning_rate": lr_scheduler.get_lr(),
+                    'tf_ratio': tf_ratio
+                    })
             else:
                 for lr_ in lr_scheduler.get_lr():
-                    wandb.log({"learning_rate": lr_})
-
-            # tf ratio logging
-            try:
-                wandb.log({'teacher_forcing_ratio': tf_ratio}) # NOTE. tf-scheduler
-            except:
-                wandb.log({'teacher_forcing_ratio': teacher_forcing_ratio}) # NOTE. tf-scheduler
+                    wandb.log({
+                        "learning_rate": lr_,
+                        'tf_ratio': tf_ratio
+                        })
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -185,6 +185,7 @@ def valid_one_epoch(
                 sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
                 loss = criterion(decoded_values, expected[:, 1:])
+
                 losses.append(loss.item())
 
                 expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -213,13 +214,10 @@ def valid_one_epoch(
     }
     return result
 
-
 def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
-            A.GridDistortion(p=0.5, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
@@ -240,7 +238,6 @@ def main(config_file):
     Train math formula recognition model
     """
     options = Flags(config_file).get()
-    print(options.optimizer.lr)
     timestamp = get_timestamp()
 
     # set random seed
@@ -319,6 +316,7 @@ def main(config_file):
 
     # define loss
     criterion = model.criterion.to(device)
+    # criterion = get_criterion(type=options.criterion).to(device)
 
     # define optimizer
     enc_params_to_optimise = [
@@ -370,6 +368,8 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
+        tf_scheduler = TeacherForcingScheduler(num_steps=total_steps, tf_max=options.teacher_forcing_ratio)
+
     else:
         optimizer = get_optimizer(
             options.optimizer.optimizer,
@@ -399,9 +399,6 @@ def main(config_file):
             )
     if checkpoint['scheduler']:
         lr_scheduler.load_state_dict(checkpoint['scheduler'])
-
-    # Define Teacher Forcing Scheduler
-    tf_scheduler = TeacherForcingScheduler(num_steps=total_steps, tf_max=options.teacher_forcing_ratio)
 
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
@@ -442,17 +439,17 @@ def main(config_file):
         )
 
         train_result = train_one_epoch(
-            data_loader=train_data_loader,
-            model=model,
-            epoch_text=epoch_text,
-            criterion=criterion,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            teacher_forcing_ratio=options.teacher_forcing_ratio,
-            # tf_scheduler=tf_scheduler, # NOTE. tf-scheduler
-            max_grad_norm=options.max_grad_norm,
-            device=device,
-            scaler=scaler,
+            train_data_loader,
+            model,
+            epoch_text,
+            criterion,
+            optimizer,
+            lr_scheduler,
+            options.teacher_forcing_ratio,
+            options.max_grad_norm,
+            device,
+            scaler,
+            tf_scheduler
         )
 
         train_losses.append(train_result["loss"])
@@ -606,7 +603,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="TF-Scheduler(0.6) + SSR>GD>Norm(IMGNET)",
+        default="debug",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

@@ -10,6 +10,8 @@ from networks.SATRN import SATRN
 from networks.SWIN import SWIN
 from networks.My_SATRN import MySATRN
 
+import warnings
+
 def get_network(
     model_type,
     FLAGS,
@@ -97,3 +99,45 @@ def set_seed(seed: int=21):
 
 def get_timestamp():
     return datetime.now().strftime(format='%m%d-%H%M%S')
+
+
+class TeacherForcingScheduler:
+    """Teacher Forcing 스케줄러 클래스. Train에 활용
+    Example:
+        # Define TF Scheduler
+        total_steps = len(train_data_loader)*options.num_epochs
+        teacher_forcing_ratio = 0.6
+        tf_scheduler = TeacherForcingScheduler(
+            num_steps=total_steps,
+            tf_max=teacher_forcing_ratio
+            )
+        
+        # Train phase
+        tf_ratio = tf_scheduler.step()
+        output = model(input, expected, False, tf_ratio)
+
+    Args:
+        num_steps (int): 총 스텝 수
+        tf_max (float): 최대 teacher forcing ratio. tf_max에서 시작해서 코사인 함수를 그리며 0으로 마무리 됨
+    """
+    def __init__(self, num_steps: int, tf_max: float):
+        linspace = self._get_linspace(num_steps, tf_max)
+        self.__scheduler = iter(linspace)
+        
+    def step(self):
+        try:
+            return next(self.__scheduler)
+        except:
+            warnings.warn('Teacher forcing scheduler has been done. Return just 0 for now.')
+            return 0.0
+
+    @staticmethod
+    def _get_linspace(num_steps, tf_max):
+       from copy import deepcopy
+       factor = tf_max / 2
+       x = np.linspace(0, np.pi, num_steps)
+       x = np.cos(x)
+       x *= factor
+       x += factor
+    #    return deepcopy(x.tolist())
+       return x

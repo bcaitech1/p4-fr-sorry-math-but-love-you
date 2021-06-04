@@ -521,33 +521,3 @@ class Attention(nn.Module):
                 for _ in range(self.decoder.num_layers)
             ]
         return hidden
-
-
-if __name__ == '__main__':
-    from flags import Flags
-    from dataset import dataset_loader
-    from train import get_train_transforms, get_valid_transforms
-
-    CONFIG_PATH = "./configs/Attention-jupyter.yaml"
-    options = Flags(CONFIG_PATH).get()
-    # get data
-    (
-        train_data_loader,
-        validation_data_loader,
-        train_dataset,
-        valid_dataset,
-    ) = dataset_loader(
-        options=options,
-        train_transform=get_train_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-        valid_transform=get_valid_transforms(
-            options.input_size.height, options.input_size.width
-            ),
-            )
-    model = Attention(options, train_dataset)
-    batch = next(iter(train_data_loader))
-
-    SOS_TOKEN_ID = train_dataset.token_to_id['<SOS>']
-    EOS_TOKEN_ID = train_dataset.token_to_id['<EOS>']
-    model.beam_search(input=batch['image'], sos_token_id=SOS_TOKEN_ID, eos_token_id=EOS_TOKEN_ID)
