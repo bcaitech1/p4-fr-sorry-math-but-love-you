@@ -182,7 +182,6 @@ def valid_one_epoch(
                 sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
                 loss = criterion(decoded_values, expected[:, 1:])
-
                 losses.append(loss.item())
 
                 expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -216,7 +215,9 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            # A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
+            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+            A.GridDistortion(p=0.5, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -226,7 +227,7 @@ def get_train_transforms(height, width):
 def get_valid_transforms(height, width):
     return A.Compose([
         A.Resize(height, width), 
-        # A.Normalize(mean=[0.6280586 , 0.61502952, 0.58616558], std=[0.16464177, 0.16915324, 0.1757833]),
+        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV2(p=1.0)]
         )
 

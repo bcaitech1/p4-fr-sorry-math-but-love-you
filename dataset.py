@@ -209,7 +209,6 @@ class LoadDataset(Dataset):
             if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
-            # image = self.transform(image)
             image = self.transform(image=image)['image']
 
         return {"path": item["path"], "truth": item["truth"], "image": image}
