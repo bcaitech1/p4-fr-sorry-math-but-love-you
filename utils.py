@@ -1,12 +1,16 @@
 import os
 import random
 from psutil import virtual_memory
+from datetime import datetime
 import numpy as np
 import torch
 import torch.optim as optim
 from networks.Attention import Attention
 from networks.SATRN import SATRN
 from networks.SWIN import SWIN
+from networks.My_SATRN import MySATRN
+
+import warnings
 
 def get_network(
     model_type,
@@ -24,6 +28,8 @@ def get_network(
         model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
         checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
         model.encoder.load_state_dict(checkpoint['model'], strict=False)
+    elif model_type == "MySATRN":
+        model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
     else:
         raise NotImplementedError
 
@@ -55,12 +61,17 @@ def print_system_envs():
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
-        special_ids = [
-            data_loader.dataset.token_to_id["<PAD>"],
+        eos_id = data_loader.dataset.token_to_id['<EOS>']
+        special_ids = set([
+            data_loader.dataset.token_to_id['<PAD>'],
             data_loader.dataset.token_to_id["<SOS>"],
-            data_loader.dataset.token_to_id["<EOS>"]
-            ]
-
+            eos_id
+            ])
+        # special_ids = [
+        #     data_loader.dataset.token_to_id["<PAD>"],
+        #     data_loader.dataset.token_to_id["<SOS>"],
+        #     data_loader.dataset.token_to_id["<EOS>"]
+        #     ]
     for example in tokens:
         string = ""
         if do_eval:
@@ -69,6 +80,8 @@ def id_to_string(tokens, data_loader, do_eval=0):
                 if token not in special_ids:
                     if token != -1:
                         string += data_loader.dataset.id_to_token[token] + " "
+                elif token == eos_id:
+                    break
         else:
             for token in example:
                 token = token.item()
@@ -83,3 +96,6 @@ def set_seed(seed: int=21):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def get_timestamp():
+    return datetime.now().strftime(format='%m%d-%H%M%S')
