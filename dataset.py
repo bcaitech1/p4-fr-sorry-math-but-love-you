@@ -85,13 +85,11 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
 
     # Author: Junchul Choi
     root = os.path.join(os.path.dirname(groundtruth), "images")
-    ####----------------------
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
     val_image_names = set(df[df['fold']==3]['image_name'].values)
     train_image_names = set(df[df['fold'].isin([0, 1])]['image_name'].values)
-    ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]
         for line in fd:
@@ -99,11 +97,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         random.shuffle(data)
         dataset_len = round(len(data) * proportion)
         data = data[:dataset_len]
-    ####--------------
         train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
         val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
-    ####-------------
-        # data = [[os.path.join(root, x[0]), x[1]] for x in data]
     return train_data, val_data
 
 
@@ -209,7 +204,6 @@ class LoadDataset(Dataset):
             if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
-            # image = self.transform(image)
             image = self.transform(image=image)['image']
 
         return {"path": item["path"], "truth": item["truth"], "image": image}

@@ -1,6 +1,6 @@
 import math
-import warnings
 import numpy as np
+import warnings
 from torch.optim.lr_scheduler import _LRScheduler
 
 
@@ -148,22 +148,19 @@ class TeacherForcingScheduler:
         tf_max (float): 최대 teacher forcing ratio. tf_max에서 시작해서 코사인 함수를 그리며 0으로 마무리 됨
     """
     def __init__(self, num_steps: int, tf_max: float):
-        """
-        Args:
-            
-        """
-        linspace = self.get_linspace(num_steps, tf_max)
-        self.scheduler = iter(linspace)
-    
+        linspace = self._get_linspace(num_steps, tf_max)
+        self.__scheduler = iter(linspace)
+        
     def step(self):
         try:
-            return next(self.scheduler)
+            return next(self.__scheduler)
         except:
             warnings.warn('Teacher forcing scheduler has been done. Return just 0 for now.')
             return 0.0
 
     @staticmethod
-    def get_linspace(num_steps, tf_max):
+    def _get_linspace(num_steps, tf_max):
+       from copy import deepcopy
        factor = tf_max / 2
        x = np.linspace(0, np.pi, num_steps)
        x = np.cos(x)
