@@ -501,7 +501,7 @@ def main(config_file):
         if best_score < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
-            prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
+            # prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
