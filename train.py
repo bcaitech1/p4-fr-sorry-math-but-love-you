@@ -41,8 +41,8 @@ def train_one_epoch(
     criterion,
     optimizer,
     lr_scheduler,
-    tf_scheduler, 
-    # teacher_forcing_ratio,
+    # tf_scheduler, # NOTE. tf-scheduler
+    teacher_forcing_ratio,
     max_grad_norm,
     device,
     scaler,
@@ -67,7 +67,7 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
-            tf_ratio = tf_scheduler.step()
+            # tf_ratio = tf_scheduler.step() # NOTE. tf-scheduler
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -75,8 +75,8 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
-            # output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
-            output = model(input, expected, True, tf_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            # output = model(input, expected, True, tf_ratio) # NOTE. tf-scheduler
 
             decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
@@ -124,7 +124,10 @@ def train_one_epoch(
                     wandb.log({"learning_rate": lr_})
 
             # tf ratio logging
-            wandb.log({'teacher_forcing_ratio': tf_ratio})
+            try:
+                wandb.log({'teacher_forcing_ratio': tf_ratio}) # NOTE. tf-scheduler
+            except:
+                wandb.log({'teacher_forcing_ratio': teacher_forcing_ratio}) # NOTE. tf-scheduler
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -237,6 +240,7 @@ def main(config_file):
     Train math formula recognition model
     """
     options = Flags(config_file).get()
+    print(options.optimizer.lr)
     timestamp = get_timestamp()
 
     # set random seed
@@ -444,8 +448,8 @@ def main(config_file):
             criterion=criterion,
             optimizer=optimizer,
             lr_scheduler=lr_scheduler,
-            # options.teacher_forcing_ratio,
-            tf_scheduler=tf_scheduler,
+            teacher_forcing_ratio=options.teacher_forcing_ratio,
+            # tf_scheduler=tf_scheduler, # NOTE. tf-scheduler
             max_grad_norm=options.max_grad_norm,
             device=device,
             scaler=scaler,
@@ -602,7 +606,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="LSLoss + Norm ",
+        default="TF-Scheduler(0.6) + SSR>GD>Norm(IMGNET)",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
