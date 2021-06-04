@@ -45,7 +45,7 @@ def train_one_epoch(
     max_grad_norm,
     device,
     scaler,
-    tf_scheduler
+    tf_scheduler # Teacher Forcing Scheduler
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -315,7 +315,6 @@ def main(config_file):
 
     # define loss
     criterion = model.criterion.to(device)
-    # criterion = get_criterion(type=options.criterion).to(device)
 
     # define optimizer
     enc_params_to_optimise = [
@@ -524,8 +523,8 @@ def main(config_file):
                     "network": options.network,
                     "scheduler": lr_scheduler.state_dict(),
                 },
-                # prefix=options.prefix,
-                prefix=prefix,
+                prefix=options.prefix,
+                # prefix=prefix,
             )
             best_score = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
                 1 - validation_epoch_wer
@@ -602,7 +601,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="debug",
+        default="TF-Scheduler+Norm(IM2LATEX)",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
