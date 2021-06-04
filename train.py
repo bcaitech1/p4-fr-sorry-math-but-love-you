@@ -45,7 +45,7 @@ def train_one_epoch(
     max_grad_norm,
     device,
     scaler,
-    # tf_scheduler # NOTE. Teacher Forcing Scheduler
+    tf_scheduler # NOTE. Teacher Forcing Scheduler
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -67,7 +67,7 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
-            # tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
+            tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -75,8 +75,8 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
-            # output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
-            output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
+            # output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
             decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
@@ -120,13 +120,13 @@ def train_one_epoch(
             if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
                 wandb.log({
                     "learning_rate": lr_scheduler.get_lr(),
-                    # 'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
+                    'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
                     })
             else:
                 for lr_ in lr_scheduler.get_lr():
                     wandb.log({
                         "learning_rate": lr_,
-                        # 'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
+                        'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
                         })
 
     expected = id_to_string(expected, data_loader)
@@ -367,7 +367,7 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
-        # tf_scheduler = TeacherForcingScheduler(num_steps=total_steps, tf_max=options.teacher_forcing_ratio) # NOTE. Teacher Forcing Scheduler
+        tf_scheduler = TeacherForcingScheduler(num_steps=total_steps, tf_max=options.teacher_forcing_ratio) # NOTE. Teacher Forcing Scheduler
 
     else:
         optimizer = get_optimizer(
@@ -448,7 +448,7 @@ def main(config_file):
             options.max_grad_norm,
             device,
             scaler,
-            # tf_scheduler # NOTE. Teacher Forcing Scheduler
+            tf_scheduler # NOTE. Teacher Forcing Scheduler
         )
 
         train_losses.append(train_result["loss"])
@@ -602,7 +602,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="[실험명 설정]",
+        default="TF-Scheduler+Norm(IMGNET)",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

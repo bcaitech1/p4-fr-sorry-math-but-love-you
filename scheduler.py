@@ -160,10 +160,17 @@ class TeacherForcingScheduler:
 
     @staticmethod
     def _get_linspace(num_steps, tf_max):
-       from copy import deepcopy
-       factor = tf_max / 2
-       x = np.linspace(0, np.pi, num_steps)
-       x = np.cos(x)
-       x *= factor
-       x += factor
-       return x
+        factor = tf_max / 2
+        x = np.linspace(0, np.pi, num_steps)
+        x = np.cos(x)
+        x *= factor
+        x += factor
+        return x
+
+    @staticmethod
+    def _get_arctan(num_steps, tf_max):
+        x = np.linspace(-5, 5, num_steps)
+        x = -np.arctan(x)
+        x -= x[-1]
+        x *= (tf_max/x[0])
+        return x
