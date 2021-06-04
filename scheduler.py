@@ -166,5 +166,4 @@ class TeacherForcingScheduler:
        x = np.cos(x)
        x *= factor
        x += factor
-    #    return deepcopy(x.tolist())
        return x
