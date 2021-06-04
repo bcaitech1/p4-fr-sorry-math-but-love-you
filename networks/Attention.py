@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 sys.path.insert(0, '../')
 from dataset import START, PAD
-from beam_search import BeamSearchNode
+from decoding import BeamSearchNode
 from criterion import LabelSmoothingLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

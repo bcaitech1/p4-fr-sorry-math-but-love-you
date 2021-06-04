@@ -49,6 +49,8 @@ def decode(
             beam_width=beam_width,
             max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
         )
+    
+
     else:
         raise NotImplementedError(f"There's no '{method}' type yet.")
 
@@ -63,12 +65,31 @@ class BeamSearchNode(object):
         self.logp = log_prob
         self.len = length  # 길이
 
-    def eval(self, alpha=1.0):
-        reward = 0
-        return self.logp / float(self.len - 1 + 1e-6) + alpha * reward
+    def eval(self, alpha=0.1) -> float:
+        """score 측정 함수
+        score: L - 해당 스텝까지의 총 길이, alpha - 페널티항, c: context
+            {1/L^{alpha}} * log{ P(y_{1}, ..., y_{L} | c)}
+            = {1/L^{alpha}}*SUM_{t'=1}^{L}{log{P(y_{1}, ..., y_{L} | c)}}
+        Args:
+            alpha (float, optional): 스텝 길이에 따른 페널티를 위한 파라미터. Defaults to 0.75.
+
+        Returns:
+            score (float): 점수
+        
+        References:
+            - Beam Search, Dive into Deep Learning,
+              https://d2l.ai/chapter_recurrent-modern/beam-search.html#id1
+        """
+
+        return self.logp / (float(self.len)) # **alpha)
+        # return self.logp / float(self.len - 1 + 1e-6) + alpha * reward
 
     def __lt__(self, other):
         return self.len < other.len
 
     def __gt__(self, other):
         return self.len > other.len
+
+    def get_penalty(self, length, alpha: float=1.2, min_length: int=5):
+        p = ((1+length) / (1+min_length)) ** alpha
+        return p

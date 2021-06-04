@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 import timm
 
 from dataset import START, PAD
-from beam_search import BeamSearchNode
+from decoding import BeamSearchNode
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

@@ -1,5 +1,9 @@
-from torch.optim.lr_scheduler import _LRScheduler
 import math
+import warnings
+import numpy as np
+from torch.optim.lr_scheduler import _LRScheduler
+
+
 class CircularLRBeta:
 
     def __init__(
@@ -122,3 +126,47 @@ class CustomCosineAnnealingWarmUpRestarts(_LRScheduler):
         self.last_epoch = math.floor(epoch)
         for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
             param_group['lr'] = lr
+
+
+class TeacherForcingScheduler:
+    """Teacher Forcing 스케줄러 클래스. Train에 활용
+    Example:
+        # Define TF Scheduler
+        total_steps = len(train_data_loader)*options.num_epochs
+        teacher_forcing_ratio = 0.6
+        tf_scheduler = TeacherForcingScheduler(
+            num_steps=total_steps,
+            tf_max=teacher_forcing_ratio
+            )
+        
+        # Train phase
+        tf_ratio = tf_scheduler.step()
+        output = model(input, expected, False, tf_ratio)
+
+    Args:
+        num_steps (int): 총 스텝 수
+        tf_max (float): 최대 teacher forcing ratio. tf_max에서 시작해서 코사인 함수를 그리며 0으로 마무리 됨
+    """
+    def __init__(self, num_steps: int, tf_max: float):
+        """
+        Args:
+            
+        """
+        linspace = self.get_linspace(num_steps, tf_max)
+        self.scheduler = iter(linspace)
+    
+    def step(self):
+        try:
+            return next(self.scheduler)
+        except:
+            warnings.warn('Teacher forcing scheduler has been done. Return just 0 for now.')
+            return 0.0
+
+    @staticmethod
+    def get_linspace(num_steps, tf_max):
+       factor = tf_max / 2
+       x = np.linspace(0, np.pi, num_steps)
+       x = np.cos(x)
+       x *= factor
+       x += factor
+       return x

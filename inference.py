@@ -52,7 +52,8 @@ def validate(parser):
     )
     valid_data_loader = DataLoader(
         valid_dataset,
-        batch_size=options.batch_size,
+        # batch_size=options.batch_size,
+        batch_size=64,
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
@@ -81,10 +82,7 @@ def validate(parser):
     num_sent_acc = 0
     
     # Infernce
-    print(
-        "[+] Decoding Type\n",
-        parser.decode_type,
-    )
+    print("[+] Decoding Type:", parser.decode_type)
     start = time.time()
     with torch.no_grad():
         with tqdm(
@@ -186,15 +184,11 @@ def main(parser):
     )
     model.eval()
     results = []
-    print(
-        "[+] Decoding Type\n",
-        parser.decode_type,
-    )
+    print("[+] Decoding Type:", parser.decode_type)
     with torch.no_grad():
         for d in tqdm(test_data_loader):
             input = d["image"].float().to(device)
             expected = d["truth"]["encoded"].to(device)
-
             sequence = decode(
                     model=model, 
                     input=input, 
@@ -203,7 +197,6 @@ def main(parser):
                     method=parser.decode_type, 
                     beam_width=parser.beam_width
                     )
-
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
             
             for path, predicted in zip(d["file_path"], sequence_str):
@@ -221,6 +214,7 @@ if __name__ == "__main__":
         "--checkpoint",
         dest="checkpoint",
         default="./log/MySATRN_best_model.pth",
+        # default="./configs/Attention_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -276,5 +270,5 @@ if __name__ == "__main__":
     )
 
     parser = parser.parse_args()
-    # main(parser)
-    validate(parser)
+    main(parser)
+    # validate(parser)
