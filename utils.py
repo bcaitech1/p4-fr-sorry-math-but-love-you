@@ -59,12 +59,17 @@ def print_system_envs():
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
-        special_ids = [
-            data_loader.dataset.token_to_id["<PAD>"],
+        eos_id = data_loader.dataset.token_to_id['<EOS>']
+        special_ids = set([
+            data_loader.dataset.token_to_id['<PAD>'],
             data_loader.dataset.token_to_id["<SOS>"],
-            data_loader.dataset.token_to_id["<EOS>"]
-            ]
-
+            eos_id
+            ])
+        # special_ids = [
+        #     data_loader.dataset.token_to_id["<PAD>"],
+        #     data_loader.dataset.token_to_id["<SOS>"],
+        #     data_loader.dataset.token_to_id["<EOS>"]
+        #     ]
     for example in tokens:
         string = ""
         if do_eval:
@@ -73,6 +78,8 @@ def id_to_string(tokens, data_loader, do_eval=0):
                 if token not in special_ids:
                     if token != -1:
                         string += data_loader.dataset.id_to_token[token] + " "
+                elif token == eos_id:
+                    break
         else:
             for token in example:
                 token = token.item()

@@ -27,8 +27,7 @@ from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp ### 
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts
-# from criterion import get_criterion
+from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
 from metrics import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
@@ -42,7 +41,8 @@ def train_one_epoch(
     criterion,
     optimizer,
     lr_scheduler,
-    teacher_forcing_ratio,
+    tf_scheduler, 
+    # teacher_forcing_ratio,
     max_grad_norm,
     device,
     scaler,
@@ -67,6 +67,7 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
+            tf_ratio = tf_scheduler.step()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -74,7 +75,8 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
-            output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            # output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            output = model(input, expected, True, tf_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
             decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
@@ -120,6 +122,9 @@ def train_one_epoch(
             else:
                 for lr_ in lr_scheduler.get_lr():
                     wandb.log({"learning_rate": lr_})
+
+            # tf ratio logging
+            wandb.log({'teacher_forcing_ratio': tf_ratio})
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -309,7 +314,6 @@ def main(config_file):
 
     # define loss
     criterion = model.criterion.to(device)
-    # criterion = get_criterion(type=options.criterion).to(device)
 
     # define optimizer
     enc_params_to_optimise = [
@@ -391,6 +395,9 @@ def main(config_file):
     if checkpoint['scheduler']:
         lr_scheduler.load_state_dict(checkpoint['scheduler'])
 
+    # Define Teacher Forcing Scheduler
+    tf_scheduler = TeacherForcingScheduler(num_steps=total_steps, tf_max=options.teacher_forcing_ratio)
+
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
 
@@ -430,16 +437,17 @@ def main(config_file):
         )
 
         train_result = train_one_epoch(
-            train_data_loader,
-            model,
-            epoch_text,
-            criterion,
-            optimizer,
-            lr_scheduler,
-            options.teacher_forcing_ratio,
-            options.max_grad_norm,
-            device,
-            scaler,
+            data_loader=train_data_loader,
+            model=model,
+            epoch_text=epoch_text,
+            criterion=criterion,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            # options.teacher_forcing_ratio,
+            tf_scheduler=tf_scheduler,
+            max_grad_norm=options.max_grad_norm,
+            device=device,
+            scaler=scaler,
         )
 
         train_losses.append(train_result["loss"])
