@@ -10,6 +10,10 @@ from dataset import START, PAD
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def get_padding(kernel_size: int, stride: int = 1, dilation: int = 1, **_) -> int:
+    padding = ((stride - 1) + dilation * (kernel_size - 1)) // 2
+    return padding
+
 
 class ShallowCNN(nn.Module):
     def __init__(self, input_channels, hidden_size):
@@ -51,10 +55,10 @@ class ShallowCNN(nn.Module):
 
         return x # (batch, hidden_size, h/8, w/8)
 
-class CustomCNN(nn.Module):
+class EfficientNet(nn.Module):
     def __init__(self, input_channel, output_channel):
-        super(CustomCNN, self).__init__()
-        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
+        super(EfficientNet, self).__init__()
+        m = timm.create_model('tf_efficientnetv2_s_in21k', pretrained=True)
         self.conv_stem= nn.Conv2d(input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
         self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
         self.act1 = nn.SiLU(inplace=True)
@@ -72,6 +76,58 @@ class CustomCNN(nn.Module):
         x = self.act2(self.bn2(x))
 
         return x #[b, c, h/32, w/32]
+
+class ScaledStdConv2d(nn.Conv2d):
+    """Conv2d layer with Scaled Weight Standardization.
+    Paper: `Characterizing signal propagation to close the performance gap in unnormalized ResNets` -
+        https://arxiv.org/abs/2101.08692
+    NOTE: the operations used in this impl differ slightly from the DeepMind Haiku impl. The impact is minor.
+    """
+
+    def __init__(
+            self, in_channels, out_channels, kernel_size, stride=1, padding=None, dilation=1, groups=1,
+            bias=True, gamma=1.0, eps=1e-5, gain_init=1.0, use_layernorm=False):
+        if padding is None:
+            padding = get_padding(kernel_size, stride, dilation)
+        super().__init__(
+            in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation,
+            groups=groups, bias=bias)
+        self.gain = nn.Parameter(torch.full((self.out_channels, 1, 1, 1), gain_init))
+        self.scale = gamma * self.weight[0].numel() ** -0.5  # gamma * 1 / sqrt(fan-in)
+        self.eps = eps ** 2 if use_layernorm else eps
+        self.use_layernorm = use_layernorm  # experimental, slightly faster/less GPU memory to hijack LN kernel
+
+    def get_weight(self):
+        if self.use_layernorm:
+            weight = self.scale * F.layer_norm(self.weight, self.weight.shape[1:], eps=self.eps)
+        else:
+            std, mean = torch.std_mean(self.weight, dim=[1, 2, 3], keepdim=True, unbiased=False)
+            weight = self.scale * (self.weight - mean) / (std + self.eps)
+        return self.gain * weight
+
+    def forward(self, x):
+        return F.conv2d(x, self.get_weight(), self.bias, self.stride, self.padding, self.dilation, self.groups)
+
+
+
+class NFNet(nn.Module):
+    def __init__(self, input_channel, output_channel):
+        super(NFNet, self).__init__()
+        m = timm.create_model('eca_nfnet_l0', pretrained=True)
+        self.prelayer = m.stem
+        self.nf_block = m.stages
+        self.conv_last = ScaledStdConv2d(1536, output_channel, kernel_size=1, stride=1, bias=False)
+        self.act2 = nn.SiLU(inplace=True)
+
+    def forward(self, x):
+
+        x = self.prelayer(x)
+        x = self.nf_block(x)
+        x = self.conv_last(x)
+        x = self.act2(x)
+
+        return x #[b, c, h/32, w/32]
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, hidden_size, h=128, w=128, dropout=0.1):
@@ -273,7 +329,9 @@ class SATRNEncoder(nn.Module):
         super(SATRNEncoder, self).__init__()
 
         # self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
-        self.shallow_cnn = CustomCNN(input_channel, hidden_size)
+        # self.shallow_cnn = EfficientNet(input_channel, hidden_size)
+        self.effnet = EfficientNet(input_channel, hidden_size)
+        # self.nfnet = NFNet(input_channel, hidden_size)
         self.positional_encoding = PositionalEncoding(hidden_size, 
                                                     h=input_height//32, 
                                                     w=input_width//32, 
@@ -289,8 +347,13 @@ class SATRNEncoder(nn.Module):
     
     def forward(self, x):
         # x - [b, c, h, w]
-        out = self.shallow_cnn(x)  # [b, c, h//4, w//4]
-        out = self.positional_encoding(out)  # [b, c, h//4, w//4]
+        # out = self.shallow_cnn(x)  # [b, c, h//32, w//32]
+        # eff_out = self.effnet(x) # [b, c, h//32, w//32]
+        # nf_out = self.nfnet(x) # [b, c, h//32, w//32]
+        # out = eff_out + nf_out
+
+        out = self.effnet(x)
+        out = self.positional_encoding(out)  # [b, c, h//32, w//32]
 
         for layer in self.attention_layers:
             out = layer(out)
@@ -543,7 +606,7 @@ class MySATRN(nn.Module):
         )
 
         self.criterion = (
-            nn.CrossEntropyLoss()
+            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
         )  # without ignore_index=train_dataset.token_to_id[PAD]
 
         if checkpoint:

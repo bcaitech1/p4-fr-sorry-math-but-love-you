@@ -99,8 +99,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
-    val_image_names = set(df[df['fold']==4]['image_name'].values)
-    train_image_names = set(df[df['fold']<2]['image_name'].values)
+    val_image_names = set(df[df['fold']==3]['image_name'].values)
+    train_image_names = set(df[df['fold']!=3]['image_name'].values)
     ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]

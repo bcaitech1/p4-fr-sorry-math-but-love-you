@@ -205,16 +205,16 @@ def valid_one_epoch(
 def get_train_transforms(height, width):
     return A.Compose([
         A.Resize(height, width),
-        A.Compose([
-            A.HorizontalFlip(p=1),
-            A.VerticalFlip(p=1),
-        ],p=0.1),
+        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+        A.GridDistortion(p=0.5, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
+        A.Normalize(),
         ToTensorV2(p = 1.0),
     ],p=1.0)
 
 def get_valid_transforms(height, width):
     return A.Compose([
         A.Resize(height, width), 
+        A.Normalize(),
         ToTensorV2(p=1.0)
         ])
 
@@ -413,7 +413,7 @@ def main(config_file):
     scaler = GradScaler()
 
     best_sentence_acc = 0.0
-
+    teacher_forcing_ratio = options.teacher_forcing_ratio
     # Train
     for epoch in range(options.num_epochs):
         start_time = time.time()
@@ -425,6 +425,15 @@ def main(config_file):
             pad=len(str(options.num_epochs)),
         )
 
+        if 4 < epoch and epoch <= 8:
+            teacher_forcing_ratio = 0.8
+        elif 8 < epoch and epoch <= 12:
+            teacher_forcing_ratio = 0.6
+        elif 12 < epoch and epoch <= 16:
+            teacher_forcing_ratio = 0.4
+        elif 16 < epoch:
+            teacher_forcing_ratio = 0.0
+
         train_result = train_one_epoch(
             train_data_loader,
             model,
@@ -432,7 +441,7 @@ def main(config_file):
             criterion,
             optimizer,
             lr_scheduler,
-            options.teacher_forcing_ratio,
+            teacher_forcing_ratio,
             options.max_grad_norm,
             device,
         )
@@ -454,15 +463,16 @@ def main(config_file):
             sentence_acc=train_epoch_sentence_accuracy, word_error_rate=train_epoch_wer
         )
         epoch_lr = lr_scheduler.get_lr()  # cycle
-
-        validation_result = valid_one_epoch(
-            validation_data_loader,
-            model,
-            epoch_text,
-            criterion,
-            device,
-            teacher_forcing_ratio=options.teacher_forcing_ratio,
-        )
+        
+        with torch.no_grad():
+            validation_result = valid_one_epoch(
+                validation_data_loader,
+                model,
+                epoch_text,
+                criterion,
+                device,
+                teacher_forcing_ratio=0.0,
+            )
 
         validation_losses.append(validation_result["loss"])
         validation_epoch_symbol_accuracy = (
@@ -586,7 +596,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN_JY_implement_effnetv2M_256_512",
+        default="SATRN_JY_implement_effnetv2S_ecaNF0",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

@@ -55,14 +55,36 @@ def print_system_envs():
         "Memory Size : {}G\n".format(mem_size),
     )
 
+# def id_to_string(tokens, data_loader, do_eval=0):
+#     result = []
+#     if do_eval:
+#         special_ids = [
+#             data_loader.dataset.token_to_id["<PAD>"],
+#             data_loader.dataset.token_to_id["<SOS>"],
+#             data_loader.dataset.token_to_id["<EOS>"]
+#             ]
+
+#     for example in tokens:
+#         string = ""
+#         if do_eval:
+#             for token in example:
+#                 token = token.item()
+#                 if token not in special_ids:
+#                     if token != -1:
+#                         string += data_loader.dataset.id_to_token[token] + " "
+#         else:
+#             for token in example:
+#                 token = token.item()
+#                 if token != -1:
+#                     string += data_loader.dataset.id_to_token[token] + " "
+#         result.append(string)
+#     return result
+
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
-        special_ids = [
-            data_loader.dataset.token_to_id["<PAD>"],
-            data_loader.dataset.token_to_id["<SOS>"],
-            data_loader.dataset.token_to_id["<EOS>"]
-            ]
+        eos_id = data_loader.dataset.token_to_id["<EOS>"]
+        special_ids = set([data_loader.dataset.token_to_id["<PAD>"], data_loader.dataset.token_to_id["<SOS>"], eos_id])
 
     for example in tokens:
         string = ""
@@ -72,13 +94,17 @@ def id_to_string(tokens, data_loader, do_eval=0):
                 if token not in special_ids:
                     if token != -1:
                         string += data_loader.dataset.id_to_token[token] + " "
+                elif token == eos_id:
+                    break
         else:
             for token in example:
                 token = token.item()
                 if token != -1:
                     string += data_loader.dataset.id_to_token[token] + " "
+        
         result.append(string)
     return result
+
     
 def set_seed(seed: int=21):
     torch.manual_seed(seed)

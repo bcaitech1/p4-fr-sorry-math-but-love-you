@@ -67,27 +67,28 @@ def main(parser):
     print("Running {} on device {}\n".format(options.network, device))
 
     results = []
-    for d in tqdm(test_data_loader):
-        input = d["image"].to(device).float()
-        expected = d["truth"]["encoded"].to(device)
-        decoded_values = None
-        for model in models:
-            output = model(input, expected, False, 0.0)
-            if decoded_values is None:
-                decoded_values = output.transpose(1, 2)
-            else:
-                decoded_values += ouput.transpose(1, 2)
-        decoded_values /= len(models)
-        _, sequence = torch.topk(decoded_values, 1, dim=1)
-        sequence = sequence.squeeze(1)
-        sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
-        for path, predicted in zip(d["file_path"], sequence_str):
-            results.append((path, predicted))
+    with torch.no_grad():
+        for d in tqdm(test_data_loader):
+            input = d["image"].to(device).float()
+            expected = d["truth"]["encoded"].to(device)
+            decoded_values = None
+            for model in models:
+                output = model(input, expected, False, 0.0)
+                if decoded_values is None:
+                    decoded_values = output.transpose(1, 2)
+                else:
+                    decoded_values += ouput.transpose(1, 2)
+            decoded_values /= len(models)
+            _, sequence = torch.topk(decoded_values, 1, dim=1)
+            sequence = sequence.squeeze(1)
+            sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+            for path, predicted in zip(d["file_path"], sequence_str):
+                results.append((path, predicted))
 
-    os.makedirs(parser.output_dir, exist_ok=True)
-    with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
-        for path, predicted in results:
-            w.write(path + "\t" + predicted + "\n")
+        os.makedirs(parser.output_dir, exist_ok=True)
+        with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
+            for path, predicted in results:
+                w.write(path + "\t" + predicted + "\n")
 
 
 if __name__ == "__main__":
