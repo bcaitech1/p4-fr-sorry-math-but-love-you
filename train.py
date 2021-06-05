@@ -25,9 +25,9 @@ from checkpoint import (
 )
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
+from utils import get_timestamp
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts
-# from criterion import get_criterion
+from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
 from metrics import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
@@ -73,6 +73,7 @@ def train_one_epoch(
     max_grad_norm,
     device,
     scaler,
+    tf_scheduler # NOTE. Teacher Forcing Scheduler
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -94,20 +95,22 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
+            tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
 
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            with autocast():
-                output = model(input, expected, True, teacher_forcing_ratio)
+            # with autocast():
+            output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
+#             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+            decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+            _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
+            sequence = sequence.squeeze(1) # [B, MAX_LEN], Metric 측정을 위해
 
-                loss = criterion(decoded_values, expected[:, 1:])
+            loss = criterion(decoded_values, expected[:, 1:]) # [SOS] 이후부터
 
             optim_params = [
                 p
@@ -115,16 +118,17 @@ def train_one_epoch(
                 for p in param_group["params"]
             ]
             optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
+            loss.backward()
+            # scaler.scale(loss).backward()
+            # scaler.unscale_(optimizer)
 
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             # cycle
-            scaler.step(optimizer)
-            scaler.update()
-
+            # scaler.step(optimizer)
+            # scaler.update()
+            optimizer.step()
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -142,10 +146,16 @@ def train_one_epoch(
 
             # lr logging
             if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
-                wandb.log({"learning_rate": lr_scheduler.get_lr()})
+                wandb.log({
+                    "learning_rate": lr_scheduler.get_lr(),
+                    'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
+                    })
             else:
                 for lr_ in lr_scheduler.get_lr():
-                    wandb.log({"learning_rate": lr_})
+                    wandb.log({
+                        "learning_rate": lr_,
+                        'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
+                        })
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -181,41 +191,42 @@ def valid_one_epoch(
     sent_acc = 0
     num_sent_acc = 0
 
-    with tqdm(
-        desc=f"{epoch_text} Validation",
-        total=len(data_loader.dataset),
-        dynamic_ncols=True,
-        leave=False,
-    ) as pbar:
-        for d in data_loader:
-            input = d["image"].to(device).float()
+    with torch.no_grad():
+        with tqdm(
+            desc=f"{epoch_text} Validation",
+            total=len(data_loader.dataset),
+            dynamic_ncols=True,
+            leave=False,
+        ) as pbar:
+            for d in data_loader:
+                input = d["image"].to(device).float()
 
-            curr_batch_size = len(input)
-            expected = d["truth"]["encoded"].to(device)
+                curr_batch_size = len(input)
+                expected = d["truth"]["encoded"].to(device)
 
-            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-            with autocast():
+                expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
+                # with autocast():
                 output = model(input, expected, False, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2)
-                _, sequence = torch.topk(decoded_values, 1, dim=1)
-                sequence = sequence.squeeze(1)
+                decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
+                _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
+                sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
                 loss = criterion(decoded_values, expected[:, 1:])
 
-            losses.append(loss.item())
+                losses.append(loss.item())
 
-            expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader, do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
-            wer += word_error_rate(sequence_str, expected_str)
-            num_wer += 1
-            sent_acc += sentence_acc(sequence_str, expected_str)
-            num_sent_acc += 1
-            correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
-            total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
+                expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
+                expected_str = id_to_string(expected, data_loader, do_eval=1)
+                sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+                wer += word_error_rate(sequence_str, expected_str)
+                num_wer += 1
+                sent_acc += sentence_acc(sequence_str, expected_str)
+                num_sent_acc += 1
+                correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
+                total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
-            pbar.update(curr_batch_size)
+                pbar.update(curr_batch_size)
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -230,7 +241,6 @@ def valid_one_epoch(
         "num_sent_acc": num_sent_acc,
     }
     return result
-
 
 def get_train_transforms(height, width):
     return A.Compose(
@@ -261,6 +271,7 @@ def main(config_file):
     Train math formula recognition model
     """
     options = Flags(config_file).get()
+    timestamp = get_timestamp()
 
     # set random seed
     set_seed(seed=options.seed)
@@ -338,7 +349,6 @@ def main(config_file):
 
     # define loss
     criterion = model.criterion.to(device)
-    # criterion = get_criterion(type=options.criterion).to(device)
 
     # define optimizer
     enc_params_to_optimise = [
@@ -390,6 +400,14 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
+        
+        # NOTE. Teacher Forcing Scheduler
+        tf_scheduler = TeacherForcingScheduler(
+            num_steps=total_steps, 
+            tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
+            tf_min=0.4
+        ) 
+
     else:
         optimizer = get_optimizer(
             options.optimizer.optimizer,
@@ -445,7 +463,7 @@ def main(config_file):
 
     scaler = GradScaler()
 
-    best_sentence_acc = 0.0
+    best_score = 0.0
 
     # Train
     for epoch in range(options.num_epochs):
@@ -469,6 +487,7 @@ def main(config_file):
             options.max_grad_norm,
             device,
             scaler,
+            tf_scheduler # NOTE. Teacher Forcing Scheduler
         )
 
         train_losses.append(train_result["loss"])
@@ -519,9 +538,10 @@ def main(config_file):
         # make config
         with open(config_file, "r") as f:
             option_dict = yaml.safe_load(f)
-        if best_sentence_acc < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+        if best_score < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
+            # prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
@@ -544,11 +564,12 @@ def main(config_file):
                     "scheduler": lr_scheduler.state_dict(),
                 },
                 prefix=options.prefix,
+                # prefix=prefix,
             )
-            best_sentence_acc = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+            best_score = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
                 1 - validation_epoch_wer
             )
-            print(f"best sentence acc: {best_sentence_acc}")
+            print(f"best score: {best_score}")
             print("model is saved")
 
         # Summary
