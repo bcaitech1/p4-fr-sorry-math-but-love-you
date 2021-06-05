@@ -99,8 +99,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
-    val_image_names = set(df[df['fold']==3]['image_name'].values)
-    train_image_names = set(df[df['fold']!=3]['image_name'].values)
+    val_image_names = set(df[df['fold']==4]['image_name'].values)
+    train_image_names = set(df[df['fold']!=4]['image_name'].values)
     ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]
@@ -331,6 +331,7 @@ def dataset_loader(options, train_transform, valid_transform):
         num_workers=options.num_workers,
         pin_memory=True,
         collate_fn=collate_batch,
+        drop_last=True,
     )
 
     valid_dataset = LoadDataset(
@@ -343,6 +344,7 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
+        drop_last=True,
     )
 
     return train_data_loader, valid_data_loader, train_dataset, valid_dataset

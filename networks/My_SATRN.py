@@ -59,7 +59,7 @@ class ShallowCNN(nn.Module):
 class EfficientNet(nn.Module):
     def __init__(self, input_channel, output_channel):
         super(EfficientNet, self).__init__()
-        m = timm.create_model('tf_efficientnetv2_s_in21k', pretrained=True)
+        m = timm.create_model('tf_efficientnetv2_m_in21ft1k', pretrained=True)
         self.conv_stem= nn.Conv2d(input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
         self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
         self.act1 = nn.SiLU(inplace=True)

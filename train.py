@@ -15,6 +15,7 @@ from torch.cuda.amp import autocast, GradScaler
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import wandb
+
 from checkpoint import (
     default_checkpoint,
     load_checkpoint,
@@ -23,6 +24,7 @@ from checkpoint import (
     write_tensorboard,
     write_wandb
 )
+
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
@@ -185,19 +187,19 @@ def valid_one_epoch(
 
             loss = criterion(decoded_values, expected[:, 1:])
 
-                losses.append(loss.item())
+            losses.append(loss.item())
 
-                expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-                expected_str = id_to_string(expected, data_loader, do_eval=1)
-                sequence_str = id_to_string(sequence, data_loader, do_eval=1)
-                wer += word_error_rate(sequence_str, expected_str)
-                num_wer += 1
-                sent_acc += sentence_acc(sequence_str, expected_str)
-                num_sent_acc += 1
-                correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
-                total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
+            expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
+            expected_str = id_to_string(expected, data_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            wer += word_error_rate(sequence_str, expected_str)
+            num_wer += 1
+            sent_acc += sentence_acc(sequence_str, expected_str)
+            num_sent_acc += 1
+            correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
+            total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
-                pbar.update(curr_batch_size)
+            pbar.update(curr_batch_size)
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -216,8 +218,8 @@ def valid_one_epoch(
 def get_train_transforms(height, width):
     return A.Compose([
         A.Resize(height, width),
-        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
-        A.GridDistortion(p=0.5, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
+        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.2),
+        A.GridDistortion(p=0.2, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
         A.Normalize(),
         ToTensorV2(p = 1.0),
     ],p=1.0)
@@ -368,7 +370,7 @@ def main(config_file):
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps, 
             tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
-            tf_min=0.4
+            tf_min=0.3
         ) 
 
     else:
@@ -444,14 +446,6 @@ def main(config_file):
             pad=len(str(options.num_epochs)),
         )
 
-        if 4 < epoch and epoch <= 8:
-            teacher_forcing_ratio = 0.8
-        elif 8 < epoch and epoch <= 12:
-            teacher_forcing_ratio = 0.6
-        elif 12 < epoch and epoch <= 16:
-            teacher_forcing_ratio = 0.4
-        elif 16 < epoch:
-            teacher_forcing_ratio = 0.0
 
         train_result = train_one_epoch(
             train_data_loader,
@@ -460,7 +454,7 @@ def main(config_file):
             criterion,
             optimizer,
             lr_scheduler,
-            teacher_forcing_ratio,
+            options.teacher_forcing_ratio,
             options.max_grad_norm,
             device,
             scaler,
@@ -492,7 +486,7 @@ def main(config_file):
                 epoch_text,
                 criterion,
                 device,
-                teacher_forcing_ratio=0.0,
+                teacher_forcing_ratio=0.5,
             )
 
         validation_losses.append(validation_result["loss"])
@@ -619,7 +613,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN_JY_implement_effnetv2S_ecaNF0",
+        default="effv2-s & TF-Arcta(0.7>0.3) & SSR(0.2)>GD(0.2)>Norm & Fold4",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
