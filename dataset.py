@@ -211,7 +211,7 @@ class LoadDataset(Dataset):
 
         if self.transform:
             w, h = image.size
-            if w / h > 2:
+            if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
             # image = self.transform(image)

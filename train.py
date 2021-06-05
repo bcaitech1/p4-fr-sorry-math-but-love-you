@@ -19,8 +19,8 @@ from checkpoint import (
     default_checkpoint,
     load_checkpoint,
     save_checkpoint,
-    init_tensorboard,
-    write_tensorboard,
+    # init_tensorboard,
+    # write_tensorboard,
     write_wandb
 )
 from flags import Flags
@@ -236,7 +236,9 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+            A.GridDistortion(p=0.5, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -244,7 +246,14 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-    return A.Compose([A.Resize(height, width), ToTensorV2(p=1.0)])
+    return A.Compose(
+        [
+            A.Resize(height, width),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(p=1.0)
+        ],
+        p=1.0,
+    )
 
 
 def main(config_file):
@@ -421,7 +430,7 @@ def main(config_file):
     shutil.copy(config_file, os.path.join(options.prefix, "train_config.yaml"))
     if options.print_epochs is None:
         options.print_epochs = options.num_epochs
-    writer = init_tensorboard(name=options.prefix.strip("-"))
+    # writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
     train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
@@ -574,20 +583,20 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
-            write_tensorboard(
-                writer=writer,
-                epoch=start_epoch + epoch + 1,
-                grad_norm=train_result["grad_norm"],
-                train_loss=train_result["loss"],
-                train_symbol_accuracy=train_epoch_symbol_accuracy,
-                train_sentence_accuracy=train_epoch_sentence_accuracy,
-                train_wer=train_epoch_wer,
-                validation_loss=validation_result["loss"],
-                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer,
-                model=model,
-            )
+            # write_tensorboard(
+            #     writer=writer,
+            #     epoch=start_epoch + epoch + 1,
+            #     grad_norm=train_result["grad_norm"],
+            #     train_loss=train_result["loss"],
+            #     train_symbol_accuracy=train_epoch_symbol_accuracy,
+            #     train_sentence_accuracy=train_epoch_sentence_accuracy,
+            #     train_wer=train_epoch_wer,
+            #     validation_loss=validation_result["loss"],
+            #     validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+            #     validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+            #     validation_wer=validation_epoch_wer,
+            #     model=model,
+            # )
             write_wandb(
                 epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
@@ -611,14 +620,14 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN-HM-AdamW",
+        default="SATRN_HM_implement_effnetv2S_fold3_aug-70epoch",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/Attention.yaml",
+        default="./configs/My_SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )

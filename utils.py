@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 from networks.Attention import Attention
 from networks.SATRN import SATRN
+from networks.My_SATRN import MySATRN
 
 def get_network(
     model_type,
@@ -20,6 +21,9 @@ def get_network(
 
     elif model_type == 'SATRN':
         model = SATRN(FLAGS, train_dataset, model_checkpoint).to(device)
+
+    elif model_type == 'MySATRN':
+        model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
 
     else:
         raise NotImplementedError
@@ -52,11 +56,12 @@ def print_system_envs():
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
-        special_ids = [
+        eos_id = data_loader.dataset.token_to_id["<EOS>"]
+        special_ids = set([
             data_loader.dataset.token_to_id["<PAD>"],
             data_loader.dataset.token_to_id["<SOS>"],
-            data_loader.dataset.token_to_id["<EOS>"]
-            ]
+            eos_id
+            ])
 
     for example in tokens:
         string = ""
@@ -66,11 +71,14 @@ def id_to_string(tokens, data_loader, do_eval=0):
                 if token not in special_ids:
                     if token != -1:
                         string += data_loader.dataset.id_to_token[token] + " "
+                elif token == eos_id:
+                    break
         else:
             for token in example:
                 token = token.item()
                 if token != -1:
                     string += data_loader.dataset.id_to_token[token] + " "
+
         result.append(string)
     return result
     
