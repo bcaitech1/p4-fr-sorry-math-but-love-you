@@ -27,8 +27,8 @@ from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
-from metrics import word_error_rate, sentence_acc, final_metric
+from scheduler_ import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
+from metrics_ import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
@@ -405,7 +405,7 @@ def main(config_file):
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps, 
             tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
-            tf_min=0.4
+            tf_min=0.3
         ) 
 
     else:
