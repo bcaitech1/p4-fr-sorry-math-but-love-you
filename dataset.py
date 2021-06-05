@@ -94,8 +94,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     # else:
     #     return data
 
+    # Author: Junchul Choi
     root = os.path.join(os.path.dirname(groundtruth), "images")
-    ####----------------------
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
@@ -109,11 +109,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         random.shuffle(data)
         dataset_len = round(len(data) * proportion)
         data = data[:dataset_len]
-    ####--------------
         train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
         val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
-    ####-------------
-        # data = [[os.path.join(root, x[0]), x[1]] for x in data]
     return train_data, val_data
 
 
@@ -214,13 +211,11 @@ class LoadDataset(Dataset):
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
 
-
         if self.transform:
             w, h = image.size
             if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
-            # image = self.transform(image)
             image = self.transform(image=image)['image']
 
         return {"path": item["path"], "truth": item["truth"], "image": image}
@@ -290,15 +285,8 @@ class LoadEvalDataset(Dataset):
             # not white ones.
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
-
-        # if self.preprocessing:
-        #     # image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 3)
-        #     h, w = image.shape
-        #     if h / w > 2:
-        #         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
                 
         if self.transform:
-            # image = self.transform(image)
             w, h = image.size
             if h / w > 2:
                 image = image.rotate(90, expand=True)

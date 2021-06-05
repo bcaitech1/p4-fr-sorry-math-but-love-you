@@ -26,6 +26,3 @@ wandb/**
 .empty/**
 .vscode/**
 .ipynb_checkpoints/**
-
-# wandb
-wandb

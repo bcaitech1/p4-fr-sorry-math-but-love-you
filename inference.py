@@ -4,16 +4,17 @@ import random
 from tqdm import tqdm
 import csv
 import torch
-from torchvision import transforms
 from torch.utils.data import DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-from metrics import word_error_rate, sentence_acc
+from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
 from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
+from train import get_valid_transforms
 from flags import Flags
-from utils import id_to_string, get_network, get_optimizer
+from utils import id_to_string, get_network, get_optimizer, set_seed
+from decoding import decode
 
 
 def main(parser):
@@ -110,9 +111,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=8,
+        default=128,
         type=int,
         help="batch size when doing inference",
+    )
+    parser.add_argument(
+        "--decode_type",
+        dest="decode_type",
+        default='greedy', # 'greedy'로 설정하면 기존과 동일하게 inference
+        type=str,
+        help="디코딩 방식 설정. 'greedy', 'beam'",
+    )
+    parser.add_argument(
+        "--beam_width",
+        dest="beam_width",
+        default=3,
+        type=int,
+        help="빔서치 사용 시 스텝별 후보 수 설정",
     )
 
     eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
