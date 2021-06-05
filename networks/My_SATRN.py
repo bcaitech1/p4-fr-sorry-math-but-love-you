@@ -1,14 +1,3 @@
-<<<<<<< HEAD
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import math
-import random
-import timm
-
-from dataset import START, PAD
-=======
 from copy import deepcopy
 import math
 import random
@@ -23,7 +12,6 @@ import timm
 
 from dataset import START, PAD
 from decoding import BeamSearchNode
->>>>>>> upstream/master
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -560,13 +548,8 @@ class MySATRN(nn.Module):
         )
 
         self.criterion = (
-<<<<<<< HEAD
             nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
         )
-=======
-            nn.CrossEntropyLoss()
-        )  # without ignore_index=train_dataset.token_to_id[PAD]
->>>>>>> upstream/master
 
         if checkpoint:
             self.load_state_dict(checkpoint)
@@ -574,16 +557,6 @@ class MySATRN(nn.Module):
     def forward(self, input, expected, is_train, teacher_forcing_ratio):
         enc_result = self.encoder(input)
         dec_result = self.decoder(
-<<<<<<< HEAD
-            enc_result,
-            expected[:, :-1],
-            is_train,
-            expected.size(1),
-            teacher_forcing_ratio,
-        )
-        return dec_result
-
-=======
             src=enc_result,
             text=expected[:, :-1],
             is_train=is_train,
@@ -743,6 +716,5 @@ class MySATRN(nn.Module):
     
 
 
->>>>>>> upstream/master
 
         

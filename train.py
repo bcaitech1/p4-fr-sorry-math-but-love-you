@@ -75,15 +75,6 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
-<<<<<<< HEAD
-            output = model(input, expected, True, teacher_forcing_ratio)
-
-            decoded_values = output.transpose(1, 2)
-            _, sequence = torch.topk(decoded_values, 1, dim=1)
-            sequence = sequence.squeeze(1)
-
-            loss = criterion(decoded_values, expected[:, 1:])
-=======
             output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
 #             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
@@ -92,7 +83,6 @@ def train_one_epoch(
             sequence = sequence.squeeze(1) # [B, MAX_LEN], Metric 측정을 위해
 
             loss = criterion(decoded_values, expected[:, 1:]) # [SOS] 이후부터
->>>>>>> upstream/master
 
             optim_params = [
                 p
@@ -110,13 +100,7 @@ def train_one_epoch(
             # cycle
             # scaler.step(optimizer)
             # scaler.update()
-<<<<<<< HEAD
-            lr_scheduler.step()
             optimizer.step()
-            
-=======
-            optimizer.step()
->>>>>>> upstream/master
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -186,10 +170,6 @@ def valid_one_epoch(
             dynamic_ncols=True,
             leave=False,
         ) as pbar:
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/master
             for d in data_loader:
                 input = d["image"].to(device).float()
 
@@ -197,11 +177,7 @@ def valid_one_epoch(
                 expected = d["truth"]["encoded"].to(device)
 
                 expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-<<<<<<< HEAD
                 
-=======
-                # with autocast():
->>>>>>> upstream/master
                 output = model(input, expected, False, teacher_forcing_ratio)
 
                 decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
@@ -242,13 +218,9 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-<<<<<<< HEAD
-            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
-            A.GridDistortion(num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0, p=0.5),
-            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], p=1.0),
-=======
+            # A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+            # A.GridDistortion(num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0, p=0.5),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
->>>>>>> upstream/master
             ToTensorV2(p=1.0),
         ],
         p=1.0,
@@ -256,22 +228,14 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-<<<<<<< HEAD
     return A.Compose(
         [
             A.Resize(height, width),
-            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], p=1.0),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
         p=1.0,
     )
-=======
-    return A.Compose([
-        A.Resize(height, width), 
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(p=1.0)]
-        )
->>>>>>> upstream/master
 
 
 def main(config_file):
@@ -649,11 +613,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-<<<<<<< HEAD
         default="jungu",
-=======
-        default="Debug",
->>>>>>> upstream/master
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

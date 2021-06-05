@@ -61,7 +61,6 @@ def print_system_envs():
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
-<<<<<<< HEAD
         eos_id = data_loader.dataset.token_to_id["<EOS>"]
         special_ids = [
             data_loader.dataset.token_to_id["<PAD>"],
@@ -69,15 +68,6 @@ def id_to_string(tokens, data_loader, do_eval=0):
             eos_id
             ]
 
-=======
-        eos_id = data_loader.dataset.token_to_id['<EOS>']
-        special_ids = set([
-            data_loader.dataset.token_to_id['<PAD>'],
-            data_loader.dataset.token_to_id["<SOS>"],
-            eos_id
-            ])
-        
->>>>>>> upstream/master
     for example in tokens:
         string = ""
         if do_eval:
