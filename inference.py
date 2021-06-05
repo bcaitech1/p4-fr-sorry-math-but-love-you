@@ -4,25 +4,25 @@ import random
 from tqdm import tqdm
 import csv
 import torch
-from torchvision import transforms
 from torch.utils.data import DataLoader
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
-from metrics import word_error_rate, sentence_acc
+from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
 from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
+from train import get_valid_transforms
 from flags import Flags
-from utils import id_to_string, get_network, get_optimizer
+from utils import id_to_string, get_network, get_optimizer, set_seed
+from decoding import decode
 
 
 def main(parser):
     is_cuda = torch.cuda.is_available()
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
-    torch.manual_seed(options.seed)
-    random.seed(options.seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
+    set_seed(options.seed)
+    
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
@@ -36,12 +36,8 @@ def main(parser):
         )
     print(options.input_size.height)
 
-    transformed = transforms.Compose(
-        [
-            transforms.Resize((options.input_size.height, options.input_size.width)),
-            transforms.ToTensor(),
-        ]
-    )
+    # transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
+    transformed = A.Compose([A.Resize(256, 512, p=1.), ToTensorV2()])
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
@@ -76,17 +72,23 @@ def main(parser):
     )
     model.eval()
     results = []
-    for d in tqdm(test_data_loader):
-        input = d["image"].to(device)
-        expected = d["truth"]["encoded"].to(device)
-
-        output = model(input, expected, False, 0.0)
-        decoded_values = output.transpose(1, 2)
-        _, sequence = torch.topk(decoded_values, 1, dim=1)
-        sequence = sequence.squeeze(1)
-        sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
-        for path, predicted in zip(d["file_path"], sequence_str):
-            results.append((path, predicted))
+    print("[+] Decoding Type:", parser.decode_type)
+    with torch.no_grad():
+        for d in tqdm(test_data_loader):
+            input = d["image"].float().to(device)
+            expected = d["truth"]["encoded"].to(device)
+            sequence = decode(
+                    model=model, 
+                    input=input, 
+                    data_loader=test_data_loader, 
+                    expected=expected,
+                    method=parser.decode_type, 
+                    beam_width=parser.beam_width
+                    )
+            sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
+            
+            for path, predicted in zip(d["file_path"], sequence_str):
+                results.append((path, predicted))
 
     os.makedirs(parser.output_dir, exist_ok=True)
     with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
@@ -99,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/satrn/checkpoints/0021.pth",
+        default="./log/attention_50/Attention_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -113,9 +115,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=8,
+        default=128,
         type=int,
         help="batch size when doing inference",
+    )
+    parser.add_argument(
+        "--decode_type",
+        dest="decode_type",
+        default='greedy', # 'greedy'로 설정하면 기존과 동일하게 inference
+        type=str,
+        help="디코딩 방식 설정. 'greedy', 'beam'",
+    )
+    parser.add_argument(
+        "--beam_width",
+        dest="beam_width",
+        default=3,
+        type=int,
+        help="빔서치 사용 시 스텝별 후보 수 설정",
     )
 
     eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
