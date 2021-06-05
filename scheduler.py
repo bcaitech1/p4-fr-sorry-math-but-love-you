@@ -137,6 +137,7 @@ class TeacherForcingScheduler:
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps,
             tf_max=teacher_forcing_ratio
+            tf_min=0.4
             )
         
         # Train phase
@@ -146,31 +147,48 @@ class TeacherForcingScheduler:
     Args:
         num_steps (int): 총 스텝 수
         tf_max (float): 최대 teacher forcing ratio. tf_max에서 시작해서 코사인 함수를 그리며 0으로 마무리 됨
+        tf_min (float, optional): 최소 teacher forcing ratio. Defaults to 0.4
     """
-    def __init__(self, num_steps: int, tf_max: float):
-        linspace = self._get_linspace(num_steps, tf_max)
+    def __init__(self, num_steps: int, tf_max: float-1.0, tf_min: float=0.4):
+        linspace = self._get_arctan(num_steps, tf_max, tf_min)
         self.__scheduler = iter(linspace)
+        self.tf_max = tf_max
+        self.tf_min = tf_min
+        
         
     def step(self):
         try:
             return next(self.__scheduler)
         except:
-            warnings.warn('Teacher forcing scheduler has been done. Return just 0 for now.')
-            return 0.0
+            warnings.warn(f'Teacher forcing scheduler has been done. Return just tf_min({self.tf_min}) for now.')
+            return self.tf_min
 
     @staticmethod
-    def _get_linspace(num_steps, tf_max):
+    def _get_arctan(num_steps, tf_max, tf_min):
+        
+        # Old Arctan
+        # https://wandb.ai/smbly/Augmentations/runs/2ujnba9s?workspace=user-smbly
+        # x = np.linspace(-5, 5, num_steps)
+        # x = -np.arctan(x)
+        # x -= x[-1]
+        # x *= (tf_max/x[0])
+        
+        # New Arctan
+        diff = tf_max - tf_min
+        inflection = int(num_steps * 0.1)
+        
+        x = np.linspace(-5, 7, num_steps)
+        x = -np.arctan(x)
+        x -= x[-1]
+        x *= (diff/x[0])
+        x += tf_min
+        return x
+    
+    @staticmethod
+    def _get_cosine(num_steps, tf_max): # NOTE. tf_min 적용 안 돼서 무조건 0으로 수렴함
         factor = tf_max / 2
         x = np.linspace(0, np.pi, num_steps)
         x = np.cos(x)
         x *= factor
         x += factor
-        return x
-
-    @staticmethod
-    def _get_arctan(num_steps, tf_max):
-        x = np.linspace(-5, 5, num_steps)
-        x = -np.arctan(x)
-        x -= x[-1]
-        x *= (tf_max/x[0])
         return x

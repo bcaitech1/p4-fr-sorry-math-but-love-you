@@ -76,7 +76,7 @@ def train_one_epoch(
 
             # with autocast():
             output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
-            # output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+#             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
             decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
@@ -602,7 +602,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="TF-Scheduler+Norm(IMGNET)",
+        default="TF-Constant(1.0)+Norm(IMGNET)",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

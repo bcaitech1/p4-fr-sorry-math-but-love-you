@@ -101,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/MySATRN_best_model.pth",
+        default="./log/attention_50/Attention_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
