@@ -367,7 +367,13 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
-        tf_scheduler = TeacherForcingScheduler(num_steps=total_steps, tf_max=options.teacher_forcing_ratio) # NOTE. Teacher Forcing Scheduler
+        
+        # NOTE. Teacher Forcing Scheduler
+        tf_scheduler = TeacherForcingScheduler(
+            num_steps=total_steps, 
+            tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
+            tf_min=0.4
+        ) 
 
     else:
         optimizer = get_optimizer(

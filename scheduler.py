@@ -182,6 +182,8 @@ class TeacherForcingScheduler:
         x -= x[-1]
         x *= (diff/x[0])
         x += tf_min
+        x = x[inflection:]
+
         return x
     
     @staticmethod
