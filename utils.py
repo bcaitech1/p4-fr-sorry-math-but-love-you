@@ -57,7 +57,8 @@ def id_to_string(tokens, data_loader, do_eval=0):
         eos_id = data_loader.dataset.token_to_id["<EOS>"]
         special_ids = [
             data_loader.dataset.token_to_id["<PAD>"],
-            data_loader.dataset.token_to_id["<SOS>"]
+            data_loader.dataset.token_to_id["<SOS>"],
+            eos_id
             ]
 
     for example in tokens:
