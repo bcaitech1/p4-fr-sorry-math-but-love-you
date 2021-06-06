@@ -11,24 +11,12 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import timm
 
-sys.path.insert(0, '../')
-from dataset import START, PAD
-from decoding import BeamSearchNode
-from criterion import LabelSmoothingLoss
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = 'cpu'
 
-
-class CNN(nn.Module):
-    """베이스라인 모델(Semi-ASTER)의 인코더 역할을 수행하는 CNN"""
-
+class DeepCNN(nn.Module):
     def __init__(self, nc: int, leaky_relu=False):
-        """
-        Args:
-            nc (int): 입력 이미지 채널
-            leakyRelu (bool, optional): Leacky ReLu 사용 여부. Defaults to False.
-        """
-        super(CustomCNN, self).__init__()
+        super(DeepCNN, self).__init__()
         m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
         self.conv_stem = nn.Conv2d(nc, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
         self.bn1 = nn.BatchNorm2d(24, eps=1e-3, momentum=0.1, affine=True, track_running_stats=True)
@@ -40,17 +28,16 @@ class CNN(nn.Module):
         self.pooling2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
         self.conv3 = self.convRelu(nc, 6, leaky_relu=leaky_relu, bn=True)
 
-
     def forward(self, input):
         out = self.conv_stem(input) # [B, 24, 511, 511]
         out = self.bn1(out) # [B, 24, 511, 511]
         out = self.act1(out) # [B, 24, 511, 511]
         out = self.eff_blocks(out) # [B, 256, 32, 32]
         out = self.pooling1(out) # [B, 256, 16, 33]
-        out = self.conv1(out) # [B, 512, 16, 33]
-        out = self.conv2(out) # [B, 512, 16, 33]
-        out = self.pooling2(out) # [B, 512, 8, 34]
-        out = self.conv3(out) # [B, 512, 7, 33]
+        out = self.conv1(out) # [B, 512, 16, 33] # NOTE [B, 256, 16, 33]
+        # out = self.conv2(out) # [B, 512, 16, 33] 
+        out = self.pooling2(out) # [B, 512, 8, 34] # NOTE [B, 256, 16, 33]
+        out = self.conv3(out) # [B, 512, 7, 33] # NOTE [B, 256, 16, 33]
         return out
     
     @staticmethod
@@ -63,7 +50,8 @@ class CNN(nn.Module):
         ks = [3, 3, 3, 3, 3, 3, 2]  # kernel size
         ps = [1, 1, 1, 1, 1, 1, 0]  # padding size
         ss = [1, 1, 1, 1, 1, 1, 1]  # strides
-        nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
+        # nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
+        nm = [64, 128, 256, 256, 256, 256, 256]  # output channel list
 
         cnn = nn.Sequential()
         nIn = nc if i == 0 else nm[i - 1]
@@ -82,9 +70,8 @@ class CNN(nn.Module):
         return cnn
 
 
-
 class AttentionCell(nn.Module):
-    """디코더(AttentionDecoder) 내 Attention 계산에 활용할 attention cell 클래스"""
+    """디코더(ASTERDecoder) 내 Attention 계산에 활용할 attention cell 클래스"""
 
     def __init__(
         self,
@@ -92,7 +79,7 @@ class AttentionCell(nn.Module):
         hidden_dim: int,
         embedding_dim: int,
         num_layers=1,
-        cell_type="LSTM",
+        # cell_type="LSTM",
     ):
         """
         Args:
@@ -118,32 +105,15 @@ class AttentionCell(nn.Module):
         self.score = nn.Linear(hidden_dim, 1, bias=False)  # to get attention logit
 
         if num_layers == 1:
-            if cell_type == "LSTM":
-                self.rnn = nn.LSTMCell(src_dim + embedding_dim, hidden_dim)
-            elif cell_type == "GRU":
-                self.rnn = nn.GRUCell(src_dim + embedding_dim, hidden_dim)
-            else:
-                raise NotImplementedError
+            self.rnn = nn.LSTMCell(src_dim + embedding_dim, hidden_dim)
         else:
-            if cell_type == "LSTM":
-                self.rnn = nn.ModuleList(
-                    [nn.LSTMCell(src_dim + embedding_dim, hidden_dim)]
-                    + [
-                        nn.LSTMCell(hidden_dim, hidden_dim)
-                        for _ in range(num_layers - 1)
-                    ]
-                )
-            elif cell_type == "GRU":
-                self.rnn = nn.ModuleList(
-                    [nn.GRUCell(src_dim + embedding_dim, hidden_dim)]
-                    + [
-                        nn.GRUCell(hidden_dim, hidden_dim)
-                        for _ in range(num_layers - 1)
-                    ]
-                )
-            else:
-                raise NotImplementedError
-
+            self.rnn = nn.ModuleList(
+                [nn.LSTMCell(src_dim + embedding_dim, hidden_dim)]
+                + [
+                    nn.LSTMCell(hidden_dim, hidden_dim)
+                    for _ in range(num_layers - 1)
+                ]
+            )
         self.hidden_dim = hidden_dim
 
     def forward(self, prev_hidden, src, tgt):  # src: [b, L, c]
@@ -184,7 +154,31 @@ class AttentionCell(nn.Module):
         return cur_hidden, alpha
 
 
-class AttentionDecoder(nn.Module):
+class ASTEREncoder(nn.Module):
+    def __init__(self, FLAGS):
+        super(ASTEREncoder, self).__init__()
+        self.cnn = DeepCNN(nc=FLAGS.data.rgb)
+        self.blstm = nn.LSTM(
+            input_size=1792, # H*C = 256*7
+            hidden_size=FLAGS.ASTER.hidden_dim,
+            num_layers=2,
+            bidirectional=True, 
+            )
+        self.proj = nn.Linear(
+            in_features=FLAGS.ASTER.hidden_dim*2,
+            out_features=FLAGS.ASTER.hidden_dim)
+
+    def forward(self, input):
+        out = self.cnn(input)
+        b, c, h, w = out.size()
+        out = out.view(b, c*h, w).permute(2, 0, 1) # [SEQ_LEN, B, INPUT_SIZE]
+        out, _ = self.blstm(out) # [SEQ_LEN, B, HIDDEN*2]
+        out = self.proj(out) # [SEQ_LEN, B, HIDDEN]
+        out = out.transpose(0, 1) # [B, SEQ_LEN, HIDDEN]
+        return out  
+
+
+class ASTERDecoder(nn.Module):
     def __init__(
         self,
         num_classes,
@@ -194,14 +188,12 @@ class AttentionDecoder(nn.Module):
         pad_id,
         st_id,
         num_layers=1,
-        cell_type="LSTM",
         checkpoint=None,
     ):
-        super(AttentionDecoder, self).__init__()
-
-        self.embedding = nn.Embedding(num_classes + 1, embedding_dim)
+        super(ASTERDecoder, self).__init__()
+        self.embedding = nn.Embedding(num_classes+1, embedding_dim)
         self.attention_cell = AttentionCell(
-            src_dim, hidden_dim, embedding_dim, num_layers, cell_type
+            src_dim, hidden_dim, embedding_dim, num_layers
         )
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
@@ -305,16 +297,16 @@ class AttentionDecoder(nn.Module):
         return probs
 
 
-class Attention(nn.Module):
+class ASTER(nn.Module):
     def __init__(
         self,
         FLAGS,
         train_dataset,
         checkpoint=None,
     ):
-        super(Attention, self).__init__()
-        self.encoder = CNN(FLAGS.data.rgb) # [B, SRC_DIM, ]
-        self.decoder = AttentionDecoder(
+        super(ASTER, self).__init__()
+        self.encoder = MildCNN(FLAGS.data.rgb) # [B, SRC_DIM, ]
+        self.decoder = ASTERDecoder(
             num_classes=len(train_dataset.id_to_token),
             src_dim=FLAGS.Attention.src_dim,
             embedding_dim=FLAGS.Attention.embedding_dim,
@@ -428,7 +420,8 @@ class Attention(nn.Module):
                             continue
 
                     #------디코딩------
-                    input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
+                    # input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
+                    input_embedded = self.decoder.embedding(current_input.to(device))
 
                     # Hidden state 갱신
                     current_hidden, alpha = self.decoder.attention_cell(
@@ -524,3 +517,68 @@ class Attention(nn.Module):
                 for _ in range(self.decoder.num_layers)
             ]
         return hidden
+
+# for debug
+if __name__ == '__main__':
+    import sys
+    import albumentations as A
+    from albumentations.pytorch import ToTensorV2
+    
+    sys.path.insert(0, '../')
+    from flags import Flags
+    from dataset import START, PAD, dataset_loader
+    from decoding import BeamSearchNode
+
+    CONFIG_PATH = "./configs/ASTER-jupyter.yaml"
+    options = Flags(CONFIG_PATH).get()
+    train_transform = A.Compose([
+        A.Resize(options.input_size.height, options.input_size.width),
+        ToTensorV2(p=1.0)],
+        p=1.0,
+        )
+    valid_transform = A.Compose([
+        A.Resize(options.input_size.height, options.input_size.width),
+        ToTensorV2(p=1.0)],
+        p=1.0,
+        )
+
+    # get data
+    (
+        train_data_loader,
+        validation_data_loader,
+        train_dataset,
+        valid_dataset,
+    ) = dataset_loader(
+        options=options,
+        train_transform=train_transform, 
+        valid_transform=valid_transform
+        )
+
+    pad_id = train_data_loader.dataset.token_to_id['<PAD>']
+    st_id = train_data_loader.dataset.token_to_id['<SOS>']
+
+    encoder = ASTEREncoder(options)
+    decoder = ASTERDecoder(
+        num_classes=len(train_dataset.token_to_id),
+        src_dim=options.ASTER.src_dim,
+        embedding_dim=options.ASTER.embedding_dim,
+        hidden_dim=options.ASTER.hidden_dim,
+        pad_id=pad_id,
+        st_id=st_id,
+    )
+
+    batch = next(iter(train_data_loader))
+    input = batch['image'].float()
+    expected = batch['truth']['encoded']
+    expected[expected == -1] = train_data_loader.dataset.token_to_id['<PAD>']
+
+    src = encoder(input) # [B, SEQ_LEN, HIDDEN]
+    output = decoder(
+        src=src,
+        text=expected,
+        is_train=True,
+        teacher_forcing_ratio=1.0,
+        batch_max_length=expected.size(1)
+    )
+
+    print(output.size())
