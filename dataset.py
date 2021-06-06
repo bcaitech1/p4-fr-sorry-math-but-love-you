@@ -88,8 +88,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
-    val_image_names = set(df[df['fold']==3]['image_name'].values)
-    train_image_names = set(df[df['fold'].isin([0, 1])]['image_name'].values)
+    val_image_names = set(df[df['fold']==1]['image_name'].values)
+    train_image_names = set(df[df['fold']!=1]['image_name'].values)
     with open(groundtruth, "r") as fd:
         data=[]
         for line in fd:
@@ -99,6 +99,7 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         data = data[:dataset_len]
         train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
         val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
+
     return train_data, val_data
 
 
@@ -317,6 +318,7 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=True,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
+        drop_last=True # NOTE 추가
     )
 
     valid_dataset = LoadDataset(
@@ -329,6 +331,7 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
+        drop_last=True # NOTE 추가
     )
 
     return train_data_loader, valid_data_loader, train_dataset, valid_dataset

@@ -498,7 +498,13 @@ class SATRNDecoder(nn.Module):
             features = [None] * self.layer_num
 
             for t in range(num_steps):
-                target = target.unsqueeze(1)
+                if target.ndim == 1:    
+                    target = target.unsqueeze(1)
+                else:
+                    import warnings
+                    warnings.warn("batch length is 1")
+                    target = target.unsqueeze(0).unsqueeze(1)
+
                 tgt = self.text_embedding(target)
                 tgt = self.pos_encoder(tgt, point=t)
                 tgt_mask = self.order_mask(t + 1)
@@ -548,8 +554,8 @@ class MySATRN(nn.Module):
         )
 
         self.criterion = (
-            nn.CrossEntropyLoss()
-        )  # without ignore_index=train_dataset.token_to_id[PAD]
+            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)

@@ -9,6 +9,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
+import timm
 
 sys.path.insert(0, '../')
 from dataset import START, PAD
@@ -21,66 +22,65 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class CNN(nn.Module):
     """베이스라인 모델(Semi-ASTER)의 인코더 역할을 수행하는 CNN"""
 
-    def __init__(self, nc: int, leakyRelu=False):
+    def __init__(self, nc: int, leaky_relu=False):
         """
         Args:
             nc (int): 입력 이미지 채널
             leakyRelu (bool, optional): Leacky ReLu 사용 여부. Defaults to False.
         """
-        super(CNN, self).__init__()
+        super(CustomCNN, self).__init__()
+        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
+        self.conv_stem = nn.Conv2d(nc, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
+        self.bn1 = nn.BatchNorm2d(24, eps=1e-3, momentum=0.1, affine=True, track_running_stats=True)
+        self.act1 = nn.SiLU(inplace=True)
+        self.eff_blocks = m.blocks
+        self.pooling1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
+        self.conv1 = self.convRelu(nc, 4, leaky_relu=leaky_relu, bn=True)
+        self.conv2 = self.convRelu(nc, 5, leaky_relu=leaky_relu)
+        self.pooling2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
+        self.conv3 = self.convRelu(nc, 6, leaky_relu=leaky_relu, bn=True)
 
+
+    def forward(self, input):
+        out = self.conv_stem(input) # [B, 24, 511, 511]
+        out = self.bn1(out) # [B, 24, 511, 511]
+        out = self.act1(out) # [B, 24, 511, 511]
+        out = self.eff_blocks(out) # [B, 256, 32, 32]
+        out = self.pooling1(out) # [B, 256, 16, 33]
+        out = self.conv1(out) # [B, 512, 16, 33]
+        out = self.conv2(out) # [B, 512, 16, 33]
+        out = self.pooling2(out) # [B, 512, 8, 34]
+        out = self.conv3(out) # [B, 512, 7, 33]
+        return out
+    
+    @staticmethod
+    def convRelu(nc, i, leaky_relu: bool, bn=False) -> nn.Module:
+        """Conv 레이어를 생성하는 함수
+        Args:
+            i (int): ks, ps, ss, nm으로부터 가져올 element의 인덱스
+            batchNormalization (bool, optional): BN 적용 여부. Defaults to False.
+        """
         ks = [3, 3, 3, 3, 3, 3, 2]  # kernel size
         ps = [1, 1, 1, 1, 1, 1, 0]  # padding size
         ss = [1, 1, 1, 1, 1, 1, 1]  # strides
         nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
 
-        def convRelu(i, batchNormalization=False) -> nn.Module:
-            """Conv 레이어를 생성하는 함수
-            Args:
-                i (int): ks, ps, ss, nm으로부터 가져올 element의 인덱스
-                batchNormalization (bool, optional): BN 적용 여부. Defaults to False.
-            """
-            cnn = nn.Sequential()
-            nIn = nc if i == 0 else nm[i - 1]
-            nOut = nm[i]
-            cnn.add_module(
-                "conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i])
-            )
-            if batchNormalization:
-                cnn.add_module("batchnorm{0}".format(i), nn.BatchNorm2d(nOut))
+        cnn = nn.Sequential()
+        nIn = nc if i == 0 else nm[i - 1]
+        nOut = nm[i]
+        cnn.add_module(
+            "conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i])
+        )
+        if bn:
+            cnn.add_module("batchnorm{0}".format(i), nn.BatchNorm2d(nOut))
 
-            if leakyRelu:
-                cnn.add_module("relu{0}".format(i), nn.LeakyReLU(0.2, inplace=True))
-            else:
-                cnn.add_module("relu{0}".format(i), nn.ReLU(True))
+        if leaky_relu:
+            cnn.add_module("relu{0}".format(i), nn.LeakyReLU(0.2, inplace=True))
+        else:
+            cnn.add_module("relu{0}".format(i), nn.ReLU(True))
+            
+        return cnn
 
-            return cnn
-
-        self.conv0 = convRelu(0)
-        self.pooling0 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv1 = convRelu(1)
-        self.pooling1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = convRelu(2, True)
-        self.conv3 = convRelu(3)
-        self.pooling3 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
-        self.conv4 = convRelu(4, True)
-        self.conv5 = convRelu(5)
-        self.pooling5 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
-        self.conv6 = convRelu(6, True)
-
-    def forward(self, input):
-        out = self.conv0(input)  # [B, 64, 128, 128]
-        out = self.pooling0(out)  # [B, 64, 64, 64]
-        out = self.conv1(out)  # [B, 128, 64, 64]
-        out = self.pooling1(out)  # [B, 128, 32, 32]
-        out = self.conv2(out)  # [B, 256, 32, 32]
-        out = self.conv3(out)  # [B, 256, 32, 32]
-        out = self.pooling3(out)  # [B, 256, 16, 33]
-        out = self.conv4(out)  # [B, 512, 16, 33]
-        out = self.conv5(out)  # [B, 512, 16, 33]
-        out = self.pooling5(out)  # [B, 512, 8, 34]
-        out = self.conv6(out)  # [B, 512, 7, 33] heigth가 점점 눌리네
-        return out
 
 
 class AttentionCell(nn.Module):
