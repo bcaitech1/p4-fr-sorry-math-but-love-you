@@ -159,7 +159,7 @@ class ASTEREncoder(nn.Module):
         super(ASTEREncoder, self).__init__()
         self.cnn = DeepCNN(nc=FLAGS.data.rgb)
         self.blstm = nn.LSTM(
-            input_size=1792, # H*C = 256*7
+            input_size=768, # H*C = 256*7
             hidden_size=FLAGS.ASTER.hidden_dim,
             num_layers=2,
             bidirectional=True, 
@@ -169,7 +169,7 @@ class ASTEREncoder(nn.Module):
             out_features=FLAGS.ASTER.hidden_dim)
 
     def forward(self, input):
-        out = self.cnn(input)
+        out = self.cnn(input) # [B, SEQ_LEN, HIDDEN]
         b, c, h, w = out.size()
         out = out.view(b, c*h, w).permute(2, 0, 1) # [SEQ_LEN, B, INPUT_SIZE]
         out, _ = self.blstm(out) # [SEQ_LEN, B, HIDDEN*2]
@@ -311,8 +311,8 @@ class ASTER(nn.Module):
             src_dim=FLAGS.ASTER.src_dim,
             embedding_dim=FLAGS.ASTER.embedding_dim,
             hidden_dim=FLAGS.ASTER.hidden_dim,
-            pad_id=train_dataset.token_to_id[PAD],
-            st_id=train_dataset.token_to_id[START],
+            pad_id=train_dataset.token_to_id['<PAD>'],
+            st_id=train_dataset.token_to_id['<SOS>'],
             num_layers=FLAGS.ASTER.layer_num,
         )
 

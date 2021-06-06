@@ -51,7 +51,7 @@ class DeepCNN(nn.Module):
         ps = [1, 1, 1, 1, 1, 1, 0]  # padding size
         ss = [1, 1, 1, 1, 1, 1, 1]  # strides
         # nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
-        nm = [64, 128, 256, 256, 256, 256, 256]  # output channel list
+        nm = [64, 128, 256, 256, 384, 384, 384]  # output channel list
 
         cnn = nn.Sequential()
         nIn = nc if i == 0 else nm[i - 1]
@@ -159,7 +159,7 @@ class ASTEREncoder(nn.Module):
         super(ASTEREncoder, self).__init__()
         self.cnn = DeepCNN(nc=FLAGS.data.rgb)
         self.blstm = nn.LSTM(
-            input_size=1792, # H*C = 256*7
+            input_size=384, # H*C = 256*7
             hidden_size=FLAGS.ASTER.hidden_dim,
             num_layers=2,
             bidirectional=True, 
@@ -169,7 +169,7 @@ class ASTEREncoder(nn.Module):
             out_features=FLAGS.ASTER.hidden_dim)
 
     def forward(self, input):
-        out = self.cnn(input)
+        out = self.cnn(input) # [B, SEQ_LEN, HIDDEN]
         b, c, h, w = out.size()
         out = out.view(b, c*h, w).permute(2, 0, 1) # [SEQ_LEN, B, INPUT_SIZE]
         out, _ = self.blstm(out) # [SEQ_LEN, B, HIDDEN*2]
@@ -311,8 +311,8 @@ class ASTER(nn.Module):
             src_dim=FLAGS.ASTER.src_dim,
             embedding_dim=FLAGS.ASTER.embedding_dim,
             hidden_dim=FLAGS.ASTER.hidden_dim,
-            pad_id=train_dataset.token_to_id[PAD],
-            st_id=train_dataset.token_to_id[START],
+            pad_id=train_dataset.token_to_id['<PAD>'],
+            st_id=train_dataset.token_to_id['<SOS>'],
             num_layers=FLAGS.ASTER.layer_num,
         )
 
@@ -516,68 +516,3 @@ class ASTER(nn.Module):
                 for _ in range(self.decoder.num_layers)
             ]
         return hidden
-
-# for debug
-if __name__ == '__main__':
-    import sys
-    import albumentations as A
-    from albumentations.pytorch import ToTensorV2
-    
-    sys.path.insert(0, '../')
-    from flags import Flags
-    from dataset import START, PAD, dataset_loader
-    from decoding import BeamSearchNode
-
-    CONFIG_PATH = "./configs/ASTER-jupyter.yaml"
-    options = Flags(CONFIG_PATH).get()
-    train_transform = A.Compose([
-        A.Resize(options.input_size.height, options.input_size.width),
-        ToTensorV2(p=1.0)],
-        p=1.0,
-        )
-    valid_transform = A.Compose([
-        A.Resize(options.input_size.height, options.input_size.width),
-        ToTensorV2(p=1.0)],
-        p=1.0,
-        )
-
-    # get data
-    (
-        train_data_loader,
-        validation_data_loader,
-        train_dataset,
-        valid_dataset,
-    ) = dataset_loader(
-        options=options,
-        train_transform=train_transform, 
-        valid_transform=valid_transform
-        )
-
-    pad_id = train_data_loader.dataset.token_to_id['<PAD>']
-    st_id = train_data_loader.dataset.token_to_id['<SOS>']
-
-    encoder = ASTEREncoder(options)
-    decoder = ASTERDecoder(
-        num_classes=len(train_dataset.token_to_id),
-        src_dim=options.ASTER.src_dim,
-        embedding_dim=options.ASTER.embedding_dim,
-        hidden_dim=options.ASTER.hidden_dim,
-        pad_id=pad_id,
-        st_id=st_id,
-    )
-
-    batch = next(iter(train_data_loader))
-    input = batch['image'].float()
-    expected = batch['truth']['encoded']
-    expected[expected == -1] = train_data_loader.dataset.token_to_id['<PAD>']
-
-    src = encoder(input) # [B, SEQ_LEN, HIDDEN]
-    output = decoder(
-        src=src,
-        text=expected,
-        is_train=True,
-        teacher_forcing_ratio=1.0,
-        batch_max_length=expected.size(1)
-    )
-
-    print(output.size())
