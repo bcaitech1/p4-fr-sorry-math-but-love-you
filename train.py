@@ -19,20 +19,48 @@ from checkpoint import (
     default_checkpoint,
     load_checkpoint,
     save_checkpoint,
-    init_tensorboard,
-    write_tensorboard,
+    # init_tensorboard,
+    # write_tensorboard,
     write_wandb
 )
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
-from metrics import word_error_rate, sentence_acc, final_metric
+from scheduler_ import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
+from metrics_ import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
+def log(number):
+  # log에 0이 들어가는 것을 막기 위해 아주 작은 수를 더해줌.
+  return np.log(number + 1e-10)
+
+def naive_beam_search_decoder(predictions, k):
+  # prediction = (seq_len , V)
+  sequences = [[torch.tensor(), 1.0]]
+  
+  for row in predictions:
+    all_candidates = torch.tensor()
+    
+    # 1. 각각의 timestep에서 가능한 후보군으로 확장
+    for i in range(sequences.size()):
+      seq, score = sequences[i]
+      
+      # 2. 확장된 후보 스텝에 대해 점수 계산
+      for j in range(row.size()):
+        new_seq = seq + [j] 
+        new_score = score * -log(row[j])
+        candidate = [new_seq, new_score]
+        all_candidates = torch.cat([all_candidates, candidate], dim=1)
+    
+	# 3. 가능도가 높은 k개의 시퀀스만 남김 
+    # ordered = sorted(all_candidates, key=lambda tup:tup[1]) #점수 기준 정렬
+    ordered = torch.sort(all_candidates)
+    sequences = ordered[:k]
+    
+  return sequences
 
 def train_one_epoch(
     data_loader,
@@ -228,11 +256,14 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-    return A.Compose([
-        A.Resize(height, width), 
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(p=1.0)]
-        )
+    return A.Compose(
+        [
+            A.Resize(height, width),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(p=1.0)
+        ],
+        p=1.0,
+    )
 
 
 def main(config_file):
@@ -417,7 +448,7 @@ def main(config_file):
     shutil.copy(config_file, os.path.join(options.prefix, "train_config.yaml"))
     if options.print_epochs is None:
         options.print_epochs = options.num_epochs
-    writer = init_tensorboard(name=options.prefix.strip("-"))
+    # writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
     train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
@@ -573,20 +604,20 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
-            write_tensorboard(
-                writer=writer,
-                epoch=start_epoch + epoch + 1,
-                grad_norm=train_result["grad_norm"],
-                train_loss=train_result["loss"],
-                train_symbol_accuracy=train_epoch_symbol_accuracy,
-                train_sentence_accuracy=train_epoch_sentence_accuracy,
-                train_wer=train_epoch_wer,
-                validation_loss=validation_result["loss"],
-                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer,
-                model=model,
-            )
+            # write_tensorboard(
+            #     writer=writer,
+            #     epoch=start_epoch + epoch + 1,
+            #     grad_norm=train_result["grad_norm"],
+            #     train_loss=train_result["loss"],
+            #     train_symbol_accuracy=train_epoch_symbol_accuracy,
+            #     train_sentence_accuracy=train_epoch_sentence_accuracy,
+            #     train_wer=train_epoch_wer,
+            #     validation_loss=validation_result["loss"],
+            #     validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+            #     validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+            #     validation_wer=validation_epoch_wer,
+            #     model=model,
+            # )
             write_wandb(
                 epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
@@ -610,7 +641,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="TF-Arctan(0.7>0.3) & SSR>GD>Norm(IMGNET) & Fold1",
+        default="SATRN_HM_implement_effnetv2S_fold3_aug-70epoch",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
