@@ -318,7 +318,8 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=True,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
-        drop_last=True # NOTE 추가
+        drop_last=True, # NOTE 추가
+        pin_memory=True
     )
 
     valid_dataset = LoadDataset(
@@ -331,7 +332,8 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
-        drop_last=True # NOTE 추가
+        drop_last=True, # NOTE 추가
+        pin_memory=True
     )
 
     return train_data_loader, valid_data_loader, train_dataset, valid_dataset

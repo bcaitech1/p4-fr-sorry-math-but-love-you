@@ -581,3 +581,73 @@ if __name__ == '__main__':
     )
 
     print(output.size())
+
+# for debug
+if __name__ == '__main__':
+    import sys
+    import albumentations as A
+    from albumentations.pytorch import ToTensorV2
+    
+    sys.path.insert(0, '../')
+    from flags import Flags
+    from dataset import START, PAD, dataset_loader
+    from decoding import BeamSearchNode
+
+    CONFIG_PATH = "./configs/ASTER-jupyter.yaml"
+    options = Flags(CONFIG_PATH).get()
+    train_transform = A.Compose([
+        A.Resize(options.input_size.height, options.input_size.width),
+        ToTensorV2(p=1.0)],
+        p=1.0,
+        )
+    valid_transform = A.Compose([
+        A.Resize(options.input_size.height, options.input_size.width),
+        ToTensorV2(p=1.0)],
+        p=1.0,
+        )
+
+    # get data
+    (
+        train_data_loader,
+        validation_data_loader,
+        train_dataset,
+        valid_dataset,
+    ) = dataset_loader(
+        options=options,
+        train_transform=train_transform, 
+        valid_transform=valid_transform
+        )
+
+    pad_id = train_data_loader.dataset.token_to_id['<PAD>']
+    st_id = train_data_loader.dataset.token_to_id['<SOS>']
+
+    batch = next(iter(train_data_loader))
+    input = batch['image'].float()
+    expected = batch['truth']['encoded']
+    expected[expected == -1] = train_data_loader.dataset.token_to_id['<PAD>']
+
+    model = ASTER(FLAGS=options, train_dataset=train_data_loader.dataset)
+    output = model(input=input, expected=expected, is_train=True, teacher_forcing_ratio=1.0)
+
+    # encoder = ASTEREncoder(options)
+    # decoder = ASTERDecoder(
+    #     num_classes=len(train_dataset.token_to_id),
+    #     src_dim=options.ASTER.src_dim,
+    #     embedding_dim=options.ASTER.embedding_dim,
+    #     hidden_dim=options.ASTER.hidden_dim,
+    #     pad_id=pad_id,
+    #     st_id=st_id,
+    # )
+
+    
+
+    # src = encoder(input) # [B, SEQ_LEN, HIDDEN]
+    # output = decoder(
+    #     src=src,
+    #     text=expected,
+    #     is_train=True,
+    #     teacher_forcing_ratio=1.0,
+    #     batch_max_length=expected.size(1)
+    # )
+
+    print(output.size())
