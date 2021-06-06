@@ -400,7 +400,7 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
-        
+        print('TF-MAX', options.teacher_forcing_ratio)
         # NOTE. Teacher Forcing Scheduler
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps, 
@@ -514,7 +514,7 @@ def main(config_file):
             epoch_text,
             criterion,
             device,
-            teacher_forcing_ratio=options.teacher_forcing_ratio,
+            teacher_forcing_ratio=0.5,
         )
 
         validation_losses.append(validation_result["loss"])
