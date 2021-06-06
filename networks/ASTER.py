@@ -10,6 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import timm
+from decoding import BeamSearchNode
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = 'cpu'
@@ -305,7 +306,7 @@ class ASTER(nn.Module):
         checkpoint=None,
     ):
         super(ASTER, self).__init__()
-        self.encoder = DeepCNN(FLAGS.data.rgb) # [B, SRC_DIM, ]
+        self.encoder = ASTEREncoder(FLAGS)
         self.decoder = ASTERDecoder(
             num_classes=len(train_dataset.id_to_token),
             src_dim=FLAGS.ASTER.src_dim,
@@ -316,15 +317,15 @@ class ASTER(nn.Module):
             num_layers=FLAGS.ASTER.layer_num,
         )
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = (
+            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id['<PAD>'])
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)
 
     def forward(self, input, expected, is_train, teacher_forcing_ratio):
         out = self.encoder(input) # [b, C, H, W]
-        b, c, h, w = out.size()
-        out = out.view(b, c, h * w).transpose(1, 2)  # [b, h x w, c]
         output = self.decoder(
             src=out,
             text=expected,
