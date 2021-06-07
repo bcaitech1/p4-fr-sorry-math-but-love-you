@@ -851,7 +851,11 @@ class SWIN(nn.Module):
     def __init__(self, FLAGS, train_dataset, checkpoint=None):
         super(SWIN, self).__init__()
 
-        self.encoder = SwinTransformer(ape=True)
+        self.encoder = SwinTransformer(img_size=224, patch_size=4, in_chans=3,
+                 embed_dim=128, depths=[2, 2, 18, 2], num_heads=[4, 8, 16, 32], # tiny -> embed_dim=96, depths=[2,2,6,2], num_heads=[3,6,12,24]
+                 window_size=7, mlp_ratio=4.,num_classes=21841,
+                 drop_path_rate=0.5, ape=True,) # tiny -> drop_path_rate=0.1
+        # self.encoder = SwinTransformer(ape=True)
         # self.decoder = TransformerDecoder(
         #     num_classes=len(train_dataset.id_to_token),
         #     src_dim=FLAGS.SATRN.decoder.src_dim,
@@ -875,7 +879,7 @@ class SWIN(nn.Module):
             layer_num=FLAGS.SATRN.decoder.layer_num,
         )
         self.criterion = (
-            nn.CrossEntropyLoss()
+            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
         )  # without ignore_index=train_dataset.token_to_id[PAD]
 
         if checkpoint:
