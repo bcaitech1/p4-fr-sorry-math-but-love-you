@@ -19,56 +19,32 @@ from checkpoint import (
     default_checkpoint,
     load_checkpoint,
     save_checkpoint,
-    # init_tensorboard,
-    # write_tensorboard,
+    init_tensorboard,
+    write_tensorboard,
     write_wandb
 )
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler_ import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
-from metrics_ import word_error_rate, sentence_acc, final_metric
+from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
+from metrics import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
-def log(number):
-  # log에 0이 들어가는 것을 막기 위해 아주 작은 수를 더해줌.
-  return np.log(number + 1e-10)
-
-def naive_beam_search_decoder(predictions, k):
-  # prediction = (seq_len , V)
-  sequences = [[torch.tensor(), 1.0]]
-  
-  for row in predictions:
-    all_candidates = torch.tensor()
-    
-    # 1. 각각의 timestep에서 가능한 후보군으로 확장
-    for i in range(sequences.size()):
-      seq, score = sequences[i]
-      
-      # 2. 확장된 후보 스텝에 대해 점수 계산
-      for j in range(row.size()):
-        new_seq = seq + [j] 
-        new_score = score * -log(row[j])
-        candidate = [new_seq, new_score]
-        all_candidates = torch.cat([all_candidates, candidate], dim=1)
-    
-	# 3. 가능도가 높은 k개의 시퀀스만 남김 
-    # ordered = sorted(all_candidates, key=lambda tup:tup[1]) #점수 기준 정렬
-    ordered = torch.sort(all_candidates)
-    sequences = ordered[:k]
-    
-  return sequences
 
 def train_one_epoch(
     data_loader,
     model,
     epoch_text,
     criterion,
-    optimizer,
-    lr_scheduler,
+    # optimizer,
+    # lr_scheduler,
+    enc_optimizer, # NOTE
+    dec_optimizer, # NOTE
+    enc_lr_scheduler, # NOTE
+    dec_lr_scheduler, # NOTE
     teacher_forcing_ratio,
     max_grad_norm,
     device,
@@ -112,23 +88,32 @@ def train_one_epoch(
 
             loss = criterion(decoded_values, expected[:, 1:]) # [SOS] 이후부터
 
-            optim_params = [
+            # NOTE
+            enc_optim_params = [
                 p
-                for param_group in optimizer.param_groups
+                for param_group in enc_optimizer.param_groups
                 for p in param_group["params"]
             ]
-            optimizer.zero_grad()
+
+            dec_optim_params = [
+                p
+                for param_group in dec_optimizer.param_groups
+                for p in param_group["params"]
+            ]
+
+            enc_optimizer.zero_grad()
+            dec_optimizer.zero_grad()
             loss.backward()
-            # scaler.scale(loss).backward()
-            # scaler.unscale_(optimizer)
 
-            grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
-            grad_norms.append(grad_norm)
+            enc_grad_norm = nn.utils.clip_grad_norm_(enc_optim_params, max_norm=max_grad_norm)
+            dec_grad_norm = nn.utils.clip_grad_norm_(dec_optim_params, max_norm=max_grad_norm)
 
-            # cycle
-            # scaler.step(optimizer)
-            # scaler.update()
-            optimizer.step()
+            grad_norms.append(enc_grad_norm)
+            grad_norms.append(dec_grad_norm)
+
+            enc_optimizer.step()
+            dec_optimizer.step()
+
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -142,20 +127,65 @@ def train_one_epoch(
             total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
             pbar.update(curr_batch_size)
-            lr_scheduler.step()
+            enc_lr_scheduler.step()
+            dec_lr_scheduler.step()
 
-            # lr logging
-            if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
-                wandb.log({
-                    "learning_rate": lr_scheduler.get_lr(),
-                    'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
-                    })
-            else:
-                for lr_ in lr_scheduler.get_lr():
-                    wandb.log({
-                        "learning_rate": lr_,
-                        'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
-                        })
+            wandb.log({
+                "enc_lr": enc_lr_scheduler.get_lr()[0],
+                "dec_lr": dec_lr_scheduler.get_last_lr()[0], # NOTE just for get_constant_schedule_with_warmup
+                # "enc_lr": enc_lr_scheduler.get_lr()[0],
+                # "dec_lr": dec_lr_scheduler.get_lr()[0],
+                'tf_ratio': tf_ratio
+                })
+
+            # optim_params = [
+            #     p
+            #     for param_group in optimizer.param_groups
+            #     for p in param_group["params"]
+            # ]
+            # optimizer.zero_grad()
+            # loss.backward()
+            # # scaler.scale(loss).backward()
+            # # scaler.unscale_(optimizer)
+
+            # grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
+            # grad_norms.append(grad_norm)
+
+            # # cycle
+            # # scaler.step(optimizer)
+            # # scaler.update()
+            # optimizer.step()
+            # losses.append(loss.item())
+
+            # expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
+            # expected_str = id_to_string(expected, data_loader, do_eval=1)
+            # sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            # wer += word_error_rate(sequence_str, expected_str)
+            # num_wer += 1
+            # sent_acc += sentence_acc(sequence_str, expected_str)
+            # num_sent_acc += 1
+            # correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
+            # total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
+
+            # pbar.update(curr_batch_size)
+            # lr_scheduler.step()
+
+            # # lr logging
+            # wandb.log({
+            #     'enc_learning_rate': enc_lr_sch
+            # })
+
+            # if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
+            #     wandb.log({
+            #         "learning_rate": lr_scheduler.get_lr(),
+            #         'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
+            #         })
+            # else:
+            #     for lr_ in lr_scheduler.get_lr():
+            #         wandb.log({
+            #             "learning_rate": lr_,
+            #             'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
+            #             })
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -256,14 +286,11 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-    return A.Compose(
-        [
-            A.Resize(height, width),
-            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ToTensorV2(p=1.0)
-        ],
-        p=1.0,
-    )
+    return A.Compose([
+        A.Resize(height, width), 
+        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ToTensorV2(p=1.0)]
+        )
 
 
 def main(config_file):
@@ -351,13 +378,25 @@ def main(config_file):
     criterion = model.criterion.to(device)
 
     # define optimizer
+
+    # NOTE: CNN params of MySATRN
     enc_params_to_optimise = [
-        param for param in model.encoder.parameters() if param.requires_grad
+        param for param in model.encoder.shallow_cnn.parameters() if param.requires_grad
     ]
-    dec_params_to_optimise = [
+
+    # NOTE: Transformer params of MySATRN
+    dec_params_to_optimise = []
+    dec_params_to_optimise += [
+        param for param in model.encoder.positional_encoding.parameters() if param.requires_grad
+    ]
+    dec_params_to_optimise += [
+        param for param in model.encoder.attention_layers.parameters() if param.requires_grad
+    ]
+    dec_params_to_optimise += [
         param for param in model.decoder.parameters() if param.requires_grad
     ]
-    params_to_optimise = [*enc_params_to_optimise, *dec_params_to_optimise]
+
+    # params_to_optimise = [*enc_params_to_optimise, *dec_params_to_optimise]
     print(
         "[+] Network\n",
         "Type: {}\n".format(options.network),
@@ -368,75 +407,119 @@ def main(config_file):
             sum(p.numel() for p in dec_params_to_optimise),
         ),
     )
+    
+    from torch import optim
+    from transformers import get_constant_schedule_with_warmup
+    enc_lr = 1e-4 # NOTE: CNN params of MySATRN
+    dec_lr = 5e-4 # NOTE: Transformer params of MySATRN
 
-    # Get optimizer and optimizer
-    if options.scheduler.scheduler == "CustomCosine":
-        optimizer = get_optimizer(
-            options.optimizer.optimizer,
-            params_to_optimise,
-            lr=0,
-            weight_decay=options.optimizer.weight_decay,
-        )
-        optimizer_state = checkpoint.get("optimizer")
-        if optimizer_state:
-            optimizer.load_state_dict(optimizer_state)
+    total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
+    t_0 = total_steps // 1 # 주기를 3으로 설정
+    enc_t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+    dec_t_up = int(t_0*0.1)
 
-        # Custom Cosine Annealing 파라미터 명세 볼 만한 곳: https://bit.ly/2SGDhxO
-            # T_0: 한 주기에 대한 스텝 수
-            # T_mult: 주기 반복마다 주기 길이를 T_mult배로 바꿈
-            # eta_max: warm-up을 통해 도달할 최대 LR
-            # T_up: 한 주기 내에서 warm-up을 할 스텝 수
-            # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
+    enc_optimizer = optim.Adam(enc_params_to_optimise, lr=0)
+    dec_optimizer = optim.Adam(dec_params_to_optimise, lr=dec_lr)
 
-        total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        t_0 = total_steps // 1 # 주기를 3으로 설정
-        t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+    enc_lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
+        enc_optimizer,
+        T_0=t_0,
+        T_mult=1,
+        eta_max=enc_lr,
+        T_up=enc_t_up,
+        gamma=0.8,
+    )
 
-        lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
-            optimizer,
-            T_0=t_0,
-            T_mult=1,
-            eta_max=options.optimizer.lr,
-            T_up=t_up,
-            gamma=0.8,
-        )
+    dec_lr_scheduler = get_constant_schedule_with_warmup(
+        optimizer=dec_optimizer,
+        num_warmup_steps=dec_t_up
+    )
+
+
+    # dec_lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
+    #     dec_optimizer,
+    #     T_0=t_0,
+    #     T_mult=1,
+    #     eta_max=dec_lr,
+    #     T_up=dec_t_up,
+    #     gamma=0.8,
+    # )
+
+    # NOTE. Teacher Forcing Scheduler
+    tf_scheduler = TeacherForcingScheduler(
+        num_steps=total_steps, 
+        tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
+        tf_min=0.4
+    ) 
+
+    # # Get optimizer and optimizer
+    # if options.scheduler.scheduler == "CustomCosine":
+    #     optimizer = get_optimizer(
+    #         options.optimizer.optimizer,
+    #         params_to_optimise,
+    #         lr=0,
+    #         weight_decay=options.optimizer.weight_decay,
+    #     )
+    #     optimizer_state = checkpoint.get("optimizer")
+    #     if optimizer_state:
+    #         optimizer.load_state_dict(optimizer_state)
+
+    #     # Custom Cosine Annealing 파라미터 명세 볼 만한 곳: https://bit.ly/2SGDhxO
+    #         # T_0: 한 주기에 대한 스텝 수
+    #         # T_mult: 주기 반복마다 주기 길이를 T_mult배로 바꿈
+    #         # eta_max: warm-up을 통해 도달할 최대 LR
+    #         # T_up: 한 주기 내에서 warm-up을 할 스텝 수
+    #         # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
+
+    #     total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
+    #     t_0 = total_steps // 1 # 주기를 3으로 설정
+    #     t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+
+    #     lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
+    #         optimizer,
+    #         T_0=t_0,
+    #         T_mult=1,
+    #         eta_max=options.optimizer.lr,
+    #         T_up=t_up,
+    #         gamma=0.8,
+    #     )
         
-        # NOTE. Teacher Forcing Scheduler
-        tf_scheduler = TeacherForcingScheduler(
-            num_steps=total_steps, 
-            tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
-            tf_min=0.3
-        ) 
+    #     # NOTE. Teacher Forcing Scheduler
+    #     tf_scheduler = TeacherForcingScheduler(
+    #         num_steps=total_steps, 
+    #         tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
+    #         tf_min=0.4
+    #     ) 
 
-    else:
-        optimizer = get_optimizer(
-            options.optimizer.optimizer,
-            params_to_optimise,
-            lr=options.optimizer.lr,
-            weight_decay=options.optimizer.weight_decay,
-        )
-        optimizer_state = checkpoint.get("optimizer")
-        if optimizer_state:
-            optimizer.load_state_dict(optimizer_state)
-        if options.scheduler.scheduler == "ReduceLROnPlateau":
-            lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, patience=options.schduler.patience
-            )
-        elif options.scheduler.scheduler == "StepLR":
-            lr_scheduler = optim.lr_scheduler.StepLR(
-                optimizer,
-                step_size=options.optimizer.lr_epochs,
-                gamma=options.optimizer.lr_factor,
-            )
-        elif options.scheduler.scheduler == "Cycle":
-            for param_group in optimizer.param_groups:
-                param_group["initial_lr"] = options.optimizer.lr
-            cycle = len(train_data_loader) * options.num_epochs
-            lr_scheduler = CircularLRBeta(
-                optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
-            )
-    if checkpoint['scheduler']:
-        lr_scheduler.load_state_dict(checkpoint['scheduler'])
+    # else:
+    #     optimizer = get_optimizer(
+    #         options.optimizer.optimizer,
+    #         params_to_optimise,
+    #         lr=options.optimizer.lr,
+    #         weight_decay=options.optimizer.weight_decay,
+    #     )
+    #     optimizer_state = checkpoint.get("optimizer")
+    #     if optimizer_state:
+    #         optimizer.load_state_dict(optimizer_state)
+    #     if options.scheduler.scheduler == "ReduceLROnPlateau":
+    #         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #             optimizer, patience=options.schduler.patience
+    #         )
+    #     elif options.scheduler.scheduler == "StepLR":
+    #         lr_scheduler = optim.lr_scheduler.StepLR(
+    #             optimizer,
+    #             step_size=options.optimizer.lr_epochs,
+    #             gamma=options.optimizer.lr_factor,
+    #         )
+    #     elif options.scheduler.scheduler == "Cycle":
+    #         for param_group in optimizer.param_groups:
+    #             param_group["initial_lr"] = options.optimizer.lr
+    #         cycle = len(train_data_loader) * options.num_epochs
+    #         lr_scheduler = CircularLRBeta(
+    #             optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
+    #         )
+    # if checkpoint['scheduler']:
+    #     lr_scheduler.load_state_dict(checkpoint['scheduler'])
 
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
@@ -448,7 +531,7 @@ def main(config_file):
     shutil.copy(config_file, os.path.join(options.prefix, "train_config.yaml"))
     if options.print_epochs is None:
         options.print_epochs = options.num_epochs
-    # writer = init_tensorboard(name=options.prefix.strip("-"))
+    writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
     train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
@@ -476,19 +559,36 @@ def main(config_file):
             pad=len(str(options.num_epochs)),
         )
 
+        # NOTE
         train_result = train_one_epoch(
-            train_data_loader,
-            model,
-            epoch_text,
-            criterion,
-            optimizer,
-            lr_scheduler,
-            options.teacher_forcing_ratio,
-            options.max_grad_norm,
-            device,
-            scaler,
-            tf_scheduler # NOTE. Teacher Forcing Scheduler
+            data_loader=train_data_loader,
+            model=model,
+            epoch_text=epoch_text,
+            criterion=criterion,
+            enc_optimizer=enc_optimizer,
+            dec_optimizer=dec_optimizer,
+            enc_lr_scheduler=enc_lr_scheduler,
+            dec_lr_scheduler=dec_lr_scheduler,
+            teacher_forcing_ratio=options.teacher_forcing_ratio,
+            max_grad_norm=options.max_grad_norm,
+            device=device,
+            scaler=scaler,
+            tf_scheduler=tf_scheduler
         )
+
+        # train_result = train_one_epoch(
+        #     train_data_loader,
+        #     model,
+        #     epoch_text,
+        #     criterion,
+        #     optimizer,
+        #     lr_scheduler,
+        #     options.teacher_forcing_ratio,
+        #     options.max_grad_norm,
+        #     device,
+        #     scaler,
+        #     tf_scheduler # NOTE. Teacher Forcing Scheduler
+        # )
 
         train_losses.append(train_result["loss"])
         grad_norms.append(train_result["grad_norm"])
@@ -506,7 +606,8 @@ def main(config_file):
         train_epoch_score = final_metric(
             sentence_acc=train_epoch_sentence_accuracy, word_error_rate=train_epoch_wer
         )
-        epoch_lr = lr_scheduler.get_lr()  # cycle
+        # epoch_lr = lr_scheduler.get_lr()  # cycle
+        epoch_lr = enc_lr_scheduler.get_lr()[0]  # cycle
 
         validation_result = valid_one_epoch(
             validation_data_loader,
@@ -514,7 +615,8 @@ def main(config_file):
             epoch_text,
             criterion,
             device,
-            teacher_forcing_ratio=options.teacher_forcing_ratio,
+            teacher_forcing_ratio=0.5,
+            # teacher_forcing_ratio=options.teacher_forcing_ratio,
         )
 
         validation_losses.append(validation_result["loss"])
@@ -541,7 +643,7 @@ def main(config_file):
         if best_score < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
-            # prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
+            # NOTE
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
@@ -556,16 +658,46 @@ def main(config_file):
                     "lr": epoch_lr,
                     "grad_norm": grad_norms,
                     "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
+                    "enc_optimizer": enc_optimizer.state_dict(),
+                    "dec_optimizer": dec_optimizer.state_dict(),
+                    # "optimizer": optimizer.state_dict(),
                     "configs": option_dict,
                     "token_to_id": train_data_loader.dataset.token_to_id,
                     "id_to_token": train_data_loader.dataset.id_to_token,
                     "network": options.network,
-                    "scheduler": lr_scheduler.state_dict(),
+                    "enc_scheduler": enc_lr_scheduler.state_dict(),
+                    "dec_scheduler": dec_lr_scheduler.state_dict(),
+                    # "scheduler": lr_scheduler.state_dict(),
                 },
                 prefix=options.prefix,
                 # prefix=prefix,
             )
+
+            # prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
+            # save_checkpoint(
+            #     {
+            #         "epoch": start_epoch + epoch + 1,
+            #         "train_losses": train_losses,
+            #         "train_symbol_accuracy": train_symbol_accuracy,
+            #         "train_sentence_accuracy": train_sentence_accuracy,
+            #         "train_wer": train_wer,
+            #         "validation_losses": validation_losses,
+            #         "validation_symbol_accuracy": validation_symbol_accuracy,
+            #         "validation_sentence_accuracy": validation_sentence_accuracy,
+            #         "validation_wer": validation_wer,
+            #         "lr": epoch_lr,
+            #         "grad_norm": grad_norms,
+            #         "model": model.state_dict(),
+            #         "optimizer": optimizer.state_dict(),
+            #         "configs": option_dict,
+            #         "token_to_id": train_data_loader.dataset.token_to_id,
+            #         "id_to_token": train_data_loader.dataset.id_to_token,
+            #         "network": options.network,
+            #         "scheduler": lr_scheduler.state_dict(),
+            #     },
+            #     prefix=options.prefix,
+            #     # prefix=prefix,
+            # )
             best_score = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
                 1 - validation_epoch_wer
             )
@@ -604,20 +736,20 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
-            # write_tensorboard(
-            #     writer=writer,
-            #     epoch=start_epoch + epoch + 1,
-            #     grad_norm=train_result["grad_norm"],
-            #     train_loss=train_result["loss"],
-            #     train_symbol_accuracy=train_epoch_symbol_accuracy,
-            #     train_sentence_accuracy=train_epoch_sentence_accuracy,
-            #     train_wer=train_epoch_wer,
-            #     validation_loss=validation_result["loss"],
-            #     validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-            #     validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-            #     validation_wer=validation_epoch_wer,
-            #     model=model,
-            # )
+            write_tensorboard(
+                writer=writer,
+                epoch=start_epoch + epoch + 1,
+                grad_norm=train_result["grad_norm"],
+                train_loss=train_result["loss"],
+                train_symbol_accuracy=train_epoch_symbol_accuracy,
+                train_sentence_accuracy=train_epoch_sentence_accuracy,
+                train_wer=train_epoch_wer,
+                validation_loss=validation_result["loss"],
+                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                validation_wer=validation_epoch_wer,
+                model=model,
+            )
             write_wandb(
                 epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
@@ -641,7 +773,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN_HM_implement_effnetv2S_fold3_aug-70epoch",
+        default="TF-Arctan(1.0>0.4) & Dual Opt & SSR>GD>Norm & Fold0",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

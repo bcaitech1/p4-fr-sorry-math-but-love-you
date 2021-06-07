@@ -9,82 +9,70 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-
-sys.path.insert(0, '../')
-from dataset import START, PAD
+import timm
 from decoding import BeamSearchNode
-from criterion import LabelSmoothingLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = 'cpu'
 
+class DeepCNN(nn.Module):
+    def __init__(self, nc: int, leaky_relu=False):
+        super(DeepCNN, self).__init__()
+        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
+        self.conv_stem = nn.Conv2d(nc, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
+        self.bn1 = nn.BatchNorm2d(24, eps=1e-3, momentum=0.1, affine=True, track_running_stats=True)
+        self.act1 = nn.SiLU(inplace=True)
+        self.eff_blocks = m.blocks
+        self.pooling1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
+        self.conv1 = self.convRelu(nc, 4, leaky_relu=leaky_relu, bn=True)
+        self.conv2 = self.convRelu(nc, 5, leaky_relu=leaky_relu)
+        self.pooling2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
+        self.conv3 = self.convRelu(nc, 6, leaky_relu=leaky_relu, bn=True)
 
-class CNN(nn.Module):
-    """베이스라인 모델(Semi-ASTER)의 인코더 역할을 수행하는 CNN"""
-
-    def __init__(self, nc: int, leakyRelu=False):
-        """
+    def forward(self, input):
+        out = self.conv_stem(input) # [B, 24, 511, 511]
+        out = self.bn1(out) # [B, 24, 511, 511]
+        out = self.act1(out) # [B, 24, 511, 511]
+        out = self.eff_blocks(out) # [B, 256, 32, 32]
+        out = self.pooling1(out) # [B, 256, 16, 33]
+        out = self.conv1(out) # [B, 512, 16, 33] # NOTE [B, 256, 16, 33]
+        # out = self.conv2(out) # [B, 512, 16, 33] 
+        out = self.pooling2(out) # [B, 512, 8, 34] # NOTE [B, 256, 16, 33]
+        out = self.conv3(out) # [B, 512, 7, 33] # NOTE [B, 256, 16, 33]
+        return out
+    
+    @staticmethod
+    def convRelu(nc, i, leaky_relu: bool, bn=False) -> nn.Module:
+        """Conv 레이어를 생성하는 함수
         Args:
-            nc (int): 입력 이미지 채널
-            leakyRelu (bool, optional): Leacky ReLu 사용 여부. Defaults to False.
+            i (int): ks, ps, ss, nm으로부터 가져올 element의 인덱스
+            batchNormalization (bool, optional): BN 적용 여부. Defaults to False.
         """
-        super(CNN, self).__init__()
-
         ks = [3, 3, 3, 3, 3, 3, 2]  # kernel size
         ps = [1, 1, 1, 1, 1, 1, 0]  # padding size
         ss = [1, 1, 1, 1, 1, 1, 1]  # strides
-        nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
+        # nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
+        nm = [64, 128, 256, 256, 384, 384, 384]  # output channel list
 
-        def convRelu(i, batchNormalization=False) -> nn.Module:
-            """Conv 레이어를 생성하는 함수
-            Args:
-                i (int): ks, ps, ss, nm으로부터 가져올 element의 인덱스
-                batchNormalization (bool, optional): BN 적용 여부. Defaults to False.
-            """
-            cnn = nn.Sequential()
-            nIn = nc if i == 0 else nm[i - 1]
-            nOut = nm[i]
-            cnn.add_module(
-                "conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i])
-            )
-            if batchNormalization:
-                cnn.add_module("batchnorm{0}".format(i), nn.BatchNorm2d(nOut))
+        cnn = nn.Sequential()
+        nIn = nc if i == 0 else nm[i - 1]
+        nOut = nm[i]
+        cnn.add_module(
+            "conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i])
+        )
+        if bn:
+            cnn.add_module("batchnorm{0}".format(i), nn.BatchNorm2d(nOut))
 
-            if leakyRelu:
-                cnn.add_module("relu{0}".format(i), nn.LeakyReLU(0.2, inplace=True))
-            else:
-                cnn.add_module("relu{0}".format(i), nn.ReLU(True))
-
-            return cnn
-
-        self.conv0 = convRelu(0)
-        self.pooling0 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv1 = convRelu(1)
-        self.pooling1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = convRelu(2, True)
-        self.conv3 = convRelu(3)
-        self.pooling3 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
-        self.conv4 = convRelu(4, True)
-        self.conv5 = convRelu(5)
-        self.pooling5 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
-        self.conv6 = convRelu(6, True)
-
-    def forward(self, input):
-        out = self.conv0(input)  # [B, 64, 128, 128]
-        out = self.pooling0(out)  # [B, 64, 64, 64]
-        out = self.conv1(out)  # [B, 128, 64, 64]
-        out = self.pooling1(out)  # [B, 128, 32, 32]
-        out = self.conv2(out)  # [B, 256, 32, 32]
-        out = self.conv3(out)  # [B, 256, 32, 32]
-        out = self.pooling3(out)  # [B, 256, 16, 33]
-        out = self.conv4(out)  # [B, 512, 16, 33]
-        out = self.conv5(out)  # [B, 512, 16, 33]
-        out = self.pooling5(out)  # [B, 512, 8, 34]
-        out = self.conv6(out)  # [B, 512, 7, 33] heigth가 점점 눌리네
-        return out
+        if leaky_relu:
+            cnn.add_module("relu{0}".format(i), nn.LeakyReLU(0.2, inplace=True))
+        else:
+            cnn.add_module("relu{0}".format(i), nn.ReLU(True))
+            
+        return cnn
 
 
 class AttentionCell(nn.Module):
-    """디코더(AttentionDecoder) 내 Attention 계산에 활용할 attention cell 클래스"""
+    """디코더(ASTERDecoder) 내 Attention 계산에 활용할 attention cell 클래스"""
 
     def __init__(
         self,
@@ -92,7 +80,7 @@ class AttentionCell(nn.Module):
         hidden_dim: int,
         embedding_dim: int,
         num_layers=1,
-        cell_type="LSTM",
+        # cell_type="LSTM",
     ):
         """
         Args:
@@ -118,32 +106,15 @@ class AttentionCell(nn.Module):
         self.score = nn.Linear(hidden_dim, 1, bias=False)  # to get attention logit
 
         if num_layers == 1:
-            if cell_type == "LSTM":
-                self.rnn = nn.LSTMCell(src_dim + embedding_dim, hidden_dim)
-            elif cell_type == "GRU":
-                self.rnn = nn.GRUCell(src_dim + embedding_dim, hidden_dim)
-            else:
-                raise NotImplementedError
+            self.rnn = nn.LSTMCell(src_dim + embedding_dim, hidden_dim)
         else:
-            if cell_type == "LSTM":
-                self.rnn = nn.ModuleList(
-                    [nn.LSTMCell(src_dim + embedding_dim, hidden_dim)]
-                    + [
-                        nn.LSTMCell(hidden_dim, hidden_dim)
-                        for _ in range(num_layers - 1)
-                    ]
-                )
-            elif cell_type == "GRU":
-                self.rnn = nn.ModuleList(
-                    [nn.GRUCell(src_dim + embedding_dim, hidden_dim)]
-                    + [
-                        nn.GRUCell(hidden_dim, hidden_dim)
-                        for _ in range(num_layers - 1)
-                    ]
-                )
-            else:
-                raise NotImplementedError
-
+            self.rnn = nn.ModuleList(
+                [nn.LSTMCell(src_dim + embedding_dim, hidden_dim)]
+                + [
+                    nn.LSTMCell(hidden_dim, hidden_dim)
+                    for _ in range(num_layers - 1)
+                ]
+            )
         self.hidden_dim = hidden_dim
 
     def forward(self, prev_hidden, src, tgt):  # src: [b, L, c]
@@ -184,7 +155,31 @@ class AttentionCell(nn.Module):
         return cur_hidden, alpha
 
 
-class AttentionDecoder(nn.Module):
+class ASTEREncoder(nn.Module):
+    def __init__(self, FLAGS):
+        super(ASTEREncoder, self).__init__()
+        self.cnn = DeepCNN(nc=FLAGS.data.rgb)
+        self.blstm = nn.LSTM(
+            input_size=384, # H*C = 256*7
+            hidden_size=FLAGS.ASTER.hidden_dim,
+            num_layers=2,
+            bidirectional=True, 
+            )
+        self.proj = nn.Linear(
+            in_features=FLAGS.ASTER.hidden_dim*2,
+            out_features=FLAGS.ASTER.hidden_dim)
+
+    def forward(self, input):
+        out = self.cnn(input) # [B, SEQ_LEN, HIDDEN]
+        b, c, h, w = out.size()
+        out = out.view(b, c*h, w).permute(2, 0, 1) # [SEQ_LEN, B, INPUT_SIZE]
+        out, _ = self.blstm(out) # [SEQ_LEN, B, HIDDEN*2]
+        out = self.proj(out) # [SEQ_LEN, B, HIDDEN]
+        out = out.transpose(0, 1) # [B, SEQ_LEN, HIDDEN]
+        return out  
+
+
+class ASTERDecoder(nn.Module):
     def __init__(
         self,
         num_classes,
@@ -194,14 +189,12 @@ class AttentionDecoder(nn.Module):
         pad_id,
         st_id,
         num_layers=1,
-        cell_type="LSTM",
         checkpoint=None,
     ):
-        super(AttentionDecoder, self).__init__()
-
-        self.embedding = nn.Embedding(num_classes + 1, embedding_dim)
+        super(ASTERDecoder, self).__init__()
+        self.embedding = nn.Embedding(num_classes+1, embedding_dim)
         self.attention_cell = AttentionCell(
-            src_dim, hidden_dim, embedding_dim, num_layers, cell_type
+            src_dim, hidden_dim, embedding_dim, num_layers
         )
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
@@ -305,35 +298,34 @@ class AttentionDecoder(nn.Module):
         return probs
 
 
-class Attention(nn.Module):
+class ASTER(nn.Module):
     def __init__(
         self,
         FLAGS,
         train_dataset,
         checkpoint=None,
     ):
-        super(Attention, self).__init__()
-        self.encoder = CNN(FLAGS.data.rgb) # [B, SRC_DIM, ]
-        self.decoder = AttentionDecoder(
+        super(ASTER, self).__init__()
+        self.encoder = ASTEREncoder(FLAGS)
+        self.decoder = ASTERDecoder(
             num_classes=len(train_dataset.id_to_token),
-            src_dim=FLAGS.Attention.src_dim,
-            embedding_dim=FLAGS.Attention.embedding_dim,
-            hidden_dim=FLAGS.Attention.hidden_dim,
-            pad_id=train_dataset.token_to_id[PAD],
-            st_id=train_dataset.token_to_id[START],
-            num_layers=FLAGS.Attention.layer_num,
-            cell_type=FLAGS.Attention.cell_type,
+            src_dim=FLAGS.ASTER.src_dim,
+            embedding_dim=FLAGS.ASTER.embedding_dim,
+            hidden_dim=FLAGS.ASTER.hidden_dim,
+            pad_id=train_dataset.token_to_id['<PAD>'],
+            st_id=train_dataset.token_to_id['<SOS>'],
+            num_layers=FLAGS.ASTER.layer_num,
         )
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = (
+            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id['<PAD>'])
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)
 
     def forward(self, input, expected, is_train, teacher_forcing_ratio):
         out = self.encoder(input) # [b, C, H, W]
-        b, c, h, w = out.size()
-        out = out.view(b, c, h * w).transpose(1, 2)  # [b, h x w, c]
         output = self.decoder(
             src=out,
             text=expected,
@@ -428,7 +420,8 @@ class Attention(nn.Module):
                             continue
 
                     #------디코딩------
-                    input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
+                    # input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
+                    input_embedded = self.decoder.embedding(current_input.to(device))
 
                     # Hidden state 갱신
                     current_hidden, alpha = self.decoder.attention_cell(

@@ -177,7 +177,7 @@ class TeacherForcingScheduler:
         diff = tf_max - tf_min
         inflection = int(num_steps * 0.1)
         
-        x = np.linspace(-5, 7, num_steps)
+        x = np.linspace(-5, 4, num_steps) # NOTE. for transformer
         x = -np.arctan(x)
         x -= x[-1]
         x *= (diff/x[0])
