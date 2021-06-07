@@ -218,8 +218,8 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            # A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
-            # A.GridDistortion(num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0, p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+            A.GridDistortion(num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0, p=0.5),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
@@ -377,7 +377,7 @@ def main(config_file):
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps, 
             tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
-            tf_min=0.4
+            tf_min=0.3
         ) 
 
     else:
@@ -609,7 +609,7 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="Attention", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
@@ -620,7 +620,7 @@ if __name__ == "__main__":
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/Attention.yaml",
+        default="./configs/My_SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )
