@@ -26,7 +26,7 @@ def get_network(
         model = SATRN(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == 'SWIN':
         model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
-        checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
+        checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you/pth/swin_base_patch4_window12_384_22k.pth', map_location='cuda')
         model.encoder.load_state_dict(checkpoint['model'], strict=False)
     elif model_type == "MySATRN":
         model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)

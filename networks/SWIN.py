@@ -851,18 +851,11 @@ class SWIN(nn.Module):
     def __init__(self, FLAGS, train_dataset, checkpoint=None):
         super(SWIN, self).__init__()
 
-        self.encoder = SwinTransformer(ape=True)
-        # self.decoder = TransformerDecoder(
-        #     num_classes=len(train_dataset.id_to_token),
-        #     src_dim=FLAGS.SATRN.decoder.src_dim,
-        #     hidden_dim=FLAGS.SATRN.decoder.hidden_dim,
-        #     filter_dim=FLAGS.SATRN.decoder.filter_dim,
-        #     head_num=FLAGS.SATRN.decoder.head_num,
-        #     dropout_rate=FLAGS.dropout_rate,
-        #     pad_id=train_dataset.token_to_id[PAD],
-        #     st_id=train_dataset.token_to_id[START],
-        #     layer_num=FLAGS.SATRN.decoder.layer_num,
-        # )
+        self.encoder = SwinTransformer(img_size=384, patch_size=4, in_chans=3,
+                 embed_dim=128, depths=[2, 2, 18, 2], num_heads=[4, 8, 16, 32], # tiny -> embed_dim=96, depths=[2,2,6,2], num_heads=[3,6,12,24]
+                 window_size=12, mlp_ratio=4.,num_classes=21841,
+                 drop_path_rate=0.5, ape=True,) # tiny -> drop_path_rate=0.1
+
         self.decoder = TransformerDecoder(
             num_classes=len(train_dataset.id_to_token),
             src_dim=FLAGS.SATRN.decoder.src_dim,
