@@ -19,17 +19,19 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class ShallowCNN(nn.Module):
     def __init__(self, input_channels, hidden_size):
         super(ShallowCNN, self).__init__()
-        self.conv0 = nn.Conv2d(input_channels, hidden_size//2, 3, bias=False, padding=1)
-        self.batch_norm0 = nn.BatchNorm2d(hidden_size//2)
+        self.conv0 = nn.Conv2d(
+            input_channels, hidden_size // 2, 3, bias=False, padding=1
+        )
+        self.batch_norm0 = nn.BatchNorm2d(hidden_size // 2)
         self.relu0 = nn.ReLU()
         self.pool0 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv1 = nn.Conv2d(hidden_size//2, hidden_size, 3, bias=False, padding=1)
+        self.conv1 = nn.Conv2d(hidden_size // 2, hidden_size, 3, bias=False, padding=1)
         self.batch_norm1 = nn.BatchNorm2d(hidden_size)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv2 = nn.Conv2d(hidden_size, hidden_size ,3, bias=False, padding=1)
+        self.conv2 = nn.Conv2d(hidden_size, hidden_size, 3, bias=False, padding=1)
         self.batch_norm2 = nn.BatchNorm2d(hidden_size)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -37,7 +39,7 @@ class ShallowCNN(nn.Module):
         torch.nn.init.xavier_normal_(self.conv0.weight)
         torch.nn.init.xavier_normal_(self.conv1.weight)
         torch.nn.init.xavier_normal_(self.conv2.weight)
-        
+
     def forward(self, x):
         x = self.conv0(x)
         x = self.batch_norm0(x)
@@ -54,17 +56,24 @@ class ShallowCNN(nn.Module):
         x = self.relu2(x)
         x = self.pool2(x)
 
-        return x # (batch, hidden_size, h/8, w/8)
+        return x  # (batch, hidden_size, h/8, w/8)
+
 
 class CustomCNN(nn.Module):
     def __init__(self, input_channel, output_channel):
         super(CustomCNN, self).__init__()
-        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
-        self.conv_stem= nn.Conv2d(input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
-        self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+        m = timm.create_model("tf_efficientnetv2_s_in21ft1k", pretrained=True)
+        self.conv_stem = nn.Conv2d(
+            input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False
+        )
+        self.bn1 = nn.BatchNorm2d(
+            24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True
+        )
         self.act1 = nn.SiLU(inplace=True)
         self.eff_block = m.blocks
-        self.conv_last = nn.Conv2d(256, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.conv_last = nn.Conv2d(
+            256, output_channel, kernel_size=(1, 1), stride=(1, 1), bias=False
+        )
         self.bn2 = nn.BatchNorm2d(output_channel)
         self.act2 = nn.SiLU(inplace=True)
 
@@ -76,7 +85,8 @@ class CustomCNN(nn.Module):
         x = self.conv_last(x)
         x = self.act2(self.bn2(x))
 
-        return x #[b, c, h/32, w/32]
+        return x  # [b, c, h/32, w/32]
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, hidden_size, h=128, w=128, dropout=0.1):
@@ -90,40 +100,50 @@ class PositionalEncoding(nn.Module):
         self.w_pos_encoding = self.w_pos_encoding.unsqueeze(0)
 
         self.dropout = nn.Dropout(p=dropout)
-        self.dense0 = nn.Linear(hidden_size, hidden_size//2)
+        self.dense0 = nn.Linear(hidden_size, hidden_size // 2)
         self.relu = nn.ReLU()
 
-        self.dense1 = nn.Linear(hidden_size//2, hidden_size*2)
+        self.dense1 = nn.Linear(hidden_size // 2, hidden_size * 2)
         self.sigmoid = nn.Sigmoid()
 
         torch.nn.init.xavier_normal_(self.dense0.weight)
         torch.nn.init.xavier_normal_(self.dense1.weight)
 
-    def get_position_encoding(self, length, hidden_size, min_timescale=1.0, max_timescale=1.0e4):
+    def get_position_encoding(
+        self, length, hidden_size, min_timescale=1.0, max_timescale=1.0e4
+    ):
         position = torch.arange(length).float()
         num_timescales = [hidden_size // 2]
-        log_timescale_incretement = (
-            math.log(float(max_timescale) / float(min_timescale)) / (torch.FloatTensor(num_timescales) - 1)
+        log_timescale_incretement = math.log(
+            float(max_timescale) / float(min_timescale)
+        ) / (torch.FloatTensor(num_timescales) - 1)
+        inv_timescales = min_timescale * torch.exp(
+            torch.FloatTensor(
+                torch.arange(num_timescales[0]) * -log_timescale_incretement
+            )
         )
-        inv_timescales = min_timescale * torch.exp(torch.FloatTensor(torch.arange(num_timescales[0]) * -log_timescale_incretement))
         scaled_time = torch.unsqueeze(position, 1) * torch.unsqueeze(inv_timescales, 0)
         signal = torch.cat((torch.sin(scaled_time), torch.cos(scaled_time)), axis=1)
 
         return signal
-    
+
     def tiling(self, arr, b, c, h, w):
         arr_numpy = arr.numpy()
-        arr_tile = np.tile(arr_numpy,(b,c,h,w))
+        arr_tile = np.tile(arr_numpy, (b, c, h, w))
 
         return torch.from_numpy(arr_tile)
-    
+
     def forward(self, x):
         features = x
-        b,c,h,w = x.size()
+        b, c, h, w = x.size()
 
-        h_encoding = self.tiling(self.h_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(device)
+        h_encoding = self.tiling(self.h_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(
+            device
+        )
         # print(h_encoding.shape)
-        w_encoding = self.tiling(self.w_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(device)
+        w_encoding = self.tiling(self.w_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(
+            device
+        )
         # print
         x = torch.mean(x, [2, 3])
         x = self.dense0(x)
@@ -133,11 +153,12 @@ class PositionalEncoding(nn.Module):
         x = self.dense1(x)
         x = self.sigmoid(x)
         x = torch.reshape(x, [-1, 2, 1, self.hidden_size])
-        x = x[:,0:1, : ,:] * h_encoding + x[:,1:2,:,:]*w_encoding
+        x = x[:, 0:1, :, :] * h_encoding + x[:, 1:2, :, :] * w_encoding
         x = x.permute(0, 3, 1, 2)
         # print(x.shape)
 
-        return x + features #(batch, hidden_size, h, w)
+        return x + features  # (batch, hidden_size, h, w)
+
 
 class ScaledDotProductAttention(nn.Module):
     def __init__(self, temperature, dropout=0.1):
@@ -212,6 +233,7 @@ class MultiHeadAttention(nn.Module):
 
         return out
 
+
 class EncoderLayer(nn.Module):
     def __init__(self, hidden_size, filter_size, head_num, dropout_rate=0.2):
         super(EncoderLayer, self).__init__()
@@ -226,8 +248,9 @@ class EncoderLayer(nn.Module):
         self.dropout0 = nn.Dropout(dropout_rate)
         self.conv0 = nn.Conv2d(hidden_size, filter_size, 1, bias=False)
         self.norm0 = nn.BatchNorm2d(filter_size)
-        self.depthwise = nn.Conv2d(filter_size, filter_size,
-                                    kernel_size=3, padding=1, groups=filter_size)
+        self.depthwise = nn.Conv2d(
+            filter_size, filter_size, kernel_size=3, padding=1, groups=filter_size
+        )
         self.depthwise_norm = nn.BatchNorm2d(filter_size)
         self.conv1 = nn.Conv2d(filter_size, hidden_size, 1, bias=False)
         self.norm1 = nn.BatchNorm2d(hidden_size)
@@ -261,14 +284,16 @@ class EncoderLayer(nn.Module):
         x = self.norm1(x)
         x = self.relu1(x)
 
-        return x + features # (batch, hidden_size, h, w)
+        return x + features  # (batch, hidden_size, h, w)
+
 
 class SATRNEncoder(nn.Module):
-    def __init__(self, 
+    def __init__(
+        self,
         input_height,
         input_width,
-        input_channel, 
-        hidden_size, 
+        input_channel,
+        hidden_size,
         filter_size,
         head_num,
         layer_num,
@@ -279,10 +304,9 @@ class SATRNEncoder(nn.Module):
 
         # self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
         self.shallow_cnn = CustomCNN(input_channel, hidden_size)
-        self.positional_encoding = PositionalEncoding(hidden_size, 
-                                                    h=input_height//32, 
-                                                    w=input_width//32, 
-                                                    dropout=dropout_rate)
+        self.positional_encoding = PositionalEncoding(
+            hidden_size, h=input_height // 32, w=input_width // 32, dropout=dropout_rate
+        )
         self.attention_layers = nn.ModuleList(
             [
                 EncoderLayer(hidden_size, filter_size, head_num, dropout_rate)
@@ -291,7 +315,7 @@ class SATRNEncoder(nn.Module):
         )
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
-    
+
     def forward(self, x):
         # x - [b, c, h, w]
         out = self.shallow_cnn(x)  # [b, c, h//4, w//4]
@@ -341,6 +365,7 @@ class Feedforward(nn.Module):
         x = self.dropout1(x)
 
         return x
+
 
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, input_size, src_size, filter_size, head_num, dropout_rate=0.2):
@@ -494,14 +519,17 @@ class SATRNDecoder(nn.Module):
         else:
             out = []
             num_steps = batch_max_length - 1
-            target = torch.LongTensor(src.size(0)).fill_(self.st_id).to(device) # [START] token
+            target = (
+                torch.LongTensor(src.size(0)).fill_(self.st_id).to(device)
+            )  # [START] token
             features = [None] * self.layer_num
 
             for t in range(num_steps):
-                if target.ndim == 1:    
+                if target.ndim == 1:
                     target = target.unsqueeze(1)
                 else:
                     import warnings
+
                     warnings.warn("batch length is 1")
                     target = target.unsqueeze(0).unsqueeze(1)
 
@@ -517,11 +545,11 @@ class SATRNDecoder(nn.Module):
 
                 _out = self.generator(tgt)  # [b, 1, c]
                 target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
-                target = target.squeeze()   # [b]
+                target = target.squeeze()  # [b]
                 out.append(_out)
-            
-            out = torch.stack(out, dim=1).to(device)    # [b, max length, 1, class length]
-            out = out.squeeze(2)    # [b, max length, class length]
+
+            out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
+            out = out.squeeze(2)  # [b, max length, class length]
 
         return out
 
@@ -553,8 +581,8 @@ class MySATRN(nn.Module):
             layer_num=FLAGS.SATRN.decoder.layer_num,
         )
 
-        self.criterion = (
-            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
+        self.criterion = nn.CrossEntropyLoss(
+            ignore_index=train_dataset.token_to_id[PAD]
         )
 
         if checkpoint:
@@ -572,20 +600,20 @@ class MySATRN(nn.Module):
         return dec_result
 
     def beam_search(
-        self, 
-        input: torch.Tensor, 
+        self,
+        input: torch.Tensor,
         data_loader: DataLoader,
-        topk: int=1, 
-        beam_width: int=5, 
-        max_sequence: int=230
-        ):
+        topk: int = 1,
+        beam_width: int = 5,
+        max_sequence: int = 230,
+    ):
         # 사용할 토큰
-        sos_token_id = data_loader.dataset.token_to_id['<SOS>']
-        eos_token_id = data_loader.dataset.token_to_id['<EOS>']
-        pad_token_id = data_loader.dataset.token_to_id['<PAD>']
+        sos_token_id = data_loader.dataset.token_to_id["<SOS>"]
+        eos_token_id = data_loader.dataset.token_to_id["<EOS>"]
+        pad_token_id = data_loader.dataset.token_to_id["<PAD>"]
 
         batch_size = len(input)
-        src = self.encoder(input) # [B, HxW, C]
+        src = self.encoder(input)  # [B, HxW, C]
 
         decoded_batch = []
         with torch.no_grad():
@@ -600,31 +628,31 @@ class MySATRN(nn.Module):
                 nodes = PriorityQueue()
 
                 # 시작 토큰 초기화
-                current_src = src[data_idx, :, :].unsqueeze(0) # [B=1, HxW, C]
-                current_input = torch.LongTensor([sos_token_id]) # [B=1]
+                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, HxW, C]
+                current_input = torch.LongTensor([sos_token_id])  # [B=1]
                 current_hidden = [None] * self.decoder.layer_num
                 node = BeamSearchNode(
                     hidden_state=deepcopy(current_hidden),
                     prev_node=None,
-                    token_id=deepcopy(current_input), # [1]
+                    token_id=deepcopy(current_input),  # [1]
                     log_prob=0,
-                    length=1 # NOTE: P.E에 사용
+                    length=1,  # NOTE: P.E에 사용
                 )
                 score = -node.eval()
 
                 # 최대힙: 확률 높은 토큰을 추출하기 위함
-                nodes.put((score, node)) 
+                nodes.put((score, node))
 
                 num_steps = 0
                 while True:
-                    if num_steps >= (max_sequence-1)*beam_width:
+                    if num_steps >= (max_sequence - 1) * beam_width:
                         break
 
                     # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
                     score, n = nodes.get()
-                    current_input = n.token_id # [B=1]
+                    current_input = n.token_id  # [B=1]
                     current_hidden = n.hidden_state
-                    current_point = n.len - 1 # P.E 적용 시 활용
+                    current_point = n.len - 1  # P.E 적용 시 활용
 
                     # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
                     if n.token_id.item() == eos_token_id and n.prev_node != None:
@@ -633,33 +661,45 @@ class MySATRN(nn.Module):
                             break
                         else:
                             continue
-                        
-                    current_input = current_input.unsqueeze(1) # [B=1, 1]
-                    
-                    tgt = self.decoder.text_embedding(texts=current_input.to(input.get_device())) # [B=1, 1, HIDDEN]
-                    tgt = self.decoder.pos_encoder(x=tgt, point=current_point) # [B=1, 1, HIDDEN]
-                    tgt_mask = self.decoder.order_mask(length=current_point+1) # [B=1, LEN, LEN]
-                    tgt_mask = tgt_mask[:, -1].unsqueeze(1) # [B=1, 1, LEN]
+
+                    current_input = current_input.unsqueeze(1)  # [B=1, 1]
+
+                    tgt = self.decoder.text_embedding(
+                        texts=current_input.to(input.get_device())
+                    )  # [B=1, 1, HIDDEN]
+                    tgt = self.decoder.pos_encoder(
+                        x=tgt, point=current_point
+                    )  # [B=1, 1, HIDDEN]
+                    tgt_mask = self.decoder.order_mask(
+                        length=current_point + 1
+                    )  # [B=1, LEN, LEN]
+                    tgt_mask = tgt_mask[:, -1].unsqueeze(1)  # [B=1, 1, LEN]
 
                     # 어텐션 레이어 통과
                     for l, layer in enumerate(self.decoder.attention_layers):
                         tgt = layer(
-                            tgt=tgt, # [B=1, 1, HIDDEN]
-                            tgt_prev=current_hidden[l], 
-                            src=current_src, 
-                            tgt_mask=tgt_mask
-                            ) # [1, 1, HIDDEN]
+                            tgt=tgt,  # [B=1, 1, HIDDEN]
+                            tgt_prev=current_hidden[l],
+                            src=current_src,
+                            tgt_mask=tgt_mask,
+                        )  # [1, 1, HIDDEN]
 
                         # Hidden state 갱신
                         # 첫 state: [1, 1, HIDDEN]
                         # 이후: [B=1, 1, HIDDEN] -> [B=1, 2, HIDDEN] -> [B=1, 3, HIDDEN] -> ...
-                        current_hidden[l] = (tgt if current_hidden[l] is None else torch.cat([current_hidden[l], tgt], dim=1))
+                        current_hidden[l] = (
+                            tgt
+                            if current_hidden[l] is None
+                            else torch.cat([current_hidden[l], tgt], dim=1)
+                        )
 
                     # 확률화하기 전 모델의 로짓
-                    prob_step = self.decoder.generator(tgt) # [B=1, 1, VOCAB_SIZE]
+                    prob_step = self.decoder.generator(tgt)  # [B=1, 1, VOCAB_SIZE]
 
                     # 모델의 로짓을  확률화
-                    log_prob_step = F.log_softmax(prob_step, dim=-1) # [B=1, 1, VOCAB_SIZE]
+                    log_prob_step = F.log_softmax(
+                        prob_step, dim=-1
+                    )  # [B=1, 1, VOCAB_SIZE]
                     log_prob, indices = torch.topk(log_prob_step, beam_width)
 
                     # 다음 state에 활용할 {beam_width}개 후보 노드를 우선순위큐에 삽입
@@ -672,18 +712,18 @@ class MySATRN(nn.Module):
                             hidden_state=deepcopy(current_hidden),
                             prev_node=n,
                             token_id=deepcopy(decoded_t),
-                            log_prob=n.logp+log_p,
-                            length=n.len+1,
+                            log_prob=n.logp + log_p,
+                            length=n.len + 1,
                         )
                         score = -node.eval()
                         next_nodes.append((score, node))
-                    
+
                     for i in range(len(next_nodes)):
                         score, next_node = next_nodes[i]
                         nodes.put((score, next_node))
 
                     num_steps += beam_width
-                
+
                 # <EOS> 토큰이 한번도 등장하지 않았을 경우 - 최대 확률 노드
                 if len(end_nodes) == 0:
                     end_nodes = [nodes.get() for _ in range(topk)]
@@ -712,15 +752,10 @@ class MySATRN(nn.Module):
         for decoded_sample in decoded_batch:
             if len(decoded_sample) < max_sequence:
                 num_pads = max_sequence - len(decoded_sample)
-                decoded_sample += [pad_token_id]*num_pads
+                decoded_sample += [pad_token_id] * num_pads
             elif len(decoded_sample) > max_sequence:
                 decoded_sample = decoded_sample[:max_sequence]
             outputs.append(decoded_sample)
         outputs = torch.tensor(outputs)
 
         return outputs
-    
-
-
-
-        

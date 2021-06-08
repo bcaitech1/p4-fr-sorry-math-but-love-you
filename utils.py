@@ -13,6 +13,7 @@ from networks.ASTER import ASTER
 
 import warnings
 
+
 def get_network(
     model_type,
     FLAGS,
@@ -23,20 +24,21 @@ def get_network(
     model = None
     if model_type == "Attention":
         model = Attention(FLAGS, train_dataset, model_checkpoint).to(device)
-    elif model_type == 'SATRN':
+    elif model_type == "SATRN":
         model = SATRN(FLAGS, train_dataset, model_checkpoint).to(device)
-    elif model_type == 'SWIN':
+    elif model_type == "SWIN":
         model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
         # checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
         # model.encoder.load_state_dict(checkpoint['model'], strict=False)
     elif model_type == "MySATRN":
         model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
-    elif model_type == 'ASTER':
+    elif model_type == "ASTER":
         model = ASTER(FLAGS, train_dataset, model_checkpoint).to(device)
     else:
         raise NotImplementedError
 
     return model
+
 
 def get_optimizer(optimizer, params, lr, weight_decay=None):
     if optimizer == "Adam":
@@ -50,6 +52,7 @@ def get_optimizer(optimizer, params, lr, weight_decay=None):
         raise NotImplementedError
     return optimizer
 
+
 def print_system_envs():
     num_gpus = torch.cuda.device_count()
     num_cpus = os.cpu_count()
@@ -61,16 +64,19 @@ def print_system_envs():
         "Memory Size : {}G\n".format(mem_size),
     )
 
+
 # Fixed version of id_to_string
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
         eos_id = data_loader.dataset.token_to_id["<EOS>"]
-        special_ids = set([
-            data_loader.dataset.token_to_id["<PAD>"],
-            data_loader.dataset.token_to_id["<SOS>"],
-            eos_id
-            ])
+        special_ids = set(
+            [
+                data_loader.dataset.token_to_id["<PAD>"],
+                data_loader.dataset.token_to_id["<SOS>"],
+                eos_id,
+            ]
+        )
 
     for example in tokens:
         string = ""
@@ -91,12 +97,13 @@ def id_to_string(tokens, data_loader, do_eval=0):
         result.append(string)
     return result
 
+
 # Old: deprecated
 # def id_to_string(tokens, data_loader,do_eval=0):
 #     result = []
 #     if do_eval:
 #         special_ids = [
-#             data_loader.dataset.token_to_id["<PAD>"], 
+#             data_loader.dataset.token_to_id["<PAD>"],
 #             data_loader.dataset.token_to_id["<SOS>"],
 #             data_loader.dataset.token_to_id["<EOS>"]
 #             ]
@@ -119,12 +126,13 @@ def id_to_string(tokens, data_loader, do_eval=0):
 #     return result
 
 
-def set_seed(seed: int=21):
+def set_seed(seed: int = 21):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+
 def get_timestamp():
-    return datetime.now().strftime(format='%m%d-%H%M%S')
+    return datetime.now().strftime(format="%m%d-%H%M%S")

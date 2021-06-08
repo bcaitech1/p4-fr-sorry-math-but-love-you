@@ -110,7 +110,13 @@ class DeepCNN300(nn.Module):
     """
 
     def __init__(
-        self, input_channel, num_in_features, output_channel=256, dropout_rate=0.2, depth=16, growth_rate=24
+        self,
+        input_channel,
+        num_in_features,
+        output_channel=256,
+        dropout_rate=0.2,
+        depth=16,
+        growth_rate=24,
     ):
         super(DeepCNN300, self).__init__()
         self.conv0 = nn.Conv2d(
@@ -308,8 +314,8 @@ class PositionalEncoding2D(nn.Module):
         )
         w_pos_encoding = self.w_linear(w_pos_encoding)  # [1, W, D]
 
-        h_pos_encoding = h_pos_encoding.expand(-1, w, -1)   # h, w, c/2
-        w_pos_encoding = w_pos_encoding.expand(h, -1, -1)   # h, w, c/2
+        h_pos_encoding = h_pos_encoding.expand(-1, w, -1)  # h, w, c/2
+        w_pos_encoding = w_pos_encoding.expand(h, -1, -1)  # h, w, c/2
 
         pos_encoding = torch.cat([h_pos_encoding, w_pos_encoding], dim=2)  # [H, W, 2*D]
 
@@ -523,7 +529,9 @@ class TransformerDecoder(nn.Module):
         else:
             out = []
             num_steps = batch_max_length - 1
-            target = torch.LongTensor(src.size(0)).fill_(self.st_id).to(device) # [START] token
+            target = (
+                torch.LongTensor(src.size(0)).fill_(self.st_id).to(device)
+            )  # [START] token
             features = [None] * self.layer_num
 
             for t in range(num_steps):
@@ -540,11 +548,11 @@ class TransformerDecoder(nn.Module):
 
                 _out = self.generator(tgt)  # [b, 1, c]
                 target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
-                target = target.squeeze()   # [b]
+                target = target.squeeze()  # [b]
                 out.append(_out)
-            
-            out = torch.stack(out, dim=1).to(device)    # [b, max length, 1, class length]
-            out = out.squeeze(2)    # [b, max length, class length]
+
+            out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
+            out = out.squeeze(2)  # [b, max length, class length]
 
         return out
 

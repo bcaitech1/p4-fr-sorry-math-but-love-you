@@ -21,46 +21,22 @@ from checkpoint import (
     save_checkpoint,
     # init_tensorboard,
     # write_tensorboard,
-    write_wandb
+    write_wandb,
 )
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler_ import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
+from scheduler import (
+    CircularLRBeta,
+    CustomCosineAnnealingWarmUpRestarts,
+    TeacherForcingScheduler,
+)
 from metrics_ import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
-def log(number):
-  # log에 0이 들어가는 것을 막기 위해 아주 작은 수를 더해줌.
-  return np.log(number + 1e-10)
-
-def naive_beam_search_decoder(predictions, k):
-  # prediction = (seq_len , V)
-  sequences = [[torch.tensor(), 1.0]]
-  
-  for row in predictions:
-    all_candidates = torch.tensor()
-    
-    # 1. 각각의 timestep에서 가능한 후보군으로 확장
-    for i in range(sequences.size()):
-      seq, score = sequences[i]
-      
-      # 2. 확장된 후보 스텝에 대해 점수 계산
-      for j in range(row.size()):
-        new_seq = seq + [j] 
-        new_score = score * -log(row[j])
-        candidate = [new_seq, new_score]
-        all_candidates = torch.cat([all_candidates, candidate], dim=1)
-    
-	# 3. 가능도가 높은 k개의 시퀀스만 남김 
-    # ordered = sorted(all_candidates, key=lambda tup:tup[1]) #점수 기준 정렬
-    ordered = torch.sort(all_candidates)
-    sequences = ordered[:k]
-    
-  return sequences
 
 def train_one_epoch(
     data_loader,
@@ -73,7 +49,7 @@ def train_one_epoch(
     max_grad_norm,
     device,
     scaler,
-    tf_scheduler # NOTE. Teacher Forcing Scheduler
+    tf_scheduler,  # NOTE. Teacher Forcing Scheduler
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -95,7 +71,7 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
-            tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
+            tf_ratio = tf_scheduler.step()  # NOTE. Teacher Forcing Scheduler
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -103,14 +79,16 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
-            output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
-#             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            output = model(
+                input, expected, True, tf_ratio
+            )  # NOTE. Teacher Forcing Scheduler
+            #             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
-            decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-            _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
-            sequence = sequence.squeeze(1) # [B, MAX_LEN], Metric 측정을 위해
+            decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
+            _, sequence = torch.topk(decoded_values, k=1, dim=1)  # [B, 1, MAX_LEN]
+            sequence = sequence.squeeze(1)  # [B, MAX_LEN], Metric 측정을 위해
 
-            loss = criterion(decoded_values, expected[:, 1:]) # [SOS] 이후부터
+            loss = criterion(decoded_values, expected[:, 1:])  # [SOS] 이후부터
 
             optim_params = [
                 p
@@ -119,15 +97,11 @@ def train_one_epoch(
             ]
             optimizer.zero_grad()
             loss.backward()
-            # scaler.scale(loss).backward()
-            # scaler.unscale_(optimizer)
 
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             # cycle
-            # scaler.step(optimizer)
-            # scaler.update()
             optimizer.step()
             losses.append(loss.item())
 
@@ -145,17 +119,23 @@ def train_one_epoch(
             lr_scheduler.step()
 
             # lr logging
-            if isinstance(lr_scheduler.get_lr(), float) or isinstance(lr_scheduler.get_lr(), int):
-                wandb.log({
-                    "learning_rate": lr_scheduler.get_lr(),
-                    'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
-                    })
+            if isinstance(lr_scheduler.get_lr(), float) or isinstance(
+                lr_scheduler.get_lr(), int
+            ):
+                wandb.log(
+                    {
+                        "learning_rate": lr_scheduler.get_lr(),
+                        "tf_ratio": tf_ratio,  # NOTE. Teacher Forcing Scheduler
+                    }
+                )
             else:
                 for lr_ in lr_scheduler.get_lr():
-                    wandb.log({
-                        "learning_rate": lr_,
-                        'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
-                        })
+                    wandb.log(
+                        {
+                            "learning_rate": lr_,
+                            "tf_ratio": tf_ratio,  # NOTE. Teacher Forcing Scheduler
+                        }
+                    )
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -208,9 +188,11 @@ def valid_one_epoch(
                 # with autocast():
                 output = model(input, expected, False, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+                decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
+                _, sequence = torch.topk(
+                    decoded_values, 1, dim=1
+                )  # sequence: [B, 1, MAX_LEN]
+                sequence = sequence.squeeze(1)  # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
                 loss = criterion(decoded_values, expected[:, 1:])
 
@@ -223,7 +205,9 @@ def valid_one_epoch(
                 num_wer += 1
                 sent_acc += sentence_acc(sequence_str, expected_str)
                 num_sent_acc += 1
-                correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
+                correct_symbols += torch.sum(
+                    sequence == expected[:, 1:], dim=(0, 1)
+                ).item()
                 total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
                 pbar.update(curr_batch_size)
@@ -242,12 +226,19 @@ def valid_one_epoch(
     }
     return result
 
+
 def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
             A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
-            A.GridDistortion(p=0.5, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
+            A.GridDistortion(
+                p=0.5,
+                num_steps=8,
+                distort_limit=(-0.5, 0.5),
+                interpolation=0,
+                border_mode=0,
+            ),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
@@ -260,7 +251,7 @@ def get_valid_transforms(height, width):
         [
             A.Resize(height, width),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ToTensorV2(p=1.0)
+            ToTensorV2(p=1.0),
         ],
         p=1.0,
     )
@@ -329,7 +320,6 @@ def main(config_file):
             options.input_size.height, options.input_size.width
         ),
     )
-    # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed, transformed)
     print(
         "[+] Data\n",
         "The number of train samples : {}\n".format(len(train_dataset)),
@@ -382,15 +372,15 @@ def main(config_file):
             optimizer.load_state_dict(optimizer_state)
 
         # Custom Cosine Annealing 파라미터 명세 볼 만한 곳: https://bit.ly/2SGDhxO
-            # T_0: 한 주기에 대한 스텝 수
-            # T_mult: 주기 반복마다 주기 길이를 T_mult배로 바꿈
-            # eta_max: warm-up을 통해 도달할 최대 LR
-            # T_up: 한 주기 내에서 warm-up을 할 스텝 수
-            # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
+        # T_0: 한 주기에 대한 스텝 수
+        # T_mult: 주기 반복마다 주기 길이를 T_mult배로 바꿈
+        # eta_max: warm-up을 통해 도달할 최대 LR
+        # T_up: 한 주기 내에서 warm-up을 할 스텝 수
+        # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
-        total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        t_0 = total_steps // 1 # 주기를 3으로 설정
-        t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
+        total_steps = len(train_data_loader) * options.num_epochs  # 전체 스텝 수
+        t_0 = total_steps // 1  # 주기를 3으로 설정
+        t_up = int(t_0 * 0.1)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
@@ -400,13 +390,13 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
-        print('TF-MAX', options.teacher_forcing_ratio)
+        print("TF-MAX", options.teacher_forcing_ratio)
         # NOTE. Teacher Forcing Scheduler
         tf_scheduler = TeacherForcingScheduler(
-            num_steps=total_steps, 
-            tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
-            tf_min=0.3
-        ) 
+            num_steps=total_steps,
+            tf_max=options.teacher_forcing_ratio,  # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
+            tf_min=0.3,
+        )
 
     else:
         optimizer = get_optimizer(
@@ -435,8 +425,8 @@ def main(config_file):
             lr_scheduler = CircularLRBeta(
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
-    if checkpoint['scheduler']:
-        lr_scheduler.load_state_dict(checkpoint['scheduler'])
+    if checkpoint["scheduler"]:
+        lr_scheduler.load_state_dict(checkpoint["scheduler"])
 
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
@@ -487,7 +477,7 @@ def main(config_file):
             options.max_grad_norm,
             device,
             scaler,
-            tf_scheduler # NOTE. Teacher Forcing Scheduler
+            tf_scheduler,  # NOTE. Teacher Forcing Scheduler
         )
 
         train_losses.append(train_result["loss"])
@@ -630,7 +620,7 @@ def main(config_file):
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                validation_score=validation_epoch_score
+                validation_score=validation_epoch_score,
             )
 
 

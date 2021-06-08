@@ -15,12 +15,17 @@ from decoding import BeamSearchNode
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = 'cpu'
 
+
 class DeepCNN(nn.Module):
     def __init__(self, nc: int, leaky_relu=False):
         super(DeepCNN, self).__init__()
-        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
-        self.conv_stem = nn.Conv2d(nc, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
-        self.bn1 = nn.BatchNorm2d(24, eps=1e-3, momentum=0.1, affine=True, track_running_stats=True)
+        m = timm.create_model("tf_efficientnetv2_s_in21ft1k", pretrained=True)
+        self.conv_stem = nn.Conv2d(
+            nc, 24, kernel_size=(3, 3), stride=(2, 2), bias=False
+        )
+        self.bn1 = nn.BatchNorm2d(
+            24, eps=1e-3, momentum=0.1, affine=True, track_running_stats=True
+        )
         self.act1 = nn.SiLU(inplace=True)
         self.eff_blocks = m.blocks
         self.pooling1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
@@ -30,17 +35,17 @@ class DeepCNN(nn.Module):
         self.conv3 = self.convRelu(nc, 6, leaky_relu=leaky_relu, bn=True)
 
     def forward(self, input):
-        out = self.conv_stem(input) # [B, 24, 511, 511]
-        out = self.bn1(out) # [B, 24, 511, 511]
-        out = self.act1(out) # [B, 24, 511, 511]
-        out = self.eff_blocks(out) # [B, 256, 32, 32]
-        out = self.pooling1(out) # [B, 256, 16, 33]
-        out = self.conv1(out) # [B, 512, 16, 33] # NOTE [B, 256, 16, 33]
-        # out = self.conv2(out) # [B, 512, 16, 33] 
-        out = self.pooling2(out) # [B, 512, 8, 34] # NOTE [B, 256, 16, 33]
-        out = self.conv3(out) # [B, 512, 7, 33] # NOTE [B, 256, 16, 33]
+        out = self.conv_stem(input)  # [B, 24, 511, 511]
+        out = self.bn1(out)  # [B, 24, 511, 511]
+        out = self.act1(out)  # [B, 24, 511, 511]
+        out = self.eff_blocks(out)  # [B, 256, 32, 32]
+        out = self.pooling1(out)  # [B, 256, 16, 33]
+        out = self.conv1(out)  # [B, 512, 16, 33] # NOTE [B, 256, 16, 33]
+        # out = self.conv2(out) # [B, 512, 16, 33]
+        out = self.pooling2(out)  # [B, 512, 8, 34] # NOTE [B, 256, 16, 33]
+        out = self.conv3(out)  # [B, 512, 7, 33] # NOTE [B, 256, 16, 33]
         return out
-    
+
     @staticmethod
     def convRelu(nc, i, leaky_relu: bool, bn=False) -> nn.Module:
         """Conv 레이어를 생성하는 함수
@@ -57,9 +62,7 @@ class DeepCNN(nn.Module):
         cnn = nn.Sequential()
         nIn = nc if i == 0 else nm[i - 1]
         nOut = nm[i]
-        cnn.add_module(
-            "conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i])
-        )
+        cnn.add_module("conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i]))
         if bn:
             cnn.add_module("batchnorm{0}".format(i), nn.BatchNorm2d(nOut))
 
@@ -67,7 +70,7 @@ class DeepCNN(nn.Module):
             cnn.add_module("relu{0}".format(i), nn.LeakyReLU(0.2, inplace=True))
         else:
             cnn.add_module("relu{0}".format(i), nn.ReLU(True))
-            
+
         return cnn
 
 
@@ -110,10 +113,7 @@ class AttentionCell(nn.Module):
         else:
             self.rnn = nn.ModuleList(
                 [nn.LSTMCell(src_dim + embedding_dim, hidden_dim)]
-                + [
-                    nn.LSTMCell(hidden_dim, hidden_dim)
-                    for _ in range(num_layers - 1)
-                ]
+                + [nn.LSTMCell(hidden_dim, hidden_dim) for _ in range(num_layers - 1)]
             )
         self.hidden_dim = hidden_dim
 
@@ -160,23 +160,23 @@ class ASTEREncoder(nn.Module):
         super(ASTEREncoder, self).__init__()
         self.cnn = DeepCNN(nc=FLAGS.data.rgb)
         self.blstm = nn.LSTM(
-            input_size=384, # H*C = 256*7
+            input_size=384,  # H*C = 256*7
             hidden_size=FLAGS.ASTER.hidden_dim,
             num_layers=2,
-            bidirectional=True, 
-            )
+            bidirectional=True,
+        )
         self.proj = nn.Linear(
-            in_features=FLAGS.ASTER.hidden_dim*2,
-            out_features=FLAGS.ASTER.hidden_dim)
+            in_features=FLAGS.ASTER.hidden_dim * 2, out_features=FLAGS.ASTER.hidden_dim
+        )
 
     def forward(self, input):
-        out = self.cnn(input) # [B, SEQ_LEN, HIDDEN]
+        out = self.cnn(input)  # [B, SEQ_LEN, HIDDEN]
         b, c, h, w = out.size()
-        out = out.view(b, c*h, w).permute(2, 0, 1) # [SEQ_LEN, B, INPUT_SIZE]
-        out, _ = self.blstm(out) # [SEQ_LEN, B, HIDDEN*2]
-        out = self.proj(out) # [SEQ_LEN, B, HIDDEN]
-        out = out.transpose(0, 1) # [B, SEQ_LEN, HIDDEN]
-        return out  
+        out = out.view(b, c * h, w).permute(2, 0, 1)  # [SEQ_LEN, B, INPUT_SIZE]
+        out, _ = self.blstm(out)  # [SEQ_LEN, B, HIDDEN*2]
+        out = self.proj(out)  # [SEQ_LEN, B, HIDDEN]
+        out = out.transpose(0, 1)  # [B, SEQ_LEN, HIDDEN]
+        return out
 
 
 class ASTERDecoder(nn.Module):
@@ -192,7 +192,7 @@ class ASTERDecoder(nn.Module):
         checkpoint=None,
     ):
         super(ASTERDecoder, self).__init__()
-        self.embedding = nn.Embedding(num_classes+1, embedding_dim)
+        self.embedding = nn.Embedding(num_classes + 1, embedding_dim)
         self.attention_cell = AttentionCell(
             src_dim, hidden_dim, embedding_dim, num_layers
         )
@@ -312,20 +312,20 @@ class ASTER(nn.Module):
             src_dim=FLAGS.ASTER.src_dim,
             embedding_dim=FLAGS.ASTER.embedding_dim,
             hidden_dim=FLAGS.ASTER.hidden_dim,
-            pad_id=train_dataset.token_to_id['<PAD>'],
-            st_id=train_dataset.token_to_id['<SOS>'],
+            pad_id=train_dataset.token_to_id["<PAD>"],
+            st_id=train_dataset.token_to_id["<SOS>"],
             num_layers=FLAGS.ASTER.layer_num,
         )
 
-        self.criterion = (
-            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id['<PAD>'])
+        self.criterion = nn.CrossEntropyLoss(
+            ignore_index=train_dataset.token_to_id["<PAD>"]
         )
 
         if checkpoint:
             self.load_state_dict(checkpoint)
 
     def forward(self, input, expected, is_train, teacher_forcing_ratio):
-        out = self.encoder(input) # [b, C, H, W]
+        out = self.encoder(input)  # [b, C, H, W]
         output = self.decoder(
             src=out,
             text=expected,
@@ -339,9 +339,9 @@ class ASTER(nn.Module):
         self,
         input: torch.Tensor,
         data_loader: DataLoader,
-        topk: int=1, # 상위 몇 개의 결과를 얻을 것인지
-        beam_width: int = 10, # 각 스텝마다 몇 개의 후보군을 선별할지
-        max_sequence: int=230
+        topk: int = 1,  # 상위 몇 개의 결과를 얻을 것인지
+        beam_width: int = 10,  # 각 스텝마다 몇 개의 후보군을 선별할지
+        max_sequence: int = 230
         # step: int=None
     ):
         """빔서치 디코딩을 수행하는 함수. inference시에만 활용
@@ -357,24 +357,27 @@ class ASTER(nn.Module):
 
         Returns:
             Tensor: id_to_string에 입력 가능한 형태의 텐서 [B, MAX_SEQUENCE]
-        
+
         References.
             - budzianowski, PyTorch-Beam-Search, https://github.com/budzianowski/PyTorch-Beam-Search-Decoding
             - 312shaun, Pytorch-seq2seq-Beam-Search, https://github.com/312shan/Pytorch-seq2seq-Beam-Search
         """
-        sos_token_id = data_loader.dataset.token_to_id['<SOS>']
-        eos_token_id = data_loader.dataset.token_to_id['<EOS>']
-        pad_token_id = data_loader.dataset.token_to_id['<PAD>']
+        sos_token_id = data_loader.dataset.token_to_id["<SOS>"]
+        eos_token_id = data_loader.dataset.token_to_id["<EOS>"]
+        pad_token_id = data_loader.dataset.token_to_id["<PAD>"]
 
         batch_size = len(input)
-        encoder_output = self.encoder(input) # [B, C, H, W]
+        encoder_output = self.encoder(input)  # [B, C, H, W]
         b, c, h, w = encoder_output.size()
-        src = encoder_output.view(b, c, h*w).transpose(1, 2) # [B, C, HxW] => [B, HxW, C]
-
+        src = encoder_output.view(b, c, h * w).transpose(
+            1, 2
+        )  # [B, C, HxW] => [B, HxW, C]
 
         decoded_batch = []
         with torch.no_grad():
-            hidden = self.get_initialized_hidden_states(batch_size=batch_size) # [B, HIDDEN]x2
+            hidden = self.get_initialized_hidden_states(
+                batch_size=batch_size
+            )  # [B, HIDDEN]x2
 
             # 문장 단위 생성
             for data_idx in range(batch_size):
@@ -386,9 +389,11 @@ class ASTER(nn.Module):
                 nodes = PriorityQueue()
 
                 # 시작 토큰 초기화
-                current_src = src[data_idx, :, :].unsqueeze(0) # [B=1, HxW, C]
-                current_input = torch.LongTensor([sos_token_id]) # [1]
-                current_hidden = [h[data_idx].unsqueeze(0) for h in hidden] # [B=1, HIDDEN]x2
+                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, HxW, C]
+                current_input = torch.LongTensor([sos_token_id])  # [1]
+                current_hidden = [
+                    h[data_idx].unsqueeze(0) for h in hidden
+                ]  # [B=1, HIDDEN]x2
                 node = BeamSearchNode(
                     hidden_state=deepcopy(current_hidden),
                     prev_node=None,
@@ -399,15 +404,15 @@ class ASTER(nn.Module):
                 score = -node.eval()
 
                 # 최대힙: 확률 높은 토큰을 추출하기 위함
-                nodes.put((score, node))  
-                
+                nodes.put((score, node))
+
                 num_steps = 0
                 while True:
-                    if num_steps >= (max_sequence-1)*beam_width:
+                    if num_steps >= (max_sequence - 1) * beam_width:
                         break
 
                     # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
-                    score, n = nodes.get()  
+                    score, n = nodes.get()
                     current_input = n.token_id  # 토큰 ID # [B=1]
                     current_hidden = n.hidden_state  # hidden state
 
@@ -419,14 +424,14 @@ class ASTER(nn.Module):
                         else:
                             continue
 
-                    #------디코딩------
+                    # ------디코딩------
                     # input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
                     input_embedded = self.decoder.embedding(current_input.to(device))
 
                     # Hidden state 갱신
                     current_hidden, alpha = self.decoder.attention_cell(
                         prev_hidden=current_hidden, src=current_src, tgt=input_embedded
-                    ) # hidden state 갱신
+                    )  # hidden state 갱신
                     prob_step = self.decoder.generator(
                         current_hidden[0]
                     )  # [1, VOCAB_SIZE] (num_layers=1) ***앙상블에 필요한 로짓
@@ -444,8 +449,8 @@ class ASTER(nn.Module):
                             hidden_state=deepcopy(current_hidden),
                             prev_node=n,
                             token_id=deepcopy(decoded_t),
-                            log_prob=n.logp+log_p,
-                            length=n.len+1,
+                            log_prob=n.logp + log_p,
+                            length=n.len + 1,
                         )
                         score = -node.eval()
                         next_nodes.append((score, node))
@@ -461,9 +466,7 @@ class ASTER(nn.Module):
                     end_nodes = [nodes.get() for _ in range(topk)]
 
                 utterances = []
-                for score, n in sorted(
-                    end_nodes, key=operator.itemgetter(0)
-                ):  
+                for score, n in sorted(end_nodes, key=operator.itemgetter(0)):
                     utterance = []
                     utterance.append(n.token_id.item())
                     # 가장 마지막 노드에서 역추적
@@ -478,20 +481,19 @@ class ASTER(nn.Module):
                     decoded_batch.append(utterances[0])
                 else:
                     decoded_batch.append(utterances)
-        
+
         # id_to_string의 입력에 맞게 텐서로 변경
         outputs = []
         for decoded_sample in decoded_batch:
             if len(decoded_sample) < max_sequence:
                 num_pads = max_sequence - len(decoded_sample)
-                decoded_sample += [pad_token_id]*num_pads
+                decoded_sample += [pad_token_id] * num_pads
             elif len(decoded_sample) > max_sequence:
                 decoded_sample = decoded_sample[:max_sequence]
             outputs.append(decoded_sample)
         outputs = torch.tensor(outputs)
 
         return outputs
-
 
     def get_initialized_hidden_states(self, batch_size: int):
         # LSTM case

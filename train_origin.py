@@ -22,36 +22,31 @@ from checkpoint import (
     save_checkpoint,
     init_tensorboard,
     write_tensorboard,
-    write_wandb # added
+    write_wandb,  # added
 )
 from flags import Flags
-from utils import (
-    set_seed, 
-    print_system_envs, 
-    get_optimizer, 
-    get_network, 
-    id_to_string
-    )
-from dataset import dataset_loader, START, PAD,load_vocab
+from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
+from dataset import dataset_loader, START, PAD, load_vocab
 from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts
 from criterion import get_criterion
 from metrics import word_error_rate, sentence_acc, final_metric
+
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
 
 def train_one_epoch(
-    data_loader, 
-    model, 
-    epoch_text, 
-    criterion, 
-    optimizer, 
-    lr_scheduler, 
-    teacher_forcing_ratio, 
-    max_grad_norm, 
-    device, 
-    scaler
-    ):
+    data_loader,
+    model,
+    epoch_text,
+    criterion,
+    optimizer,
+    lr_scheduler,
+    teacher_forcing_ratio,
+    max_grad_norm,
+    device,
+    scaler,
+):
     torch.set_grad_enabled(True)
     model.train()
 
@@ -64,14 +59,19 @@ def train_one_epoch(
     sent_acc = 0
     num_sent_acc = 0
 
-    with tqdm(desc=f"{epoch_text} Train", total=len(data_loader.dataset), dynamic_ncols=True, leave=False) as pbar:
+    with tqdm(
+        desc=f"{epoch_text} Train",
+        total=len(data_loader.dataset),
+        dynamic_ncols=True,
+        leave=False,
+    ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
 
-            expected[expected==-1] = data_loader.dataset.token_to_id[PAD]
+            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             with autocast():
                 output = model(input, expected, True, teacher_forcing_ratio)
@@ -82,14 +82,16 @@ def train_one_epoch(
 
                 loss = criterion(decoded_values, expected[:, 1:])
 
-            optim_params = [p for param_group in optimizer.param_groups for p in param_group["params"]]
+            optim_params = [
+                p
+                for param_group in optimizer.param_groups
+                for p in param_group["params"]
+            ]
             optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
 
-            grad_norm = nn.utils.clip_grad_norm_(
-                optim_params, max_norm=max_grad_norm
-            )
+            grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             # cycle
@@ -99,11 +101,11 @@ def train_one_epoch(
             losses.append(loss.item())
 
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader,do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader,do_eval=1)
-            wer += word_error_rate(sequence_str,expected_str)
+            expected_str = id_to_string(expected, data_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
-            sent_acc += sentence_acc(sequence_str,expected_str)
+            sent_acc += sentence_acc(sequence_str, expected_str)
             num_sent_acc += 1
             correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
             total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
@@ -113,20 +115,15 @@ def train_one_epoch(
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
-    # print("-" * 10 + "GT train")
-    # print(*expected[:3], sep="\n")
-    # print("-" * 10 + "PR train")
-    # print(*sequence[:3], sep="\n")
-    # print(f"{lr_scheduler.get_lr()[0]}\n")
 
     result = {
         "loss": np.mean(losses),
         "correct_symbols": correct_symbols,
         "total_symbols": total_symbols,
         "wer": wer,
-        "num_wer":num_wer,
+        "num_wer": num_wer,
         "sent_acc": sent_acc,
-        "num_sent_acc":num_sent_acc
+        "num_sent_acc": num_sent_acc,
     }
 
     try:
@@ -136,14 +133,10 @@ def train_one_epoch(
 
     return result
 
+
 def valid_one_epoch(
-    data_loader, 
-    model, 
-    epoch_text, 
-    criterion, 
-    device, 
-    teacher_forcing_ratio
-    ):
+    data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio
+):
     model.eval()
 
     losses = []
@@ -154,14 +147,19 @@ def valid_one_epoch(
     sent_acc = 0
     num_sent_acc = 0
 
-    with tqdm(desc=f"{epoch_text} Validation", total=len(data_loader.dataset), dynamic_ncols=True, leave=False) as pbar:
+    with tqdm(
+        desc=f"{epoch_text} Validation",
+        total=len(data_loader.dataset),
+        dynamic_ncols=True,
+        leave=False,
+    ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
 
-            expected[expected==-1] = data_loader.dataset.token_to_id[PAD]
+            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
             with autocast():
                 output = model(input, expected, False, teacher_forcing_ratio)
 
@@ -172,13 +170,13 @@ def valid_one_epoch(
                 loss = criterion(decoded_values, expected[:, 1:])
 
             losses.append(loss.item())
-            
+
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader,do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader,do_eval=1)
-            wer += word_error_rate(sequence_str,expected_str)
+            expected_str = id_to_string(expected, data_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
-            sent_acc += sentence_acc(sequence_str,expected_str)
+            sent_acc += sentence_acc(sequence_str, expected_str)
             num_sent_acc += 1
             correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
             total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
@@ -187,21 +185,18 @@ def valid_one_epoch(
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
-    # print("-" * 10 + "GT valid")
-    # print(*expected[:3], sep="\n")
-    # print("-" * 10 + "PR valid")
-    # print(*sequence[:3], sep="\n")
 
     result = {
         "loss": np.mean(losses),
         "correct_symbols": correct_symbols,
         "total_symbols": total_symbols,
         "wer": wer,
-        "num_wer":num_wer,
+        "num_wer": num_wer,
         "sent_acc": sent_acc,
-        "num_sent_acc":num_sent_acc
+        "num_sent_acc": num_sent_acc,
     }
     return result
+
 
 def run_epoch(
     data_loader,
@@ -248,11 +243,11 @@ def run_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             output = model(input, expected, train, teacher_forcing_ratio)
-            
+
             decoded_values = output.transpose(1, 2)
             _, sequence = torch.topk(decoded_values, 1, dim=1)
             sequence = sequence.squeeze(1)
-            
+
             loss = criterion(decoded_values, expected[:, 1:])
 
             if train:
@@ -277,13 +272,13 @@ def run_epoch(
                 wandb.log({"learning_rate": lr_scheduler.get_lr()})
 
             losses.append(loss.item())
-            
+
             expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader,do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader,do_eval=1)
-            wer += word_error_rate(sequence_str,expected_str)
+            expected_str = id_to_string(expected, data_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
-            sent_acc += sentence_acc(sequence_str,expected_str)
+            sent_acc += sentence_acc(sequence_str, expected_str)
             num_sent_acc += 1
             correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
             total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
@@ -302,9 +297,9 @@ def run_epoch(
         "correct_symbols": correct_symbols,
         "total_symbols": total_symbols,
         "wer": wer,
-        "num_wer":num_wer,
+        "num_wer": num_wer,
         "sent_acc": sent_acc,
-        "num_sent_acc":num_sent_acc
+        "num_sent_acc": num_sent_acc,
     }
     if train:
         try:
@@ -314,33 +309,31 @@ def run_epoch(
 
     return result
 
+
 def get_train_transforms(height, width):
-    return A.Compose([
-        A.Resize(height, width),
-        A.Compose([
-            A.HorizontalFlip(p=1),
-            A.VerticalFlip(p=1)
-        ],p=0.5),
-        ToTensorV2(p = 1.0),
-    ],p=1.0)
+    return A.Compose(
+        [
+            A.Resize(height, width),
+            A.Compose([A.HorizontalFlip(p=1), A.VerticalFlip(p=1)], p=0.5),
+            ToTensorV2(p=1.0),
+        ],
+        p=1.0,
+    )
+
 
 def get_valid_transforms(height, width):
-    return A.Compose([
-        A.Resize(height, width),
-        ToTensorV2(p = 1.0)
-        ])
+    return A.Compose([A.Resize(height, width), ToTensorV2(p=1.0)])
+
 
 def main(config_file):
     """
     Train math formula recognition model
     """
     options = Flags(config_file).get()
-    
+
     # set random seed
     set_seed(seed=options.seed)
 
-    
-    
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
@@ -348,7 +341,7 @@ def main(config_file):
     print("Running {} on device {}\n".format(options.network, device))
 
     # Print system environments
-    print_system_envs() 
+    print_system_envs()
 
     # Load checkpoint and print result
     checkpoint = (
@@ -362,8 +355,12 @@ def main(config_file):
         print(
             "[+] Checkpoint\n",
             "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
-            "Train Symbol Accuracy : {:.5f}\n".format(checkpoint["train_symbol_accuracy"][-1]),
-            "Train Sentence Accuracy : {:.5f}\n".format(checkpoint["train_sentence_accuracy"][-1]),
+            "Train Symbol Accuracy : {:.5f}\n".format(
+                checkpoint["train_symbol_accuracy"][-1]
+            ),
+            "Train Sentence Accuracy : {:.5f}\n".format(
+                checkpoint["train_sentence_accuracy"][-1]
+            ),
             "Train WER : {:.5f}\n".format(checkpoint["train_wer"][-1]),
             "Train Loss : {:.5f}\n".format(checkpoint["train_losses"][-1]),
             "Validation Symbol Accuracy : {:.5f}\n".format(
@@ -372,24 +369,24 @@ def main(config_file):
             "Validation Sentence Accuracy : {:.5f}\n".format(
                 checkpoint["validation_sentence_accuracy"][-1]
             ),
-            "Validation WER : {:.5f}\n".format(
-                checkpoint["validation_wer"][-1]
-            ),
+            "Validation WER : {:.5f}\n".format(checkpoint["validation_wer"][-1]),
             "Validation Loss : {:.5f}\n".format(checkpoint["validation_losses"][-1]),
         )
 
-    # Get data
-    # transformed = transforms.Compose(
-    #     [
-    #         # Resize so all images have the same size
-    #         transforms.Resize((options.input_size.height, options.input_size.width)),
-    #         transforms.ToTensor(),
-    #     ]
-    # )
-
-
-    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, train_transform=get_train_transforms(options.input_size.height, options.input_size.width), valid_transform=get_valid_transforms(options.input_size.height, options.input_size.width))
-    # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed, transformed)
+    (
+        train_data_loader,
+        validation_data_loader,
+        train_dataset,
+        valid_dataset,
+    ) = dataset_loader(
+        options,
+        train_transform=get_train_transforms(
+            options.input_size.height, options.input_size.width
+        ),
+        valid_transform=get_valid_transforms(
+            options.input_size.height, options.input_size.width
+        ),
+    )
     print(
         "[+] Data\n",
         "The number of train samples : {}\n".format(len(train_dataset)),
@@ -441,7 +438,14 @@ def main(config_file):
         optimizer_state = checkpoint.get("optimizer")
         if optimizer_state:
             optimizer.load_state_dict(optimizer_state)
-        lr_scheduler = CustomCosineAnnealingWarmUpRestarts(optimizer, T_0=options.num_epochs, T_mult=1, eta_max=options.optimizer.lr, T_up=2, gamma=1.)
+        lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
+            optimizer,
+            T_0=options.num_epochs,
+            T_mult=1,
+            eta_max=options.optimizer.lr,
+            T_up=2,
+            gamma=1.0,
+        )
     else:
         optimizer = get_optimizer(
             options.optimizer.optimizer,
@@ -453,9 +457,15 @@ def main(config_file):
         if optimizer_state:
             optimizer.load_state_dict(optimizer_state)
         if options.scheduler.scheduler == "ReduceLROnPlateau":
-            lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=options.schduler.patience)
+            lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, patience=options.schduler.patience
+            )
         elif options.scheduler.scheduler == "StepLR":
-            lr_scheduler = lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=options.optimizer.lr_epochs, gamma=options.optimizer.lr_factor)
+            lr_scheduler = lr_scheduler = optim.lr_scheduler.StepLR(
+                optimizer,
+                step_size=options.optimizer.lr_epochs,
+                gamma=options.optimizer.lr_factor,
+            )
         elif options.scheduler.scheduler == "Cycle":
             for param_group in optimizer.param_groups:
                 param_group["initial_lr"] = options.optimizer.lr
@@ -464,9 +474,8 @@ def main(config_file):
                 optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
 
-
     # Log for W&B
-    wandb.config.update(dict(options._asdict())) # logging to W&B
+    wandb.config.update(dict(options._asdict()))  # logging to W&B
 
     # Log for tensorboard
     if not os.path.exists(options.prefix):
@@ -483,7 +492,7 @@ def main(config_file):
     train_losses = checkpoint["train_losses"]
     validation_symbol_accuracy = checkpoint["validation_symbol_accuracy"]
     validation_sentence_accuracy = checkpoint["validation_sentence_accuracy"]
-    validation_wer=checkpoint["validation_wer"]
+    validation_wer = checkpoint["validation_wer"]
     validation_losses = checkpoint["validation_losses"]
     learning_rates = checkpoint["lr"]
     grad_norms = checkpoint["grad_norm"]
@@ -517,7 +526,18 @@ def main(config_file):
         #     train=True,
         # )
 
-        train_result = train_one_epoch(train_data_loader, model, epoch_text, criterion, optimizer, lr_scheduler, options.teacher_forcing_ratio, options.max_grad_norm, device, scaler)
+        train_result = train_one_epoch(
+            train_data_loader,
+            model,
+            epoch_text,
+            criterion,
+            optimizer,
+            lr_scheduler,
+            options.teacher_forcing_ratio,
+            options.max_grad_norm,
+            device,
+            scaler,
+        )
 
         train_losses.append(train_result["loss"])
         grad_norms.append(train_result["grad_norm"])
@@ -526,16 +546,16 @@ def main(config_file):
         )
         train_symbol_accuracy.append(train_epoch_symbol_accuracy)
         train_epoch_sentence_accuracy = (
-                train_result["sent_acc"] / train_result["num_sent_acc"]
+            train_result["sent_acc"] / train_result["num_sent_acc"]
         )
 
         train_sentence_accuracy.append(train_epoch_sentence_accuracy)
-        train_epoch_wer = (
-                train_result["wer"] / train_result["num_wer"]
-        )
+        train_epoch_wer = train_result["wer"] / train_result["num_wer"]
         train_wer.append(train_epoch_wer)
         ### 추가추가
-        train_epoch_score = final_metric(sentence_acc=train_epoch_sentence_accuracy, word_error_rate=train_epoch_wer)
+        train_epoch_score = final_metric(
+            sentence_acc=train_epoch_sentence_accuracy, word_error_rate=train_epoch_wer
+        )
         epoch_lr = lr_scheduler.get_lr()  # cycle
 
         # Validation
@@ -552,7 +572,14 @@ def main(config_file):
         #     train=False,
         # )
 
-        validation_result = valid_one_epoch(validation_data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio=options.teacher_forcing_ratio)
+        validation_result = valid_one_epoch(
+            validation_data_loader,
+            model,
+            epoch_text,
+            criterion,
+            device,
+            teacher_forcing_ratio=options.teacher_forcing_ratio,
+        )
 
         validation_losses.append(validation_result["loss"])
         validation_epoch_symbol_accuracy = (
@@ -564,41 +591,46 @@ def main(config_file):
             validation_result["sent_acc"] / validation_result["num_sent_acc"]
         )
         validation_sentence_accuracy.append(validation_epoch_sentence_accuracy)
-        validation_epoch_wer = (
-                validation_result["wer"] / validation_result["num_wer"]
-        )
+        validation_epoch_wer = validation_result["wer"] / validation_result["num_wer"]
         validation_wer.append(validation_epoch_wer)
         # 추가추가
-        validation_epoch_score = final_metric(sentence_acc=validation_epoch_sentence_accuracy, word_error_rate=validation_epoch_wer)
+        validation_epoch_score = final_metric(
+            sentence_acc=validation_epoch_sentence_accuracy,
+            word_error_rate=validation_epoch_wer,
+        )
 
         # Save checkpoint
         # make config
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             option_dict = yaml.safe_load(f)
-        if best_sentence_acc < 0.9*validation_epoch_sentence_accuracy + 0.1*(1-validation_epoch_wer):
+        if best_sentence_acc < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+            1 - validation_epoch_wer
+        ):
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
                     "train_losses": train_losses,
                     "train_symbol_accuracy": train_symbol_accuracy,
                     "train_sentence_accuracy": train_sentence_accuracy,
-                    "train_wer":train_wer,
+                    "train_wer": train_wer,
                     "validation_losses": validation_losses,
                     "validation_symbol_accuracy": validation_symbol_accuracy,
-                    "validation_sentence_accuracy":validation_sentence_accuracy,
-                    "validation_wer":validation_wer,
+                    "validation_sentence_accuracy": validation_sentence_accuracy,
+                    "validation_wer": validation_wer,
                     "lr": epoch_lr,
                     "grad_norm": grad_norms,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "configs": option_dict,
-                    "token_to_id":train_data_loader.dataset.token_to_id,
-                    "id_to_token":train_data_loader.dataset.id_to_token,
-                    "network": options.network
+                    "token_to_id": train_data_loader.dataset.token_to_id,
+                    "id_to_token": train_data_loader.dataset.id_to_token,
+                    "network": options.network,
                 },
                 prefix=options.prefix,
             )
-            best_sentence_acc = 0.9*validation_epoch_sentence_accuracy + 0.1*(1-validation_epoch_wer)
+            best_sentence_acc = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
+                1 - validation_epoch_wer
+            )
             print(f"best sentence acc: {best_sentence_acc}")
             print("model is saved")
 
@@ -636,7 +668,7 @@ def main(config_file):
 
             write_tensorboard(
                 writer=writer,
-                epoch=start_epoch+epoch +1,
+                epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
                 train_loss=train_result["loss"],
                 train_symbol_accuracy=train_epoch_symbol_accuracy,
@@ -646,10 +678,10 @@ def main(config_file):
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                model=model
+                model=model,
             )
             write_wandb(
-                epoch=start_epoch+epoch +1,
+                epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
                 train_loss=train_result["loss"],
                 train_symbol_accuracy=train_epoch_symbol_accuracy,
@@ -660,21 +692,20 @@ def main(config_file):
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                validation_score=validation_epoch_sentence_accuracy*0.9 + ((1-validation_epoch_wer)*0.1)
+                validation_score=validation_epoch_sentence_accuracy * 0.9
+                + ((1 - validation_epoch_wer) * 0.1),
             )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--project_name',
-        default='SATRN',
-        help='W&B에 표시될 프로젝트명. 모델명으로 통일!'
+        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
-        '--exp_name',
-        default='baseline-resume-ep21-iloveslowfood',
-        help='실험명(SATRN-베이스라인, SARTN-Loss변경 등)'
+        "--exp_name",
+        default="baseline-resume-ep21-iloveslowfood",
+        help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
@@ -694,5 +725,3 @@ if __name__ == "__main__":
 
     # fishe W&B
     run.finish()
-
-    

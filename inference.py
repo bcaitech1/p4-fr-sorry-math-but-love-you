@@ -22,7 +22,7 @@ def main(parser):
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
     set_seed(options.seed)
-    
+
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
@@ -37,7 +37,7 @@ def main(parser):
     print(options.input_size.height)
 
     # transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
-    transformed = A.Compose([A.Resize(256, 512, p=1.), ToTensorV2()])
+    transformed = A.Compose([A.Resize(256, 512, p=1.0), ToTensorV2()])
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
@@ -47,8 +47,12 @@ def main(parser):
         data = list(reader)
     test_data = [[os.path.join(root, x[0]), x[0], dummy_gt] for x in data]
     test_dataset = LoadEvalDataset(
-        test_data, checkpoint["token_to_id"], checkpoint["id_to_token"], crop=False, transform=transformed,
-        rgb=options.data.rgb
+        test_data,
+        checkpoint["token_to_id"],
+        checkpoint["id_to_token"],
+        crop=False,
+        transform=transformed,
+        rgb=options.data.rgb,
     )
     test_data_loader = DataLoader(
         test_dataset,
@@ -78,15 +82,15 @@ def main(parser):
             input = d["image"].float().to(device)
             expected = d["truth"]["encoded"].to(device)
             sequence = decode(
-                    model=model, 
-                    input=input, 
-                    data_loader=test_data_loader, 
-                    expected=expected,
-                    method=parser.decode_type, 
-                    beam_width=parser.beam_width
-                    )
+                model=model,
+                input=input,
+                data_loader=test_data_loader,
+                expected=expected,
+                method=parser.decode_type,
+                beam_width=parser.beam_width,
+            )
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
-            
+
             for path, predicted in zip(d["file_path"], sequence_str):
                 results.append((path, predicted))
 
@@ -122,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default='greedy', # 'greedy'로 설정하면 기존과 동일하게 inference
+        default="greedy",  # 'greedy'로 설정하면 기존과 동일하게 inference
         type=str,
         help="디코딩 방식 설정. 'greedy', 'beam'",
     )
@@ -134,8 +138,8 @@ if __name__ == "__main__":
         help="빔서치 사용 시 스텝별 후보 수 설정",
     )
 
-    eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
-    file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
+    eval_dir = os.environ.get("SM_CHANNEL_EVAL", "/opt/ml/input/data/")
+    file_path = os.path.join(eval_dir, "eval_dataset/input.txt")
     parser.add_argument(
         "--file_path",
         dest="file_path",
@@ -144,7 +148,7 @@ if __name__ == "__main__":
         help="file path when doing inference",
     )
 
-    output_dir = os.environ.get('SM_OUTPUT_DATA_DIR', 'submit')
+    output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "submit")
     parser.add_argument(
         "--output_dir",
         dest="output_dir",

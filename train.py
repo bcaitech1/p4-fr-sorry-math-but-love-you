@@ -21,13 +21,17 @@ from checkpoint import (
     save_checkpoint,
     init_tensorboard,
     write_tensorboard,
-    write_wandb
+    write_wandb,
 )
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
+from scheduler import (
+    CircularLRBeta,
+    CustomCosineAnnealingWarmUpRestarts,
+    TeacherForcingScheduler,
+)
 from metrics import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
@@ -41,15 +45,15 @@ def train_one_epoch(
     criterion,
     # optimizer,
     # lr_scheduler,
-    enc_optimizer, # NOTE
-    dec_optimizer, # NOTE
-    enc_lr_scheduler, # NOTE
-    dec_lr_scheduler, # NOTE
+    enc_optimizer,  # NOTE
+    dec_optimizer,  # NOTE
+    enc_lr_scheduler,  # NOTE
+    dec_lr_scheduler,  # NOTE
     teacher_forcing_ratio,
     max_grad_norm,
     device,
     scaler,
-    tf_scheduler # NOTE. Teacher Forcing Scheduler
+    tf_scheduler,  # NOTE. Teacher Forcing Scheduler
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -71,7 +75,7 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
-            tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
+            tf_ratio = tf_scheduler.step()  # NOTE. Teacher Forcing Scheduler
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
@@ -79,14 +83,16 @@ def train_one_epoch(
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
-            output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
-#             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            output = model(
+                input, expected, True, tf_ratio
+            )  # NOTE. Teacher Forcing Scheduler
+            #             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
 
-            decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-            _, sequence = torch.topk(decoded_values, k=1, dim=1) # [B, 1, MAX_LEN]
-            sequence = sequence.squeeze(1) # [B, MAX_LEN], Metric 측정을 위해
+            decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
+            _, sequence = torch.topk(decoded_values, k=1, dim=1)  # [B, 1, MAX_LEN]
+            sequence = sequence.squeeze(1)  # [B, MAX_LEN], Metric 측정을 위해
 
-            loss = criterion(decoded_values, expected[:, 1:]) # [SOS] 이후부터
+            loss = criterion(decoded_values, expected[:, 1:])  # [SOS] 이후부터
 
             # NOTE
             enc_optim_params = [
@@ -105,8 +111,12 @@ def train_one_epoch(
             dec_optimizer.zero_grad()
             loss.backward()
 
-            enc_grad_norm = nn.utils.clip_grad_norm_(enc_optim_params, max_norm=max_grad_norm)
-            dec_grad_norm = nn.utils.clip_grad_norm_(dec_optim_params, max_norm=max_grad_norm)
+            enc_grad_norm = nn.utils.clip_grad_norm_(
+                enc_optim_params, max_norm=max_grad_norm
+            )
+            dec_grad_norm = nn.utils.clip_grad_norm_(
+                dec_optim_params, max_norm=max_grad_norm
+            )
 
             grad_norms.append(enc_grad_norm)
             grad_norms.append(dec_grad_norm)
@@ -130,13 +140,17 @@ def train_one_epoch(
             enc_lr_scheduler.step()
             dec_lr_scheduler.step()
 
-            wandb.log({
-                "enc_lr": enc_lr_scheduler.get_lr()[0],
-                "dec_lr": dec_lr_scheduler.get_last_lr()[0], # NOTE just for get_constant_schedule_with_warmup
-                # "enc_lr": enc_lr_scheduler.get_lr()[0],
-                # "dec_lr": dec_lr_scheduler.get_lr()[0],
-                'tf_ratio': tf_ratio
-                })
+            wandb.log(
+                {
+                    "enc_lr": enc_lr_scheduler.get_lr()[0],
+                    "dec_lr": dec_lr_scheduler.get_last_lr()[
+                        0
+                    ],  # NOTE just for get_constant_schedule_with_warmup
+                    # "enc_lr": enc_lr_scheduler.get_lr()[0],
+                    # "dec_lr": dec_lr_scheduler.get_lr()[0],
+                    "tf_ratio": tf_ratio,
+                }
+            )
 
             # optim_params = [
             #     p
@@ -238,9 +252,11 @@ def valid_one_epoch(
                 # with autocast():
                 output = model(input, expected, False, teacher_forcing_ratio)
 
-                decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-                _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-                sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+                decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
+                _, sequence = torch.topk(
+                    decoded_values, 1, dim=1
+                )  # sequence: [B, 1, MAX_LEN]
+                sequence = sequence.squeeze(1)  # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
                 loss = criterion(decoded_values, expected[:, 1:])
 
@@ -253,7 +269,9 @@ def valid_one_epoch(
                 num_wer += 1
                 sent_acc += sentence_acc(sequence_str, expected_str)
                 num_sent_acc += 1
-                correct_symbols += torch.sum(sequence == expected[:, 1:], dim=(0, 1)).item()
+                correct_symbols += torch.sum(
+                    sequence == expected[:, 1:], dim=(0, 1)
+                ).item()
                 total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
                 pbar.update(curr_batch_size)
@@ -272,12 +290,19 @@ def valid_one_epoch(
     }
     return result
 
+
 def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
             A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
-            A.GridDistortion(p=0.5, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
+            A.GridDistortion(
+                p=0.5,
+                num_steps=8,
+                distort_limit=(-0.5, 0.5),
+                interpolation=0,
+                border_mode=0,
+            ),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ToTensorV2(p=1.0),
         ],
@@ -286,11 +311,13 @@ def get_train_transforms(height, width):
 
 
 def get_valid_transforms(height, width):
-    return A.Compose([
-        A.Resize(height, width), 
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(p=1.0)]
-        )
+    return A.Compose(
+        [
+            A.Resize(height, width),
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(p=1.0),
+        ]
+    )
 
 
 def main(config_file):
@@ -387,10 +414,14 @@ def main(config_file):
     # NOTE: Transformer params of MySATRN
     dec_params_to_optimise = []
     dec_params_to_optimise += [
-        param for param in model.encoder.positional_encoding.parameters() if param.requires_grad
+        param
+        for param in model.encoder.positional_encoding.parameters()
+        if param.requires_grad
     ]
     dec_params_to_optimise += [
-        param for param in model.encoder.attention_layers.parameters() if param.requires_grad
+        param
+        for param in model.encoder.attention_layers.parameters()
+        if param.requires_grad
     ]
     dec_params_to_optimise += [
         param for param in model.decoder.parameters() if param.requires_grad
@@ -407,19 +438,25 @@ def main(config_file):
             sum(p.numel() for p in dec_params_to_optimise),
         ),
     )
-    
+
     from torch import optim
     from transformers import get_constant_schedule_with_warmup
-    enc_lr = 1e-4 # NOTE: CNN params of MySATRN
-    dec_lr = 5e-4 # NOTE: Transformer params of MySATRN
 
-    total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-    t_0 = total_steps // 1 # 주기를 3으로 설정
-    enc_t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
-    dec_t_up = int(t_0*0.1)
+    enc_lr = 4e-4  # NOTE: CNN params of MySATRN
+    dec_lr = 5e-4  # NOTE: Transformer params of MySATRN
+
+    total_steps = len(train_data_loader) * options.num_epochs  # 전체 스텝 수
+    t_0 = total_steps // 1  # 주기를 3으로 설정
+    enc_t_up = int(t_0 * 0.1)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
+    dec_t_up = int(t_0 * 0.1)
 
     enc_optimizer = optim.Adam(enc_params_to_optimise, lr=0)
     dec_optimizer = optim.Adam(dec_params_to_optimise, lr=dec_lr)
+
+    enc_optimizer_state = checkpoint.get("enc_optimizer")
+    dec_optimizer_state = checkpoint.get("dec_optimizer")
+    enc_optimizer.load_state_dict(enc_optimizer_state)
+    dec_optimizer.load_state_dict(dec_optimizer_state)
 
     enc_lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
         enc_optimizer,
@@ -431,10 +468,11 @@ def main(config_file):
     )
 
     dec_lr_scheduler = get_constant_schedule_with_warmup(
-        optimizer=dec_optimizer,
-        num_warmup_steps=dec_t_up
+        optimizer=dec_optimizer, num_warmup_steps=dec_t_up
     )
 
+    enc_lr_scheduler.load_state_dict(checkpoint["enc_scheduler"])
+    dec_lr_scheduler.load_state_dict(checkpoint["dec_scheduler"])
 
     # dec_lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
     #     dec_optimizer,
@@ -447,10 +485,10 @@ def main(config_file):
 
     # NOTE. Teacher Forcing Scheduler
     tf_scheduler = TeacherForcingScheduler(
-        num_steps=total_steps, 
-        tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
-        tf_min=0.4
-    ) 
+        num_steps=total_steps,
+        tf_max=options.teacher_forcing_ratio,  # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
+        tf_min=0.4,
+    )
 
     # # Get optimizer and optimizer
     # if options.scheduler.scheduler == "CustomCosine":
@@ -483,13 +521,13 @@ def main(config_file):
     #         T_up=t_up,
     #         gamma=0.8,
     #     )
-        
+
     #     # NOTE. Teacher Forcing Scheduler
     #     tf_scheduler = TeacherForcingScheduler(
-    #         num_steps=total_steps, 
+    #         num_steps=total_steps,
     #         tf_max=options.teacher_forcing_ratio, # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
     #         tf_min=0.4
-    #     ) 
+    #     )
 
     # else:
     #     optimizer = get_optimizer(
@@ -573,7 +611,7 @@ def main(config_file):
             max_grad_norm=options.max_grad_norm,
             device=device,
             scaler=scaler,
-            tf_scheduler=tf_scheduler
+            tf_scheduler=tf_scheduler,
         )
 
         # train_result = train_one_epoch(
@@ -762,7 +800,7 @@ def main(config_file):
                 validation_symbol_accuracy=validation_epoch_symbol_accuracy,
                 validation_sentence_accuracy=validation_epoch_sentence_accuracy,
                 validation_wer=validation_epoch_wer,
-                validation_score=validation_epoch_score
+                validation_score=validation_epoch_score,
             )
 
 
@@ -773,7 +811,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="TF-Arctan(1.0>0.4) & Dual Opt & SSR>GD>Norm & Fold0",
+        default="TF-Arctan(1.0>0.4 & (-5, 4)) & SSR>GD>Norm & Dual Opt(enc4e-4) & Fold0",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
