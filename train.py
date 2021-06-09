@@ -29,15 +29,17 @@ from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
 from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
-from metrics import word_error_rate, sentence_acc, final_metric
+from scheduler_ import CircularLRBeta, CustomCosineAnnealingWarmUpRestarts, TeacherForcingScheduler
+from metrics_ import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
 
 def train_one_epoch(
-    data_loader,
+    # data_loader,
+    print_loader,
+    hand_loader,
     model,
     epoch_text,
     criterion,
@@ -63,18 +65,21 @@ def train_one_epoch(
     
     with tqdm(
         desc=f"{epoch_text} Train",
-        total=len(data_loader.dataset),
+        total=min(len(print_loader.dataset), len(hand_loader.dataset))
         dynamic_ncols=True,
         leave=False,
     ) as pbar:
-        for d in data_loader:
-            input = d["image"].to(device).float()
+        for pd, hd in zip(print_loader, hand_loader):
+            input = torch.cat([pd["image"], hd["image"]], dim=0).to(device).float()
+            # input = d["image"].to(device).float()
             tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
 
             curr_batch_size = len(input)
-            expected = d["truth"]["encoded"].to(device)
+            expected = torch.cat([pd["truth"]["encoded"], hd["truth"]["encoded"]], dim=0).to(device)
+            # expected = d["truth"]["encoded"].to(device)
 
-            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
+            expected[expected == -1] = print_loader.dataset.token_to_id[PAD]
+            # expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
             output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
@@ -105,9 +110,12 @@ def train_one_epoch(
             optimizer.step()
             losses.append(loss.item())
 
-            expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader, do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            expected[expected == print_loader.dataset.token_to_id[PAD]] = -1
+            expected_str = id_to_string(expected, print_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, print_loader, do_eval=1)
+            # expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
+            # expected_str = id_to_string(expected, data_loader, do_eval=1)
+            # sequence_str = id_to_string(sequence, data_loader, do_eval=1)
             wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
             sent_acc += sentence_acc(sequence_str, expected_str)
@@ -131,8 +139,11 @@ def train_one_epoch(
                         'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
                         })
 
-    expected = id_to_string(expected, data_loader)
-    sequence = id_to_string(sequence, data_loader)
+    expected = id_to_string(expected, print_loader)
+    sequence = id_to_string(sequence, print_loader)
+
+    # expected = id_to_string(expected, data_loader)
+    # sequence = id_to_string(sequence, data_loader)
 
     result = {
         "loss": np.mean(losses),
@@ -218,8 +229,8 @@ def valid_one_epoch(
 def get_train_transforms(height, width):
     return A.Compose([
         A.Resize(height, width),
-        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.2),
-        A.GridDistortion(p=0.2, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
+        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.3),
+        A.GridDistortion(p=0.3, num_steps=8, distort_limit=(-0.5, 0.5), interpolation=0, border_mode=0),
         A.Normalize(),
         ToTensorV2(p = 1.0),
     ],p=1.0)
@@ -291,15 +302,17 @@ def main(config_file):
     # )
 
 
-    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, 
+    train_print_loader, train_hand_loader, validation_data_loader, train_print_dataset, train_hand_dataset, valid_dataset = dataset_loader(options, 
     train_transform=get_train_transforms(options.input_size.height, options.input_size.width), 
     valid_transform=get_valid_transforms(options.input_size.height, options.input_size.width))
     # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed)
     print(
         "[+] Data\n",
-        "The number of train samples : {}\n".format(len(train_dataset)),
+        # "The number of train samples : {}\n".format(len(train_dataset)),
+        "The number of print train samples: {}\n".format(len(train_print_dataset)),
+        "The number of hand train samples: {}\n".format(len(train_hand_dataset)),
         "The number of validation samples : {}\n".format(len(valid_dataset)),
-        "The number of classes : {}\n".format(len(train_dataset.token_to_id)),
+        "The number of classes : {}\n".format(len(train_print_dataset.token_to_id)),
     )
 
     # define model
@@ -308,7 +321,7 @@ def main(config_file):
         options,
         model_checkpoint,
         device,
-        train_dataset,
+        train_print_dataset,
     )
     model.train()
 
@@ -448,7 +461,9 @@ def main(config_file):
 
 
         train_result = train_one_epoch(
-            train_data_loader,
+            # train_data_loader,
+            train_print_loader,
+            train_hand_loader,
             model,
             epoch_text,
             criterion,
@@ -613,14 +628,14 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="effv2-s & TF-Arcta(0.7>0.3) & SSR(0.2)>GD(0.2)>Norm & Fold4",
+        default="TF-Arcta(0.8>0.3 & (-5,5)) & SSR(0.3)>GD(0.3)>Norm & decoder 256_1024 & Fold0",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="/opt/ml/p4-fr-sorry-math-but-love-you/configs/My_SATRN.yaml",
+        default="/opt/ml/sorry_math_but_love_you/configs/My_SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )

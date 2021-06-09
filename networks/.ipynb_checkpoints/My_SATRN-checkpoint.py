@@ -331,8 +331,6 @@ class SATRNEncoder(nn.Module):
 
         # self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
         self.shallow_cnn = EfficientNet(input_channel, hidden_size)
-        # self.effnet = EfficientNet(input_channel, hidden_size)
-        # self.nfnet = NFNet(input_channel, hidden_size)
         self.positional_encoding = PositionalEncoding(hidden_size, 
                                                     h=input_height//32, 
                                                     w=input_width//32, 
@@ -349,11 +347,6 @@ class SATRNEncoder(nn.Module):
     def forward(self, x):
         # x - [b, c, h, w]
         out = self.shallow_cnn(x)  # [b, c, h//32, w//32]
-        # eff_out = self.effnet(x) # [b, c, h//32, w//32]
-        # nf_out = self.nfnet(x) # [b, c, h//32, w//32]
-        # out = eff_out + nf_out
-
-        # out = self.effnet(x)
         out = self.positional_encoding(out)  # [b, c, h//32, w//32]
 
         for layer in self.attention_layers:

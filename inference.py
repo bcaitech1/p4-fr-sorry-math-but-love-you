@@ -17,6 +17,25 @@ from utils import id_to_string, get_network, get_optimizer, set_seed
 from decoding import decode
 
 
+def get_test_transform(height, width):
+    return A.Compose([
+        A.Resize(height, width, p=1.),
+        A.Normalize(),
+        ToTensorV2(),
+    ])
+
+def ensemble(models, input_images, expected):
+    decoded_values = None
+    for model in models:
+        output = model(input_images, expected, False, 0.0)
+        if decoded_values is None:
+            decoded_values = output.transpose(1, 2)
+        else:
+            decoded_values += output.transpose(1, 2)
+    decoded_values /= len(models)
+
+    return decoded_values
+
 def main(parser):
     torch.manual_seed(21)
     random.seed(21)
@@ -28,11 +47,8 @@ def main(parser):
     device = torch.device(hardware)
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
-
-    transformed = A.Compose([
-        A.Resize(256, 512, p=1.),
-        ToTensorV2(),
-    ])
+    
+    transformed = get_test_transform(256, 512)
     
     token_to_id_ = load_checkpoint(parser.checkpoint[0], cuda=is_cuda)['token_to_id']
     id_to_token_ = load_checkpoint(parser.checkpoint[0], cuda=is_cuda)['id_to_token']
@@ -54,7 +70,7 @@ def main(parser):
         collate_fn=collate_eval_batch,
     )
 
-    models = []
+    SATRN_models = []
 
     for parser_checkpoint in parser.checkpoint:
         checkpoint = load_checkpoint(parser_checkpoint, cuda=is_cuda)
@@ -62,7 +78,7 @@ def main(parser):
         model_checkpoint = checkpoint["model"]
         model = get_network(options.network, options, model_checkpoint, device, test_dataset)
         model.eval()
-        models.append(model)
+        SATRN_models.append(model)
     
     print("--------------------------------")
     print("Running {} on device {}\n".format(options.network, device))
@@ -72,14 +88,8 @@ def main(parser):
         for d in tqdm(test_data_loader):
             input = d["image"].to(device).float()
             expected = d["truth"]["encoded"].to(device)
-            decoded_values = None
-            for model in models:
-                output = model(input, expected, False, 0.0)
-                if decoded_values is None:
-                    decoded_values = output.transpose(1, 2)
-                else:
-                    decoded_values += ouput.transpose(1, 2)
-            decoded_values /= len(models)
+
+            decoded_values = ensemble(SATRN_models, input, expected)
             _, sequence = torch.topk(decoded_values, 1, dim=1)
             sequence = sequence.squeeze(1)
             sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
@@ -97,7 +107,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default=["/opt/ml/code/log/my_satrn/checkpoints/MySATRN_best_model.pth"],
+        default=["/opt/ml/sorry_math_but_love_you/log/my_satrn/MySATRN_fold2.pth",
+                "/opt/ml/sorry_math_but_love_you/log/my_satrn/MySATRN_fold3_7945.pth",
+                "/opt/ml/sorry_math_but_love_you/log/my_satrn/MySATRN_fold4.pth"],
         nargs='*',
         help="Path of checkpoint file",
     )
@@ -111,7 +123,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=128,
+        default=4,
         type=int,
         help="batch size when doing inference",
     )

@@ -26,7 +26,7 @@ default_checkpoint = {
 }
 
 
-def save_checkpoint(checkpoint, dir="./checkpoints", prefix=""):
+def save_checkpoint(checkpoint, dir="./", prefix=""):
     filename = f"{checkpoint['network']}_best_model.pth"
     if not os.path.exists(os.path.join(prefix, dir)):
         os.makedirs(os.path.join(prefix, dir))
