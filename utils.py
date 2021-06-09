@@ -9,6 +9,7 @@ from networks.Attention import Attention
 from networks.SATRN import SATRN
 from networks.SWIN import SWIN
 from networks.My_SATRN import MySATRN
+from networks.ASTER import ASTER
 
 import warnings
 
@@ -30,6 +31,8 @@ def get_network(
         model.encoder.load_state_dict(checkpoint['model'], strict=False)
     elif model_type == "MySATRN":
         model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
+    elif model_type == 'ASTER':
+        model = ASTER(FLAGS, train_dataset, model_checkpoint).to(device)
     else:
         raise NotImplementedError
 

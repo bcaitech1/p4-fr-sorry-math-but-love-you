@@ -609,7 +609,7 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="Swin", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
@@ -620,7 +620,7 @@ if __name__ == "__main__":
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/My_SATRN.yaml",
+        default="./configs/SWIN.yaml",
         type=str,
         help="Path of configuration file",
     )
