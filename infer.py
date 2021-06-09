@@ -9,11 +9,8 @@ from torch.utils.data import DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-###########
 import numpy as np
 import pandas as pd
-
-##########
 
 from metrics import word_error_rate, sentence_acc
 from checkpoint import load_checkpoint

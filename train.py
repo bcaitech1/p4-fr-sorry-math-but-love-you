@@ -292,12 +292,13 @@ def valid_one_epoch(
 
 
 def get_train_transforms(height, width):
+    aug_prob = 0.3
     return A.Compose(
         [
             A.Resize(height, width),
-            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=aug_prob),
             A.GridDistortion(
-                p=0.5,
+                p=aug_prob,
                 num_steps=8,
                 distort_limit=(-0.5, 0.5),
                 interpolation=0,
@@ -442,7 +443,7 @@ def main(config_file):
     from torch import optim
     from transformers import get_constant_schedule_with_warmup
 
-    enc_lr = 4e-4  # NOTE: CNN params of MySATRN
+    enc_lr = 5e-4  # NOTE: CNN params of MySATRN
     dec_lr = 5e-4  # NOTE: Transformer params of MySATRN
 
     total_steps = len(train_data_loader) * options.num_epochs  # 전체 스텝 수
@@ -450,13 +451,13 @@ def main(config_file):
     enc_t_up = int(t_0 * 0.1)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
     dec_t_up = int(t_0 * 0.1)
 
-    enc_optimizer = optim.Adam(enc_params_to_optimise, lr=0)
-    dec_optimizer = optim.Adam(dec_params_to_optimise, lr=dec_lr)
+    enc_optimizer = optim.AdamW(enc_params_to_optimise, lr=0)
+    dec_optimizer = optim.AdamW(dec_params_to_optimise, lr=dec_lr)
 
-    enc_optimizer_state = checkpoint.get("enc_optimizer")
-    dec_optimizer_state = checkpoint.get("dec_optimizer")
-    enc_optimizer.load_state_dict(enc_optimizer_state)
-    dec_optimizer.load_state_dict(dec_optimizer_state)
+    # enc_optimizer_state = checkpoint.get("enc_optimizer")
+    # dec_optimizer_state = checkpoint.get("dec_optimizer")
+    # enc_optimizer.load_state_dict(enc_optimizer_state)
+    # dec_optimizer.load_state_dict(dec_optimizer_state)
 
     enc_lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
         enc_optimizer,
@@ -471,8 +472,8 @@ def main(config_file):
         optimizer=dec_optimizer, num_warmup_steps=dec_t_up
     )
 
-    enc_lr_scheduler.load_state_dict(checkpoint["enc_scheduler"])
-    dec_lr_scheduler.load_state_dict(checkpoint["dec_scheduler"])
+    # enc_lr_scheduler.load_state_dict(checkpoint["enc_scheduler"])
+    # dec_lr_scheduler.load_state_dict(checkpoint["dec_scheduler"])
 
     # dec_lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
     #     dec_optimizer,
@@ -708,7 +709,6 @@ def main(config_file):
                     # "scheduler": lr_scheduler.state_dict(),
                 },
                 prefix=options.prefix,
-                # prefix=prefix,
             )
 
             # prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
@@ -811,7 +811,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="TF-Arctan(1.0>0.4 & (-5, 4)) & SSR>GD>Norm & Dual Opt(enc4e-4) & Fold0",
+        default="TF(8>3&(-5,5)) & SSR(.3)>GD(.3)>Norm & Dual Opt & Dec(256_1024) & Fold0",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

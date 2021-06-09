@@ -36,8 +36,8 @@ def main(parser):
         )
     print(options.input_size.height)
 
-    # transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
-    transformed = A.Compose([A.Resize(256, 512, p=1.0), ToTensorV2()])
+    transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
+    # transformed = A.Compose([A.Resize(256, 512, p=1.0), ToTensorV2()])
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
@@ -56,7 +56,8 @@ def main(parser):
     )
     test_data_loader = DataLoader(
         test_dataset,
-        batch_size=parser.batch_size,
+        # batch_size=parser.batch_size,
+        batch_size=64,
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_eval_batch,
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/attention_50/Attention_best_model.pth",
+        default="./configs/(fold1)ASTER_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default="greedy",  # 'greedy'로 설정하면 기존과 동일하게 inference
+        default="beam",  # 'greedy'로 설정하면 기존과 동일하게 inference
         type=str,
         help="디코딩 방식 설정. 'greedy', 'beam'",
     )

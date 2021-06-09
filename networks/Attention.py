@@ -292,6 +292,8 @@ class AttentionDecoder(nn.Module):
                     src=src,  # [B, WxH, C]
                     tgt=embedd,  # [B, HIDDEN]
                 )  # hidden: [B, HIDDEN] x2
+                
+                # 한 글자 생성에 대한 각 샘플의 확률 분포
                 probs_step = (
                     self.generator(hidden[0])
                     if self.num_layers == 1

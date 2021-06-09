@@ -83,7 +83,6 @@ class AttentionCell(nn.Module):
         hidden_dim: int,
         embedding_dim: int,
         num_layers=1,
-        # cell_type="LSTM",
     ):
         """
         Args:
@@ -125,15 +124,19 @@ class AttentionCell(nn.Module):
             tgt (torch.Tensor): START 토큰 등 RNN의 입력으로 들어가는 텐서
         output:
         """
+        print('src', src.size())
         src_features = self.i2h(src)  # [b, L, h]
+        print('attn src size', src_features.size())
         if self.num_layers == 1:
             prev_hidden_proj = self.h2h(prev_hidden[0]).unsqueeze(1)  # [b, 1, h]
         else:
             prev_hidden_proj = self.h2h(prev_hidden[-1][0]).unsqueeze(1)  # [b, 1, h]
+        print('prev_hidden_proj', prev_hidden_proj.size())
         attention_logit = self.score(
             torch.tanh(src_features + prev_hidden_proj)  # [b, L, h]
         )  # [b, L, 1]
         alpha = F.softmax(attention_logit, dim=1)  # [b, L, 1]
+        print('alpha', alpha.size())
         context = torch.bmm(alpha.permute(0, 2, 1), src).squeeze(
             1
         )  # [b, c], values applied attention
@@ -367,11 +370,8 @@ class ASTER(nn.Module):
         pad_token_id = data_loader.dataset.token_to_id["<PAD>"]
 
         batch_size = len(input)
-        encoder_output = self.encoder(input)  # [B, C, H, W]
-        b, c, h, w = encoder_output.size()
-        src = encoder_output.view(b, c, h * w).transpose(
-            1, 2
-        )  # [B, C, HxW] => [B, HxW, C]
+        src = self.encoder(input)
+        print('src', src.size())
 
         decoded_batch = []
         with torch.no_grad():
@@ -389,7 +389,7 @@ class ASTER(nn.Module):
                 nodes = PriorityQueue()
 
                 # 시작 토큰 초기화
-                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, HxW, C]
+                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, W, C]
                 current_input = torch.LongTensor([sos_token_id])  # [1]
                 current_hidden = [
                     h[data_idx].unsqueeze(0) for h in hidden
@@ -427,6 +427,7 @@ class ASTER(nn.Module):
                     # ------디코딩------
                     # input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
                     input_embedded = self.decoder.embedding(current_input.to(device))
+                    print('input_embedded', input_embedded.size())
 
                     # Hidden state 갱신
                     current_hidden, alpha = self.decoder.attention_cell(
@@ -496,7 +497,6 @@ class ASTER(nn.Module):
         return outputs
 
     def get_initialized_hidden_states(self, batch_size: int):
-        # LSTM case
         if self.decoder.num_layers == 1:
             hidden = (
                 torch.FloatTensor(batch_size, self.decoder.hidden_dim)
