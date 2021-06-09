@@ -163,16 +163,24 @@ class MemoryNode:
         self.id2token = {i:t for i, t in enumerate(tokens)}
 
         self.current_token_id = self.encode('<SOS>') # 직전 토큰이 무엇인지
-        self.num_series = 0 # 같은 토큰이 몇 회 연속으로 등장하고 있는지
+        self.num_series = 1 # 같은 토큰이 몇 회 연속으로 등장하고 있는지
         self.blacklist = [] # 현재 step에서 제외해야할 토큰은 무엇이 있는지
 
 
     def record(self, target_id: int):
         self.history.append(target_id)
-        self.current_token_id = target_id
-        self._look_back()
 
-    def _look_back(self):
+        # 연속 등장 횟수 카운트
+        if self.current_token_id == target_id:
+            self.num_series += 1
+        else:
+            self.num_series = 1
+
+        self.current_token_id = target_id # 현재 타깃ID 갱신
+        self.blacklist = self.look_back() # 블랙리스트 갱신
+
+
+    def look_back(self):
         black_raw = [] # 다음 step에서 생성을 금지할 토큰
 
         #=====CHECK #1 - 첫 step에서 등장할 수 없는 토큰=====
@@ -201,11 +209,14 @@ class MemoryNode:
                 if self.current_token_id in self.rules['cannot_next_lbracket']:
                     black_raw.extend(self.encode('{')) # '_' 추가
 
-                # 자기 자신이 연속으로 등장할 수 없는 토큰
-                if self.num_series >= 2 and self.current_token_id in self.rules['cannot_series']:
-                    black_raw.append(self.current_token_id) # 자기 자신을 추가
-
-        self.blacklist = deepcopy(black_raw)
+                #=====CHECK #4 - 최대 연속 생성 횟수 확인=====
+                if self.num_series >= 2:
+                    token_name = self.decode(self.current_token_id)
+                    if self.rules['limit_series'][token_name]:
+                        series_limit = self.rules['limit_params'][token_name]
+                        if self.num_series >= series_limit:
+                            black_raw.append(self.current_token_id)
+        return black_raw
 
     
     def encode(self, token):
