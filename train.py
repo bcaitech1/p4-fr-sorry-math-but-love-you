@@ -65,9 +65,9 @@ def train_one_epoch(
     
     with tqdm(
         desc=f"{epoch_text} Train",
-        total=min(len(print_loader.dataset), len(hand_loader.dataset))
+        total=min(len(print_loader.dataset), len(hand_loader.dataset)),
         dynamic_ncols=True,
-        leave=False,
+        leave=False
     ) as pbar:
         for pd, hd in zip(print_loader, hand_loader):
             input = torch.cat([pd["image"], hd["image"]], dim=0).to(device).float()
@@ -75,7 +75,15 @@ def train_one_epoch(
             tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
 
             curr_batch_size = len(input)
-            expected = torch.cat([pd["truth"]["encoded"], hd["truth"]["encoded"]], dim=0).to(device)
+            pd_expect = pd["truth"]["encoded"]
+            hd_expect = hd["truth"]["encoded"]
+            pd_expect_len = pd_expect.shape[1]
+            hd_expect_len = hd_expect.shape[1]
+
+            max_len = max(pd_expect_len, hd_expect_len)
+            pd_expect = torch.nn.functional.pad(pd_expect, pad=(0, max_len-pd_expect_len), value=-1)
+            hd_expect = torch.nn.functional.pad(hd_expect, pad=(0, max_len-hd_expect_len), value=-1)
+            expected = torch.cat([pd_expect, hd_expect], dim=0).to(device)
             # expected = d["truth"]["encoded"].to(device)
 
             expected[expected == -1] = print_loader.dataset.token_to_id[PAD]
@@ -366,16 +374,18 @@ def main(config_file):
             # T_up: 한 주기 내에서 warm-up을 할 스텝 수
             # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
-        total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
+        # total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
+        loader_length = min(len(train_print_loader), len(train_hand_loader))
+        total_steps = loader_length*options.num_epochs
         t_0 = total_steps // 1 # 주기를 3으로 설정
         t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
-            T_0=options.num_epochs*len(train_data_loader),
+            T_0=total_steps,
             T_mult=1,
             eta_max=options.optimizer.lr,
-            T_up=options.num_epochs*len(train_data_loader)//10,
+            T_up=total_steps//10,
             gamma=1.0,
         )
         
@@ -545,8 +555,8 @@ def main(config_file):
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "configs": option_dict,
-                    "token_to_id": train_data_loader.dataset.token_to_id,
-                    "id_to_token": train_data_loader.dataset.id_to_token,
+                    "token_to_id": train_hand_loader.dataset.token_to_id,
+                    "id_to_token": train_hand_loader.dataset.id_to_token,
                     "network": options.network,
                     "scheduler": lr_scheduler.state_dict(),
                 },
@@ -628,14 +638,14 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="TF-Arcta(0.8>0.3 & (-5,5)) & SSR(0.3)>GD(0.3)>Norm & decoder 256_1024 & Fold0",
+        default="TF-Arcta(0.8>0.3 & (-5,5)) & SSR(0.3)>GD(0.3)>Norm & decoder 256_1024 & hand:print 5:5 &Fold0",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
         "-c",
         "--config_file",
         dest="config_file",
-        default="/opt/ml/sorry_math_but_love_you/configs/My_SATRN.yaml",
+        default="/opt/ml/p4-fr-sorry-math-but-love-you/configs/My_SATRN.yaml",
         type=str,
         help="Path of configuration file",
     )

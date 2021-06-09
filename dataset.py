@@ -101,8 +101,8 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
     val_image_names = set(df[df['fold']==0]['image_name'].values)
     # train_image_names = set(df[df['fold']!=0]['image_name'].values)
-    train_print_image_names = set(df[(df['fold']!=0) & (df['source']==0)].values)
-    train_hand_image_names = set(df[(df['fold']!=0) & (df['source']==1)].values)
+    train_print_image_names = set(df[(df['fold']!=0) & (df['source']==0)]['image_name'].values)
+    train_hand_image_names = set(df[(df['fold']!=0) & (df['source']==1)]['image_name'].values)
     ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]
@@ -314,7 +314,7 @@ def dataset_loader(options, train_transform, valid_transform):
             train_print, train_hand, val = split_gt(path, prop, options.data.test_proportions)
             train_print_data += train_print
             train_hand_data += train_hand
-            valid_data += valid
+            valid_data += val
     else:
         for i, path in enumerate(options.data.train):
             prop = 1.0
