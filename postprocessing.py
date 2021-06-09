@@ -1,4 +1,7 @@
 from copy import deepcopy
+import torch
+import torch.nn.functional as F
+
 
 
 RULES = {
@@ -73,12 +76,13 @@ RULES = {
         # NOTE. 숫자와 소문자 알파벳은 포함하지 않음
     # 연속 생성 횟수를 규제할 토큰인지 여부
     'limit_series': {
-        'O': True, '\\prod': True, '\\downarrow': True, '\\widehat': True, '\\iiint': True, 
-        '\\ddot': True, '\\supsetneq': True, '_': True, '\\log': True, '\\dot': True, '\\sqrt': True, '0': False, 
-        '6': False, '\\ominus': True, ';': True, 'g': False, '\\leqq': True, 'I': True, '\\tanh': True, '\\subset': True, 
-        '\\pm': True, '\\oint': True, 'f': False, '\\rightharpoonup': True, '\\right|': True, '\\tau': True, 
-        '\\underset': True, '\\not': True, '<': True, '\\cos': True, '\\theta': True, '\\rho': True, '\\epsilon': True, 
-        '\\roman1': True, '\\ln': True, '\\cong': True, '/': True, 'X': True, 'b': False, '\\sec': True, 'K': True, 
+        '<PAD>': False, '<EOS>': False, 'O': True, '\\prod': True, '\\downarrow': True, '\\widehat': True, 
+        '\\iiint': True, '\\ddot': True, '\\supsetneq': True, '_': True, '\\log': True, '\\dot': True, 
+        '\\sqrt': True, '0': False, '6': False, '\\ominus': True, ';': True, 'g': False, '\\leqq': True, 
+        'I': True, '\\tanh': True, '\\subset': True, '\\pm': True, '\\oint': True, 'f': False, 
+        '\\rightharpoonup': True, '\\right|': True, '\\tau': True, '\\underset': True, '\\not': True, 
+        '<': True, '\\cos': True, '\\theta': True, '\\rho': True, '\\epsilon': True, '\\roman1': True, 
+        '\\ln': True, '\\cong': True, '/': True, 'X': True, 'b': False, '\\sec': True, 'K': True, 
         '\\zeta': True, 'V': True, '\\rightleftarrows': True, '\\wedge': True, '!': True, '\\prime': True, '\\left|': True, 
         '\\nabla': True, 'Z': True, '\\stackrel': True, 'M': True, '?': True, 'v': False, 'P': True, '\\leq': True, 
         '\\cdots': True, '\\cup': True, 'n': False, 'Q': True, '\\square': True, '\\kappa': True, '\\exists': True, 
@@ -154,21 +158,21 @@ RULES = {
     
 }
 
+
 class MemoryNode:
-    def __init__(self, rules, tokens: list):
+    def __init__(self, rules: dict, tokens: list):
         self.rules = rules
         self.history = [] # 또는 텐서 - 현재까지 생성된 토큰 리스트
         self.tokens = tokens
         self.token2id = {t:i for i, t in enumerate(tokens)}
         self.id2token = {i:t for i, t in enumerate(tokens)}
-
         self.current_token_id = self.encode('<SOS>') # 직전 토큰이 무엇인지
         self.num_series = 1 # 같은 토큰이 몇 회 연속으로 등장하고 있는지
-        self.blacklist = [] # 현재 step에서 제외해야할 토큰은 무엇이 있는지
+        self.blacklist = self.look_back() # 현재 step에서 제외해야할 토큰은 무엇이 있는지
 
 
     def record(self, target_id: int):
-        self.history.append(target_id)
+        self.history.append(target_id) # 아직 복잡한 로직이 없어서 필요하지는 않음
 
         if self.current_token_id == target_id: 
             self.num_series += 1 # 같은 토큰 연속 등장 시 연속 횟수 증가
@@ -180,41 +184,46 @@ class MemoryNode:
 
 
     def look_back(self):
-        blacklist = [] # 다음 step에서 생성을 금지할 토큰
+        current_token = self.decode(self.current_token_id)
+        blacklist = [self.encode('<SOS>')] # 다음 step에서 생성을 금지할 토큰
 
         #=====CHECK #1 - 첫 step에서 등장할 수 없는 토큰=====
-        if self.current_token_id == self.encode('<SOS>'):
-            blacklist.extend(self.rules['cannot_initial'])
+        if current_token == '<EOS>':
+            return blacklist
+
+        elif current_token == '<SOS>':
+            excepts = [self.encode(t) for t in self.rules['cannot_initial']]
+            blacklist.extend(excepts)
 
         else:
             #=====CHECK #2 - 다음 target id를 확정지을 수 있는지 여부=====
             # 매우 높은 확률로 뒤에 '_' 토큰이 오는 토큰
-            if self.current_token_id in self.rules['next_underbar']:            
+            if current_token in self.rules['next_underbar']:            
                 excepts = [self.encode(t) for t in self.tokens if t != '_'] # '_' 외 모든 토큰 블랙
                 blacklist = deepcopy(excepts)
 
             # 매우 높은 확률로 뒤에 '{' 토큰이 오는 토큰
-            elif self.current_token_id in self.rules['next_lbracket']:
+            elif current_token in self.rules['next_lbracket']:
                 excepts = [self.encode(t) for t in self.tokens if t != '{'] # '{' 외 모든 토큰 블랙
-                self.blacklist = deepcopy(excepts)
+                blacklist = deepcopy(excepts)
 
             else:
                 #=====CHECK #3 - 다음 target id를 확정지을 수 있는지 여부=====
                 # 매우 높은 확률로 뒤에 '_' 토큰이 붙지 않아야 하는 토큰
-                if self.current_token_id in self.rules['cannot_next_underbar']:
+                if current_token in self.rules['cannot_next_underbar']:
                     blacklist.append(self.encode('_')) # '_' 추가
 
                 # 매우 높은 확률로 뒤에 '{' 토큰이 붙지 않아야 하는 토큰
-                if self.current_token_id in self.rules['cannot_next_lbracket']:
-                    blacklist.extend(self.encode('{')) # '_' 추가
+                if current_token in self.rules['cannot_next_lbracket']:
+                    blacklist.append(self.encode('{')) # '_' 추가
 
                 #=====CHECK #4 - 최대 연속 생성 횟수 확인=====
                 if self.num_series >= 2:
-                    token_name = self.decode(self.current_token_id)
-                    if self.rules['limit_series'][token_name]:
-                        series_limit = self.rules['limit_params'][token_name]
-                        if self.num_series >= series_limit:
+                    if self.rules['limit_series'][current_token]:
+                        series_limit = self.rules['limit_params'][current_token]
+                        if self.num_series >= series_limit: # 연속 횟수가 넘쳤을 경우 블랙
                             blacklist.append(self.current_token_id)
+
         return blacklist
 
     
@@ -225,4 +234,70 @@ class MemoryNode:
         return self.id2token[id]
 
 
+class DecodingDirector:
+    def __init__(self, batch_size: int, rules: list, tokens: list):
+        assert tokens[0] == '<SOS>'
+        self.tokens = tokens
+        self.rules = rules
+        self.batch_size = batch_size
+        self.vocab_size = len(tokens)
+        self.memories = self._initialize_memory(batch_size, rules, tokens)
 
+    def gate(self, probs_step: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            probs_step(torch.Tensor): softmax 확률 분포 텐서, [B, VOCAB_SIZE]
+        Returns:
+            targets(torch.Tensor): 다음 스텝에 입력될 target 텐서, [B]
+        """
+        probs_softmax = F.softmax(probs_step, dim=-1)
+        mask = list(map(lambda x: self._mask(x, self.vocab_size), self.memories))
+        mask = torch.vstack(mask)
+        probs_softmax.masked_fill_(mask, 0)
+        targets = torch.argmax(probs_softmax, dim=-1)
+        self._update(targets)
+        return targets
+
+    def reset(self):
+        self.memories = self._initialize_memory(
+            batch_size=self.batch_size,
+            rules=self.rules,
+            tokens=self.tokens
+            )
+
+    def _initialize_memory(self, batch_size, rules, tokens):
+        memories = [
+            MemoryNode(rules=rules, tokens=tokens) 
+            for _ in range(batch_size)
+            ]
+        return memories
+
+    @staticmethod
+    def _mask(node: MemoryNode, vocab_size: int):
+        blacklist = torch.tensor(node.blacklist)
+        output = torch.zeros(vocab_size)
+        output = output.scatter(dim=0, index=blacklist, value=1)
+        output = output.bool()
+        return output
+
+    def _update(self, targets: torch.Tensor):
+        for t, node in zip(targets, self.memories):
+            node.record(t.item())
+
+    
+
+
+
+if __name__ == '__main__':
+    from dataset import SPECIAL_TOKENS
+    batch_size = 32
+    tokens = open('../input/data/train_dataset/tokens.txt').readlines()
+    tokens = list(map(lambda x: x.strip(), tokens))
+    tokens = SPECIAL_TOKENS + tokens
+    rules = RULES
+    director = DecodingDirector(batch_size, rules, tokens)
+    probs_step = torch.rand(batch_size, director.vocab_size)
+    director.gate(probs_step)
+    director.gate(probs_step)
+    director.gate(probs_step)
+    director.gate(probs_step)

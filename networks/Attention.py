@@ -300,6 +300,8 @@ class AttentionDecoder(nn.Module):
                     else self.generator(hidden[-1][0])
                 )  # [B, VOCAB_SIZE]
 
+                
+
                 probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
                 _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
                 targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
