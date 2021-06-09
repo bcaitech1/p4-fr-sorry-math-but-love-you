@@ -193,7 +193,7 @@ class ASTERDecoder(nn.Module):
         st_id,
         num_layers=1,
         checkpoint=None,
-        director=None
+        decoding_manager=None
     ):
         super(ASTERDecoder, self).__init__()
         self.embedding = nn.Embedding(num_classes + 1, embedding_dim)
@@ -207,8 +207,8 @@ class ASTERDecoder(nn.Module):
         self.pad_id = pad_id
         self.st_id = st_id
 
-        # NOTE: Decoding Director
-        self.director = director
+        # NOTE: Decoding manager
+        self.manager = decoding_manager
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
@@ -301,14 +301,16 @@ class ASTERDecoder(nn.Module):
                 probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
                 _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
                 
-                # NOTE: DecodingDirector
-                if self.director is not None:
-                    targets = self.director.gate(probs_step)
+                # NOTE: DecodingManager
+                if self.manager is not None:
+                    targets = self.manager.filter(probs_step)
+                
+                # 기존 방식대로 진행
                 else:
                     targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
             
-            if self.director is not None:
-                self.director.reset()
+            if self.manager is not None:
+                self.manager.reset()
 
         return probs
 
@@ -319,7 +321,7 @@ class ASTER(nn.Module):
         FLAGS,
         train_dataset,
         checkpoint=None,
-        director=None # NOTE
+        manager=None # NOTE
     ):
         super(ASTER, self).__init__()
         self.encoder = ASTEREncoder(FLAGS)
@@ -331,7 +333,7 @@ class ASTER(nn.Module):
             pad_id=train_dataset.token_to_id["<PAD>"],
             st_id=train_dataset.token_to_id["<SOS>"],
             num_layers=FLAGS.ASTER.layer_num,
-            director=director # NOTE
+            manager=manager # NOTE
         )
 
         self.criterion = nn.CrossEntropyLoss(

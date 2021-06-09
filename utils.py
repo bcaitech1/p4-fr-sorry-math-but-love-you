@@ -32,6 +32,7 @@ def get_network(
         # model.encoder.load_state_dict(checkpoint['model'], strict=False)
     elif model_type == "MySATRN":
         model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
+        
     elif model_type == "ASTER":
         model = ASTER(FLAGS, train_dataset, model_checkpoint).to(device)
     else:

@@ -458,6 +458,7 @@ class SATRNDecoder(nn.Module):
         st_id,
         layer_num=1,
         checkpoint=None,
+        decoding_manager=None,
     ):
         super(SATRNDecoder, self).__init__()
 
@@ -486,6 +487,9 @@ class SATRNDecoder(nn.Module):
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
+
+        # NOTE
+        self.manager = decoding_manager
 
     def pad_mask(self, text):
         pad_mask = text == self.pad_id
@@ -544,18 +548,25 @@ class SATRNDecoder(nn.Module):
                     )
 
                 _out = self.generator(tgt)  # [b, 1, c]
-                target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
-                target = target.squeeze()  # [b]
+
+                if self.manager is not None:
+                    probs_step = _out[:, -1:, :]
+                    target = self.manager.filter(probs_step) # [B]
+                else:
+                    target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
+                    target = target.squeeze()  # [b]
+
                 out.append(_out)
 
             out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
             out = out.squeeze(2)  # [b, max length, class length]
+            self.manager.reset()
 
         return out
 
 
 class MySATRN(nn.Module):
-    def __init__(self, FLAGS, train_dataset, checkpoint=None):
+    def __init__(self, FLAGS, train_dataset, checkpoint=None, director=None):
         super(MySATRN, self).__init__()
 
         self.encoder = SATRNEncoder(
@@ -579,6 +590,7 @@ class MySATRN(nn.Module):
             pad_id=train_dataset.token_to_id[PAD],
             st_id=train_dataset.token_to_id[START],
             layer_num=FLAGS.SATRN.decoder.layer_num,
+            director=director
         )
 
         self.criterion = nn.CrossEntropyLoss(

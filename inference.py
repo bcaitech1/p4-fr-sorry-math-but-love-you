@@ -16,6 +16,8 @@ from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
 from decoding import decode
 
+from postprocessing import RULES, DecodingManager
+
 
 def main(parser):
     is_cuda = torch.cuda.is_available()
