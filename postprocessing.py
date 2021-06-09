@@ -170,29 +170,28 @@ class MemoryNode:
     def record(self, target_id: int):
         self.history.append(target_id)
 
-        # 연속 등장 횟수 카운트
-        if self.current_token_id == target_id:
-            self.num_series += 1
+        if self.current_token_id == target_id: 
+            self.num_series += 1 # 같은 토큰 연속 등장 시 연속 횟수 증가
         else:
-            self.num_series = 1
+            self.num_series = 1 # 새로운 토큰 등장 시 초기화
 
         self.current_token_id = target_id # 현재 타깃ID 갱신
         self.blacklist = self.look_back() # 블랙리스트 갱신
 
 
     def look_back(self):
-        black_raw = [] # 다음 step에서 생성을 금지할 토큰
+        blacklist = [] # 다음 step에서 생성을 금지할 토큰
 
         #=====CHECK #1 - 첫 step에서 등장할 수 없는 토큰=====
         if self.current_token_id == self.encode('<SOS>'):
-            black_raw.extend(self.rules['cannot_initial'])
+            blacklist.extend(self.rules['cannot_initial'])
 
         else:
             #=====CHECK #2 - 다음 target id를 확정지을 수 있는지 여부=====
             # 매우 높은 확률로 뒤에 '_' 토큰이 오는 토큰
             if self.current_token_id in self.rules['next_underbar']:            
                 excepts = [self.encode(t) for t in self.tokens if t != '_'] # '_' 외 모든 토큰 블랙
-                black_raw = deepcopy(excepts)
+                blacklist = deepcopy(excepts)
 
             # 매우 높은 확률로 뒤에 '{' 토큰이 오는 토큰
             elif self.current_token_id in self.rules['next_lbracket']:
@@ -203,11 +202,11 @@ class MemoryNode:
                 #=====CHECK #3 - 다음 target id를 확정지을 수 있는지 여부=====
                 # 매우 높은 확률로 뒤에 '_' 토큰이 붙지 않아야 하는 토큰
                 if self.current_token_id in self.rules['cannot_next_underbar']:
-                    black_raw.append(self.encode('_')) # '_' 추가
+                    blacklist.append(self.encode('_')) # '_' 추가
 
                 # 매우 높은 확률로 뒤에 '{' 토큰이 붙지 않아야 하는 토큰
                 if self.current_token_id in self.rules['cannot_next_lbracket']:
-                    black_raw.extend(self.encode('{')) # '_' 추가
+                    blacklist.extend(self.encode('{')) # '_' 추가
 
                 #=====CHECK #4 - 최대 연속 생성 횟수 확인=====
                 if self.num_series >= 2:
@@ -215,8 +214,8 @@ class MemoryNode:
                     if self.rules['limit_series'][token_name]:
                         series_limit = self.rules['limit_params'][token_name]
                         if self.num_series >= series_limit:
-                            black_raw.append(self.current_token_id)
-        return black_raw
+                            blacklist.append(self.current_token_id)
+        return blacklist
 
     
     def encode(self, token):
