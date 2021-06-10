@@ -37,9 +37,9 @@ os.environ["WANDB_WATCH"] = "all"
 
 
 def train_one_epoch(
-    # data_loader,
-    print_loader,
-    hand_loader,
+    data_loader,
+    # print_loader,
+    # hand_loader,
     model,
     epoch_text,
     criterion,
@@ -65,29 +65,31 @@ def train_one_epoch(
     
     with tqdm(
         desc=f"{epoch_text} Train",
-        total=min(len(print_loader.dataset), len(hand_loader.dataset)),
+        # total=min(len(print_loader.dataset), len(hand_loader.dataset))*2,
+        total=len(data_loader.dataset),
         dynamic_ncols=True,
-        leave=False
+        leave=False,
     ) as pbar:
-        for pd, hd in zip(print_loader, hand_loader):
-            input = torch.cat([pd["image"], hd["image"]], dim=0).to(device).float()
-            # input = d["image"].to(device).float()
+        for d in data_loader:
+        # for pd, hd in zip(print_loader, hand_loader):
+            # input = torch.cat([pd["image"], hd["image"]], dim=0).to(device).float()
+            input = d["image"].to(device).float()
             tf_ratio = tf_scheduler.step() # NOTE. Teacher Forcing Scheduler
 
             curr_batch_size = len(input)
-            pd_expect = pd["truth"]["encoded"]
-            hd_expect = hd["truth"]["encoded"]
-            pd_expect_len = pd_expect.shape[1]
-            hd_expect_len = hd_expect.shape[1]
+            # pd_expect = pd["truth"]["encoded"]
+            # hd_expect = hd["truth"]["encoded"]
+            # pd_expect_len = pd_expect.shape[1]
+            # hd_expect_len = hd_expect.shape[1]
 
-            max_len = max(pd_expect_len, hd_expect_len)
-            pd_expect = torch.nn.functional.pad(pd_expect, pad=(0, max_len-pd_expect_len), value=-1)
-            hd_expect = torch.nn.functional.pad(hd_expect, pad=(0, max_len-hd_expect_len), value=-1)
-            expected = torch.cat([pd_expect, hd_expect], dim=0).to(device)
-            # expected = d["truth"]["encoded"].to(device)
+            # max_len = max(pd_expect_len, hd_expect_len)
+            # pd_expect = torch.nn.functional.pad(pd_expect, pad=(0, max_len-pd_expect_len), value=-1)
+            # hd_expect = torch.nn.functional.pad(hd_expect, pad=(0, max_len-hd_expect_len), value=-1)
+            # expected = torch.cat([pd_expect, hd_expect], dim=0).to(device)
+            expected = d["truth"]["encoded"].to(device)
 
-            expected[expected == -1] = print_loader.dataset.token_to_id[PAD]
-            # expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
+            # expected[expected == -1] = print_loader.dataset.token_to_id[PAD]
+            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
             # with autocast():
             output = model(input, expected, True, tf_ratio) # NOTE. Teacher Forcing Scheduler
@@ -118,12 +120,12 @@ def train_one_epoch(
             optimizer.step()
             losses.append(loss.item())
 
-            expected[expected == print_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, print_loader, do_eval=1)
-            sequence_str = id_to_string(sequence, print_loader, do_eval=1)
-            # expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            # expected_str = id_to_string(expected, data_loader, do_eval=1)
-            # sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            # expected[expected == print_loader.dataset.token_to_id[PAD]] = -1
+            # expected_str = id_to_string(expected, print_loader, do_eval=1)
+            # sequence_str = id_to_string(sequence, print_loader, do_eval=1)
+            expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
+            expected_str = id_to_string(expected, data_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
             wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
             sent_acc += sentence_acc(sequence_str, expected_str)
@@ -147,11 +149,11 @@ def train_one_epoch(
                         'tf_ratio': tf_ratio # NOTE. Teacher Forcing Scheduler
                         })
 
-    expected = id_to_string(expected, print_loader)
-    sequence = id_to_string(sequence, print_loader)
+    # expected = id_to_string(expected, print_loader)
+    # sequence = id_to_string(sequence, print_loader)
 
-    # expected = id_to_string(expected, data_loader)
-    # sequence = id_to_string(sequence, data_loader)
+    expected = id_to_string(expected, data_loader)
+    sequence = id_to_string(sequence, data_loader)
 
     result = {
         "loss": np.mean(losses),
@@ -310,17 +312,20 @@ def main(config_file):
     # )
 
 
-    train_print_loader, train_hand_loader, validation_data_loader, train_print_dataset, train_hand_dataset, valid_dataset = dataset_loader(options, 
+    # train_print_loader, train_hand_loader, validation_data_loader, train_print_dataset, train_hand_dataset, valid_dataset = dataset_loader(options, 
+    # train_transform=get_train_transforms(options.input_size.height, options.input_size.width), 
+    # valid_transform=get_valid_transforms(options.input_size.height, options.input_size.width))
+    train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, 
     train_transform=get_train_transforms(options.input_size.height, options.input_size.width), 
     valid_transform=get_valid_transforms(options.input_size.height, options.input_size.width))
     # train_data_loader, validation_data_loader, train_dataset, valid_dataset = dataset_loader(options, transformed)
     print(
         "[+] Data\n",
-        # "The number of train samples : {}\n".format(len(train_dataset)),
-        "The number of print train samples: {}\n".format(len(train_print_dataset)),
-        "The number of hand train samples: {}\n".format(len(train_hand_dataset)),
+        "The number of train samples : {}\n".format(len(train_dataset)),
+        # "The number of print train samples: {}\n".format(len(train_print_dataset)),
+        # "The number of hand train samples: {}\n".format(len(train_hand_dataset)),
         "The number of validation samples : {}\n".format(len(valid_dataset)),
-        "The number of classes : {}\n".format(len(train_print_dataset.token_to_id)),
+        "The number of classes : {}\n".format(len(train_dataset.token_to_id)),
     )
 
     # define model
@@ -329,7 +334,7 @@ def main(config_file):
         options,
         model_checkpoint,
         device,
-        train_print_dataset,
+        train_dataset,
     )
     model.train()
 
@@ -374,9 +379,9 @@ def main(config_file):
             # T_up: 한 주기 내에서 warm-up을 할 스텝 수
             # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
-        # total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
-        loader_length = min(len(train_print_loader), len(train_hand_loader))
-        total_steps = loader_length*options.num_epochs
+        total_steps = len(train_data_loader)*options.num_epochs # 전체 스텝 수
+        # loader_length = min(len(train_print_loader), len(train_hand_loader))
+        # total_steps = loader_length*options.num_epochs
         t_0 = total_steps // 1 # 주기를 3으로 설정
         t_up = int(t_0*0.1) # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
@@ -471,9 +476,9 @@ def main(config_file):
 
 
         train_result = train_one_epoch(
-            # train_data_loader,
-            train_print_loader,
-            train_hand_loader,
+            train_data_loader,
+            # train_print_loader,
+            # train_hand_loader,
             model,
             epoch_text,
             criterion,
@@ -638,7 +643,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="TF-Arcta(0.8>0.3 & (-5,5)) & SSR(0.3)>GD(0.3)>Norm & decoder 256_1024 & hand:print 5:5 &Fold0",
+        default="TF-Arcta(0.8>0.3 & (-5,5)) & SSR(0.3)>GD(0.3)>Norm & decoder 256_1024 & Fold0",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

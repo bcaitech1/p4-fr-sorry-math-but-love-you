@@ -100,9 +100,9 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
     val_image_names = set(df[df['fold']==0]['image_name'].values)
-    # train_image_names = set(df[df['fold']!=0]['image_name'].values)
-    train_print_image_names = set(df[(df['fold']!=0) & (df['source']==0)]['image_name'].values)
-    train_hand_image_names = set(df[(df['fold']!=0) & (df['source']==1)]['image_name'].values)
+    train_image_names = set(df[df['fold']!=0]['image_name'].values)
+    # train_print_image_names = set(df[(df['fold']!=0) & (df['source']==0)]['image_name'].values)
+    # train_hand_image_names = set(df[(df['fold']!=0) & (df['source']==1)]['image_name'].values)
     ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]
@@ -111,10 +111,13 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         random.shuffle(data)
         dataset_len = round(len(data) * proportion)
         data = data[:dataset_len]
-        train_print_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_print_image_names]
-        train_hand_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_hand_image_names]
+        train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
         val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
-    return train_print_data, train_hand_data, val_data
+    return train_data, val_data
+    #     train_print_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_print_image_names]
+    #     train_hand_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_hand_image_names]
+    #     val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
+    # return train_print_data, train_hand_data, val_data
 
 
 
@@ -302,19 +305,19 @@ class LoadEvalDataset(Dataset):
 def dataset_loader(options, train_transform, valid_transform):
 
     # Read data
-    # train_data, valid_data = [], [] 
-    train_print_data, train_hand_data, valid_data = [], [], []
+    train_data, valid_data = [], [] 
+    # train_print_data, train_hand_data, valid_data = [], [], []
     if options.data.random_split:
         for i, path in enumerate(options.data.train):
             prop = 1.0
             if len(options.data.dataset_proportions) > i:
                 prop = options.data.dataset_proportions[i]
-            # train, valid = split_gt(path, prop, options.data.test_proportions)
-            # train_data += train
-            train_print, train_hand, val = split_gt(path, prop, options.data.test_proportions)
-            train_print_data += train_print
-            train_hand_data += train_hand
-            valid_data += val
+            train, valid = split_gt(path, prop, options.data.test_proportions)
+            train_data += train
+            # train_print, train_hand, valid = split_gt(path, prop, options.data.test_proportions)
+            # train_print_data += train_print
+            # train_hand_data += train_hand
+            valid_data += valid
     else:
         for i, path in enumerate(options.data.train):
             prop = 1.0
@@ -324,51 +327,51 @@ def dataset_loader(options, train_transform, valid_transform):
         for i, path in enumerate(options.data.test):
             valid = split_gt(path)
             valid_data += valid
-    print(len(train_print_data))
-    print(len(train_hand_data))
+    # print(len(train_print_data))
+    # print(len(train_hand_data))
     # Load data
-    # train_dataset = LoadDataset(
-    #     # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
-    #     train_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
+    train_dataset = LoadDataset(
+        # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
+        train_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
+    )
+
+    train_data_loader = DataLoader(
+        train_dataset,
+        batch_size=options.batch_size,
+        shuffle=True,
+        num_workers=options.num_workers,
+        pin_memory=True,
+        collate_fn=collate_batch,
+        drop_last=True,
+    )
+
+    # train_print_dataset = LoadDataset(
+    #     train_print_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
     # )
 
-    # train_data_loader = DataLoader(
-    #     train_dataset,
-    #     batch_size=options.batch_size,
+    # train_hand_dataset = LoadDataset(
+    #     train_hand_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
+    # )
+    
+    # train_print_loader = DataLoader(
+    #     train_print_dataset,
+    #     batch_size=options.batch_size//2,
     #     shuffle=True,
     #     num_workers=options.num_workers,
     #     pin_memory=True,
     #     collate_fn=collate_batch,
-    #     drop_last=True,
+    #     drop_last=True
     # )
-
-    train_print_dataset = LoadDataset(
-        train_print_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
-    )
-
-    train_hand_dataset = LoadDataset(
-        train_hand_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
-    )
     
-    train_print_loader = DataLoader(
-        train_print_dataset,
-        batch_size=options.batch_size//2,
-        shuffle=True,
-        num_workers=options.num_workers,
-        pin_memory=True,
-        collate_fn=collate_batch,
-        drop_last=True
-    )
-    
-    train_hand_loader = DataLoader(
-        train_hand_dataset,
-        batch_size=options.batch_size//2,
-        shuffle=True,
-        num_workers=options.num_workers,
-        pin_memory=True,
-        collate_fn=collate_batch,
-        drop_last=True
-    )
+    # train_hand_loader = DataLoader(
+    #     train_hand_dataset,
+    #     batch_size=options.batch_size//2,
+    #     shuffle=True,
+    #     num_workers=options.num_workers,
+    #     pin_memory=True,
+    #     collate_fn=collate_batch,
+    #     drop_last=True
+    # )
 
     valid_dataset = LoadDataset(
         # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
@@ -383,5 +386,5 @@ def dataset_loader(options, train_transform, valid_transform):
         drop_last=True,
     )
 
-    # return train_data_loader, valid_data_loader, train_dataset, valid_dataset
-    return train_print_loader, train_hand_loader, valid_data_loader, train_print_dataset, train_hand_dataset, valid_dataset
+    return train_data_loader, valid_data_loader, train_dataset, valid_dataset
+    # return train_print_loader, train_hand_loader, valid_data_loader, train_print_dataset, train_hand_dataset, valid_dataset

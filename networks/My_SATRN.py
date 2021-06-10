@@ -353,7 +353,6 @@ class SATRNEncoder(nn.Module):
         # nf_out = self.nfnet(x) # [b, c, h//32, w//32]
         # out = eff_out + nf_out
 
-        # out = self.effnet(x)
         out = self.positional_encoding(out)  # [b, c, h//32, w//32]
 
         for layer in self.attention_layers:
@@ -432,7 +431,7 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt, tgt, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-            att = self.attention_layer(tgt, src, src)
+            att = self.attention_layer(out, src, src)
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
@@ -442,7 +441,7 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt_prev, tgt_prev, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-            att = self.attention_layer(tgt, src, src)
+            att = self.attention_layer(out, src, src)
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
