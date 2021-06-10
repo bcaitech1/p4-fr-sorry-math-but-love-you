@@ -303,7 +303,7 @@ class ASTERDecoder(nn.Module):
                 
                 # NOTE: DecodingManager
                 if self.manager is not None:
-                    targets = self.manager.filter(probs_step)
+                    targets = self.manager.sift(probs_step)
                 
                 # 기존 방식대로 진행
                 else:

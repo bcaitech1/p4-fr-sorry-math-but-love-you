@@ -58,8 +58,7 @@ def main(parser):
     )
     test_data_loader = DataLoader(
         test_dataset,
-        # batch_size=parser.batch_size,
-        batch_size=64,
+        batch_size=parser.batch_size,
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_eval_batch,
@@ -109,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./configs/(fold1)ASTER_best_model.pth",
+        default="./log/my_satrn/checkpoints/0.7907 F0 dual opt MySATRN_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -130,7 +129,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default="beam",  # 'greedy'로 설정하면 기존과 동일하게 inference
+        default="greedy",  # 'greedy'로 설정하면 기존과 동일하게 inference
         type=str,
         help="디코딩 방식 설정. 'greedy', 'beam'",
     )

@@ -32,7 +32,7 @@ from scheduler import (
     CustomCosineAnnealingWarmUpRestarts,
     TeacherForcingScheduler,
 )
-from metrics_ import word_error_rate, sentence_acc, final_metric
+from metrics import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
@@ -231,9 +231,9 @@ def get_train_transforms(height, width):
     return A.Compose(
         [
             A.Resize(height, width),
-            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.3),
             A.GridDistortion(
-                p=0.5,
+                p=0.3,
                 num_steps=8,
                 distort_limit=(-0.5, 0.5),
                 interpolation=0,
@@ -631,7 +631,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--exp_name",
-        default="SATRN_HM_implement_effnetv2S_fold3_aug-70epoch",
+        default="FINAL-FOLD3",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(

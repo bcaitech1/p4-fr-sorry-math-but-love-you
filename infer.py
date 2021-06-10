@@ -20,6 +20,7 @@ from utils import id_to_string, get_network, get_optimizer, set_seed
 
 
 def main(parser):
+    output_fname = "mysatrn-output-managerv0.csv"
     set_seed(21)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -43,7 +44,7 @@ def main(parser):
 
     root = os.path.join(os.path.dirname(parser.file_path), "images")
     df = pd.read_csv("./configs/data_info.txt")
-    test_image_names = set(df[df["fold"] == 3]["image_name"].values)
+    test_image_names = set(df[df["fold"] == 0]["image_name"].values)
     with open(os.path.join(os.path.dirname(parser.file_path), "gt.txt"), "r") as fd:
         data = []
         for line in fd:
@@ -55,13 +56,15 @@ def main(parser):
         for x in data
         if x[0] in test_image_names
     ]
+    test_data = test_data[130:145]
 
     test_dataset = LoadEvalDataset(
         test_data, token_to_id_, id_to_token_, crop=False, transform=transformed, rgb=3
     )
     test_data_loader = DataLoader(
         test_dataset,
-        batch_size=parser.batch_size,
+        # batch_size=parser.batch_size,
+        batch_size=4,
         shuffle=False,
         num_workers=8,
         collate_fn=collate_eval_batch,
@@ -102,7 +105,7 @@ def main(parser):
                 results.append((path, predicted))
 
         os.makedirs(parser.output_dir, exist_ok=True)
-        with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
+        with open(os.path.join(parser.output_dir, output_fname), "w") as w:
             for path, predicted in results:
                 w.write(path + "\t" + predicted + "\n")
 
@@ -112,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default=["./log/TF-Arctan(0.7_0.3) & SSR_GD_Norm(IMG) & Fold3 epoch30.pth"],
+        default=["./log/my_satrn/checkpoints/0.7907 F0 dual opt MySATRN_best_model.pth"],
         nargs="*",
         help="Path of checkpoint file",
     )
@@ -126,14 +129,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=128,
+        default=32,
         type=int,
         help="batch size when doing inference",
     )
 
     eval_dir = os.environ.get("SM_CHANNEL_EVAL", "/opt/ml/input/data/")
-    # file_path = os.path.join(eval_dir, 'train_dataset/gt.txt')
-    file_path = "/content/data/train_dataset/gt.txt"
+    file_path = os.path.join(eval_dir, 'train_dataset/gt.txt')
+    # file_path = "/content/data/train_dataset/gt.txt"
     parser.add_argument(
         "--file_path",
         dest="file_path",

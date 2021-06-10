@@ -160,7 +160,7 @@ RULES = {
 
 
 class MemoryNode:
-    def __init__(self, rules: dict, tokens: list):
+    def __init__(self, id: int, rules: dict, tokens: list):
         self.rules = rules
         self.history = []  # 또는 텐서 - 현재까지 생성된 토큰 리스트
         self.tokens = tokens
@@ -169,21 +169,28 @@ class MemoryNode:
         self.current_token_id = self._encode("<SOS>")  # 직전 토큰이 무엇인지
         self.num_series = 1  # 같은 토큰이 몇 회 연속으로 등장하고 있는지
         self.blacklist = self._look_back()  # 이번 step 생성 후보에서 제외해야 할 토큰은 무엇이 있는지
+        self.id = id
 
     def record(self, target_id: int):
         self.history.append(target_id)  # 아직 복잡한 로직이 없어서 필요하지는 않음
-
         if self.current_token_id == target_id:
             self.num_series += 1  # 같은 토큰 연속 등장 시 연속 횟수 증가
         else:
             self.num_series = 1  # 새로운 토큰 등장 시 초기화
-
         self.current_token_id = target_id  # 현재 타깃ID 갱신
         self.blacklist = self._look_back()  # 블랙리스트 갱신
+        print(f'[ID:{self.id}|HISTORY]', [self._decode(h) for h in self.history])
+        print(f'[ID:{self.id}|BLACKS]', [self._decode(h) for h in self.blacklist])
+        print('='*100)
 
     def _look_back(self) -> list:
+        print('='*100)
         current_token = self._decode(self.current_token_id)
-        blacklist = [self._encode("<SOS>")]  # 다음 step에서 생성을 금지할 토큰
+        print(f"[ID:{self.id}|CURRENT]", current_token)
+        blacklist = [
+            self._encode("<SOS>"), 
+            # self._encode(""),
+            ]  # 다음 step에서 생성을 금지할 토큰
 
         # =====CHECK #1 - 첫 step에서 등장할 수 없는 토큰=====
         if current_token == "<EOS>":
@@ -191,40 +198,52 @@ class MemoryNode:
 
         elif current_token == "<SOS>":
             excepts = [self._encode(t) for t in self.rules["cannot_initial"]]
-            blacklist.extend(excepts)
+            blacklist.extend(deepcopy(excepts))
+            print('[START]', current_token)
+            return blacklist
+
+        # =====CHECK #2 - 다음 target id를 확정지을 수 있는지 여부=====
+        # 매우 높은 확률로 뒤에 '_' 토큰이 오는 토큰
+        elif current_token in self.rules["next_underbar"]:
+            excepts = [
+                self._encode(t) for t in self.tokens if t != "_"
+            ]  # '_' 외 모든 토큰 블랙
+            blacklist.extend(deepcopy(excepts))
+            print(f'[ID:{self.id}|POST FIX: "_"]', f'CURRENT: {current_token}', blacklist)
+            return blacklist
+
+        # 매우 높은 확률로 뒤에 '{' 토큰이 오는 토큰
+        elif current_token in self.rules["next_lbracket"]:
+            excepts = [
+                self._encode(t) for t in self.tokens if t != "{"
+            ]  # '{' 외 모든 토큰 블랙
+            blacklist.extend(deepcopy(excepts))
+            tmp = "{"
+            print(f'[ID:{self.id}|POST FIX: "{tmp}"]', f'CURRENT: {current_token}', blacklist)
+            return blacklist
 
         else:
-            # =====CHECK #2 - 다음 target id를 확정지을 수 있는지 여부=====
-            # 매우 높은 확률로 뒤에 '_' 토큰이 오는 토큰
-            if current_token in self.rules["next_underbar"]:
-                excepts = [
-                    self._encode(t) for t in self.tokens if t != "_"
-                ]  # '_' 외 모든 토큰 블랙
-                blacklist = deepcopy(excepts)
+            # =====CHECK #3 - 다음 target id를 확정지을 수 있는지 여부=====
+            # 매우 높은 확률로 뒤에 '_' 토큰이 붙지 않아야 하는 토큰
+            if current_token in self.rules["cannot_next_underbar"]:
+                blacklist.append(self._encode("_"))  # '_' 추가
+                print(f'[ID:{self.id}|POST BAN: "_"]', f'CURRENT: "{current_token}"', blacklist)
 
-            # 매우 높은 확률로 뒤에 '{' 토큰이 오는 토큰
-            elif current_token in self.rules["next_lbracket"]:
-                excepts = [
-                    self._encode(t) for t in self.tokens if t != "{"
-                ]  # '{' 외 모든 토큰 블랙
-                blacklist = deepcopy(excepts)
+            # 매우 높은 확률로 뒤에 '{' 토큰이 붙지 않아야 하는 토큰
+            if current_token in self.rules["cannot_next_lbracket"]:
+                blacklist.append(self._encode("{"))  # '_' 추가
+                print(f'[ID:{self.id}|POST BAN:', "{]", f'CURRENT: "{current_token}"', blacklist)
 
-            else:
-                # =====CHECK #3 - 다음 target id를 확정지을 수 있는지 여부=====
-                # 매우 높은 확률로 뒤에 '_' 토큰이 붙지 않아야 하는 토큰
-                if current_token in self.rules["cannot_next_underbar"]:
-                    blacklist.append(self._encode("_"))  # '_' 추가
+            # =====CHECK #4 - 최대 연속 생성 횟수 확인=====
+            if self.rules["limit_series"][current_token]:
+                limit = self.rules["limit_params"][current_token]
+                if self.num_series >= limit:  # 연속 횟수가 넘쳤을 경우 블랙
+                    print(f'[ID:{self.id}|POST LIMIT: "{current_token}"]', f'LIMIT: {limit}', f'CURRENT SEIRES: {self.num_series}', end='\t')
+                    blacklist.append(self._encode(current_token))
+                    print(blacklist)
 
-                # 매우 높은 확률로 뒤에 '{' 토큰이 붙지 않아야 하는 토큰
-                if current_token in self.rules["cannot_next_lbracket"]:
-                    blacklist.append(self._encode("{"))  # '_' 추가
-
-                # =====CHECK #4 - 최대 연속 생성 횟수 확인=====
-                if self.num_series >= 2:
-                    if self.rules["limit_series"][current_token]:
-                        series_limit = self.rules["limit_params"][current_token]
-                        if self.num_series >= series_limit:  # 연속 횟수가 넘쳤을 경우 블랙
-                            blacklist.append(self.current_token_id)
+        blacklist = list(set(blacklist))
+        blacklist.sort()
         return blacklist
 
     def _encode(self, token: str) -> int:
@@ -243,22 +262,30 @@ class DecodingManager:
         self.vocab_size = len(tokens)
         self.memories = self._initialize_memories(batch_size, rules, tokens)
 
-    def filter(self, probs_step: torch.Tensor) -> torch.Tensor:
+    def sift(self, probs_step: torch.Tensor) -> torch.Tensor:
         """
         Args:
             probs_step(torch.Tensor): softmax 확률 분포 텐서, [B, VOCAB_SIZE]
         Returns:
             targets(torch.Tensor): 다음 스텝에 입력될 target 텐서, [B]
         """
+        # last batch 등 학습/추론 중 배치 사이즈가 달라질 경우 조정
         if len(probs_step) != self.batch_size:
             import warnings
-            self.memories = self._initialize_memories(len(probs_step), self.rules, self.tokens)
             warnings.warn(f"batch size has been changed! {self.batch_size}->{len(probs_step)}")
-
+            self.memories = self._initialize_memories(len(probs_step), self.rules, self.tokens)
+            self.batch_size = len(probs_step)
+            
+        if probs_step.ndim != 2:
+            probs_step = probs_step.squeeze(1).clone()
+            
         mask = list(map(lambda x: self._mask(x, self.vocab_size), self.memories))
         mask = torch.vstack(mask)
+
         probs_softmax = F.softmax(probs_step, dim=-1)
-        probs_softmax = probs_softmax.masked_fill(mask, 0)
+        probs_softmax = probs_softmax.masked_fill(mask.to(probs_softmax.get_device()), 0)
+
+        assert (probs_softmax == 0).sum().item() == mask.sum().item()
         targets = torch.argmax(probs_softmax, dim=-1)
         self._update(targets)
         return targets
@@ -269,7 +296,7 @@ class DecodingManager:
         )
 
     def _initialize_memories(self, batch_size: int, rules: dict, tokens: list) -> List[MemoryNode]:
-        memories = [MemoryNode(rules=rules, tokens=tokens) for _ in range(batch_size)]
+        memories = [MemoryNode(id=idx, rules=rules, tokens=tokens) for idx, _ in enumerate(range(batch_size))]
         return memories
 
     def _update(self, targets: torch.Tensor) -> None:

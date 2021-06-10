@@ -9,6 +9,7 @@ from networks.Attention import Attention
 from networks.SATRN import SATRN
 from networks.SWIN import SWIN
 from networks.My_SATRN import MySATRN
+# from networks.My_SATRN_v0 import MySATRN
 from networks.ASTER import ASTER
 
 import warnings
@@ -31,7 +32,18 @@ def get_network(
         # checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
         # model.encoder.load_state_dict(checkpoint['model'], strict=False)
     elif model_type == "MySATRN":
-        model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
+        # NOTE
+        # from postprocessing import DecodingManager, RULES
+        # from dataset import SPECIAL_TOKENS
+        # batch_size = FLAGS.batch_size
+        # tokens = open("../input/data/train_dataset/tokens.txt").readlines()
+        # tokens = list(map(lambda x: x.strip(), tokens))
+        # tokens = SPECIAL_TOKENS + tokens + [""]
+        # rules = RULES
+        # manager = DecodingManager(batch_size, rules, tokens)
+
+        # NOTE: 마지막 arg에 None을 넣으면 기존대로, manager 넣으면 매니징
+        model = MySATRN(FLAGS, train_dataset, model_checkpoint, None).to(device)
         
     elif model_type == "ASTER":
         model = ASTER(FLAGS, train_dataset, model_checkpoint).to(device)

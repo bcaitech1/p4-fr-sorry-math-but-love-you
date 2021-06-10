@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import timm
+
 from dataset import START, PAD
 from decoding import BeamSearchNode
 
@@ -397,8 +398,8 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt, tgt, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-            # att = self.attention_layer(tgt, src, src)
-            att = self.attention_layer(out, src, src) # NOTE
+            att = self.attention_layer(tgt, src, src)
+            # att = self.attention_layer(out, src, src) # NOTE
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
@@ -408,8 +409,8 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt_prev, tgt_prev, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-            # att = self.attention_layer(tgt, src, src)
-            att = self.attention_layer(out, src, src) # NOTE
+            att = self.attention_layer(tgt, src, src)
+            # att = self.attention_layer(out, src, src) # NOTE
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
@@ -459,6 +460,7 @@ class SATRNDecoder(nn.Module):
         st_id,
         layer_num=1,
         checkpoint=None,
+        decoding_manager=None,
     ):
         super(SATRNDecoder, self).__init__()
 
@@ -467,11 +469,9 @@ class SATRNDecoder(nn.Module):
         self.filter_dim = filter_dim
         self.num_classes = num_classes
         self.layer_num = layer_num
-
         self.pos_encoder = PositionEncoder1D(
             in_channels=hidden_dim, dropout=dropout_rate
         )
-
         self.attention_layers = nn.ModuleList(
             [
                 TransformerDecoderLayer(
@@ -481,12 +481,14 @@ class SATRNDecoder(nn.Module):
             ]
         )
         self.generator = nn.Linear(hidden_dim, num_classes)
-
         self.pad_id = pad_id
         self.st_id = st_id
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
+
+        # NOTE
+        self.manager = decoding_manager
 
     def pad_mask(self, text):
         pad_mask = text == self.pad_id
@@ -545,13 +547,21 @@ class SATRNDecoder(nn.Module):
                     )
 
                 _out = self.generator(tgt)  # [b, 1, c]
-                target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
-                target = target.squeeze()  # [b]
+
+                if self.manager is not None:
+                    probs_step = _out[:, -1:, :]
+                    target = self.manager.sift(probs_step) # [B]
+                else:
+                    target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
+                    target = target.squeeze()  # [b]
 
                 out.append(_out)
 
             out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
             out = out.squeeze(2)  # [b, max length, class length]
+
+            if self.manager is not None:
+                self.manager.reset()
 
         return out
 
@@ -581,6 +591,7 @@ class MySATRN(nn.Module):
             pad_id=train_dataset.token_to_id[PAD],
             st_id=train_dataset.token_to_id[START],
             layer_num=FLAGS.SATRN.decoder.layer_num,
+            decoding_manager=decoding_manager
         )
 
         self.criterion = nn.CrossEntropyLoss(

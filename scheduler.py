@@ -187,7 +187,6 @@ class TeacherForcingScheduler:
 
     @staticmethod
     def _get_arctan(num_steps, tf_max, tf_min):
-
         # Old Arctan
         # https://wandb.ai/smbly/Augmentations/runs/2ujnba9s?workspace=user-smbly
         # x = np.linspace(-5, 5, num_steps)
@@ -198,7 +197,6 @@ class TeacherForcingScheduler:
         # New Arctan
         diff = tf_max - tf_min
         inflection = int(num_steps * 0.1)
-
         x = np.linspace(-5, 5, num_steps)  # NOTE. for transformer
         x = -np.arctan(x)
         x -= x[-1]
