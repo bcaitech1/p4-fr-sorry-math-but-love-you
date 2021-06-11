@@ -180,24 +180,17 @@ class TeacherForcingScheduler:
         try:
             return next(self.__scheduler)
         except:
+            # 스케줄링이 끝났는데 학습은 종료되지 않은 경우 tf_min을 리턴
             warnings.warn(
                 f"Teacher forcing scheduler has been done. Return just tf_min({self.tf_min}) for now."
             )
             return self.tf_min
 
     @staticmethod
-    def _get_arctan(num_steps, tf_max, tf_min):
-        # Old Arctan
-        # https://wandb.ai/smbly/Augmentations/runs/2ujnba9s?workspace=user-smbly
-        # x = np.linspace(-5, 5, num_steps)
-        # x = -np.arctan(x)
-        # x -= x[-1]
-        # x *= (tf_max/x[0])
-
-        # New Arctan
+    def _get_arctan(num_steps: int, tf_max: float, tf_min: float):
         diff = tf_max - tf_min
         inflection = int(num_steps * 0.1)
-        x = np.linspace(-5, 5, num_steps)  # NOTE. for transformer
+        x = np.linspace(-5, 5, num_steps) # NOTE. for transformer
         x = -np.arctan(x)
         x -= x[-1]
         x *= diff / x[0]
@@ -206,7 +199,7 @@ class TeacherForcingScheduler:
         return x
 
     @staticmethod
-    def _get_cosine(num_steps, tf_max):  # NOTE. tf_min 적용 안 돼서 무조건 0으로 수렴함
+    def _get_cosine(num_steps: int, tf_max: float):  # NOTE. 아직 tf_min 미적용. 무조건 0으로 하강함
         factor = tf_max / 2
         x = np.linspace(0, np.pi, num_steps)
         x = np.cos(x)

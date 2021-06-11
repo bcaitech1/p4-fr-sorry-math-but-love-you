@@ -33,14 +33,14 @@ def get_network(
         # model.encoder.load_state_dict(checkpoint['model'], strict=False)
     elif model_type == "MySATRN":
         # NOTE
-        # from postprocessing import DecodingManager, RULES
-        # from dataset import SPECIAL_TOKENS
-        # batch_size = FLAGS.batch_size
-        # tokens = open("../input/data/train_dataset/tokens.txt").readlines()
-        # tokens = list(map(lambda x: x.strip(), tokens))
-        # tokens = SPECIAL_TOKENS + tokens + [""]
-        # rules = RULES
-        # manager = DecodingManager(batch_size, rules, tokens)
+        from postprocessing import DecodingManager, RULES
+        from dataset import SPECIAL_TOKENS
+        batch_size = FLAGS.batch_size
+        tokens = open("../input/data/train_dataset/tokens.txt").readlines()
+        tokens = list(map(lambda x: x.strip(), tokens))
+        tokens = SPECIAL_TOKENS + tokens + [""]
+        rules = RULES
+        manager = DecodingManager(batch_size, rules, tokens)
 
         # NOTE: 마지막 arg에 None을 넣으면 기존대로, manager 넣으면 매니징
         model = MySATRN(FLAGS, train_dataset, model_checkpoint, None).to(device)
