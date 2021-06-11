@@ -928,6 +928,7 @@ class TransformerDecoder(nn.Module):
         st_id,
         layer_num=1,
         checkpoint=None,
+        decoding_manager=None
     ):
         super(TransformerDecoder, self).__init__()
 
@@ -936,11 +937,9 @@ class TransformerDecoder(nn.Module):
         self.filter_dim = filter_dim
         self.num_classes = num_classes
         self.layer_num = layer_num
-
         self.pos_encoder = PositionEncoder1D(
             in_channels=hidden_dim, dropout=dropout_rate
         )
-
         self.attention_layers = nn.ModuleList(
             [
                 TransformerDecoderLayer(
@@ -950,9 +949,9 @@ class TransformerDecoder(nn.Module):
             ]
         )
         self.generator = nn.Linear(hidden_dim, num_classes)
-
         self.pad_id = pad_id
         self.st_id = st_id
+        self.manager = decoding_manager
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
@@ -978,14 +977,42 @@ class TransformerDecoder(nn.Module):
     def forward(
         self, src, text, is_train=True, batch_max_length=50, teacher_forcing_ratio=1.0
     ):
+        if is_train:
+            if random.random() < teacher_forcing_ratio:
+                tgt = self.text_embedding(text)
+                tgt = self.pos_encoder(tgt)
+                tgt_mask = self.pad_mask(text) | self.order_mask(text.size(1))
+                for layer in self.attention_layers:
+                    tgt = layer(tgt, None, src, tgt_mask)
+                out = self.generator(tgt)
+            else:
+                out = []
+                num_steps = batch_max_length - 1
+                target = (
+                    torch.LongTensor(src.size(0)).fill_(self.st_id).to(device)
+                )  # [START] token
+                features = [None] * self.layer_num
 
-        if is_train and random.random() < teacher_forcing_ratio:
-            tgt = self.text_embedding(text)
-            tgt = self.pos_encoder(tgt)
-            tgt_mask = self.pad_mask(text) | self.order_mask(text.size(1))
-            for layer in self.attention_layers:
-                tgt = layer(tgt, None, src, tgt_mask)
-            out = self.generator(tgt)
+                for t in range(num_steps):
+                    target = target.unsqueeze(1)
+                    tgt = self.text_embedding(target)
+                    tgt = self.pos_encoder(tgt, point=t)
+                    tgt_mask = self.order_mask(t + 1)
+                    tgt_mask = tgt_mask[:, -1].unsqueeze(1)  # [1, (l+1)]
+                    for l, layer in enumerate(self.attention_layers):
+                        tgt = layer(tgt, features[l], src, tgt_mask)
+                        features[l] = (
+                            tgt if features[l] == None else torch.cat([features[l], tgt], 1)
+                        )
+
+                    _out = self.generator(tgt)  # [b, 1, c]
+                    target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
+                    target = target.squeeze()  # [b]
+                    out.append(_out)
+
+                out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
+                out = out.squeeze(2)  # [b, max length, class length]
+                
         else:
             out = []
             num_steps = batch_max_length - 1
@@ -995,7 +1022,14 @@ class TransformerDecoder(nn.Module):
             features = [None] * self.layer_num
 
             for t in range(num_steps):
-                target = target.unsqueeze(1)
+                if target.ndim == 1:
+                    target = target.unsqueeze(1)
+                else:
+                    import warnings
+
+                    warnings.warn("batch length is 1")
+                    target = target.unsqueeze(0).unsqueeze(1)
+
                 tgt = self.text_embedding(target)
                 tgt = self.pos_encoder(tgt, point=t)
                 tgt_mask = self.order_mask(t + 1)
@@ -1007,18 +1041,27 @@ class TransformerDecoder(nn.Module):
                     )
 
                 _out = self.generator(tgt)  # [b, 1, c]
-                target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
-                target = target.squeeze()  # [b]
+
+                if self.manager is not None:
+                    probs_step = _out[:, -1:, :]
+                    target, _out = self.manager.sift(probs_step) # [B]
+                else:
+                    target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
+                    target = target.squeeze()  # [b]
+
                 out.append(_out)
 
             out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
             out = out.squeeze(2)  # [b, max length, class length]
 
+            if self.manager is not None:
+                self.manager.reset()
+
         return out
 
 
 class SWIN(nn.Module):
-    def __init__(self, FLAGS, train_dataset, checkpoint=None):
+    def __init__(self, FLAGS, train_dataset, checkpoint=None, decoding_manager=None):
         super(SWIN, self).__init__()
 
         self.encoder = SwinTransformer(
@@ -1061,10 +1104,11 @@ class SWIN(nn.Module):
             pad_id=train_dataset.token_to_id[PAD],
             st_id=train_dataset.token_to_id[START],
             layer_num=FLAGS.SATRN.decoder.layer_num,
+            decoding_manager=decoding_manager
         )
         self.criterion = nn.CrossEntropyLoss(
             ignore_index=train_dataset.token_to_id[PAD]
-        )  # without ignore_index=train_dataset.token_to_id[PAD]
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)

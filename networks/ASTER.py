@@ -41,7 +41,6 @@ class DeepCNN(nn.Module):
         out = self.eff_blocks(out)  # [B, 256, 32, 32]
         out = self.pooling1(out)  # [B, 256, 16, 33]
         out = self.conv1(out)  # [B, 512, 16, 33] # NOTE [B, 256, 16, 33]
-        # out = self.conv2(out) # [B, 512, 16, 33]
         out = self.pooling2(out)  # [B, 512, 8, 34] # NOTE [B, 256, 16, 33]
         out = self.conv3(out)  # [B, 512, 7, 33] # NOTE [B, 256, 16, 33]
         return out
@@ -206,8 +205,6 @@ class ASTERDecoder(nn.Module):
         self.generator = nn.Linear(hidden_dim, num_classes)
         self.pad_id = pad_id
         self.st_id = st_id
-
-        # NOTE: Decoding manager
         self.manager = decoding_manager
 
         if checkpoint is not None:
@@ -256,34 +253,55 @@ class ASTERDecoder(nn.Module):
             ]
 
         # teacher forcing할 경우
-        if is_train and random.random() < teacher_forcing_ratio:
-            # 배치 내 모든 sample에 대해 일괄 계산
-            for i in range(num_steps):
-                embedd = self.embedding(text[:, i])  # 샘플 각각의 i번째 캐릭터 임베딩
-                hidden, alpha = self.attention_cell(
-                    prev_hidden=hidden,  # [hidden_state, cell_state] for LSTM, [B, HIDDEN]
-                    src=src,  # [B, WxH, C]
-                    tgt=embedd,  # [B, HIDDEN]
-                )  # hidden: [B, HIDDEN] x2
-                if self.num_layers == 1:
-                    output_hiddens[:, i, :] = hidden[0]  # for LSTM (0: hidden, 1: Cell)
-                else:
-                    output_hiddens[:, i, :] = hidden[-1][0]  # 다중 레이어 - 마지막 레이어 사용
-            probs = self.generator(output_hiddens)
+        if is_train:
+            if random.random() < teacher_forcing_ratio:
+                # 배치 내 모든 sample에 대해 일괄 계산
+                for i in range(num_steps):
+                    embedd = self.embedding(text[:, i])  # 샘플 각각의 i번째 캐릭터 임베딩
+                    hidden, alpha = self.attention_cell(
+                        prev_hidden=hidden,  # [hidden_state, cell_state] for LSTM, [B, HIDDEN]
+                        src=src,  # [B, WxH, C]
+                        tgt=embedd,  # [B, HIDDEN]
+                    )  # hidden: [B, HIDDEN] x2
+                    if self.num_layers == 1:
+                        output_hiddens[:, i, :] = hidden[0]  # for LSTM (0: hidden, 1: Cell)
+                    else:
+                        output_hiddens[:, i, :] = hidden[-1][0]  # 다중 레이어 - 마지막 레이어 사용
+                probs = self.generator(output_hiddens)
 
-        # teacher forcing하지 않을 경우
+            else:
+                # [SOS] - [B]
+                targets = torch.LongTensor(batch_size).fill_(self.st_id).to(device)
+                probs = (
+                    torch.FloatTensor(batch_size, num_steps, self.num_classes)
+                    .fill_(0)
+                    .to(device)
+                ) # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
+
+                for i in range(num_steps):
+                    embedd = self.embedding(targets)  # [B, HIDDEN]
+                    hidden, alpha = self.attention_cell(
+                        prev_hidden=hidden,  # [hidden_state, cell_state] for LSTM, [B, HIDDEN]
+                        src=src,  # [B, WxH, C]
+                        tgt=embedd,  # [B, HIDDEN]
+                    )  # hidden: [B, HIDDEN] x2
+                    probs_step = (
+                        self.generator(hidden[0])
+                        if self.num_layers == 1
+                        else self.generator(hidden[-1][0])
+                    )  # [B, VOCAB_SIZE]
+
+                    probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
+                    _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
+                    targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
+
         else:
-            # 배치 내 모든 샘플에 대해 첫 시작에 [START] 마련
-
-            # [SOS] - [B]
             targets = torch.LongTensor(batch_size).fill_(self.st_id).to(device)
-
-            # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
             probs = (
                 torch.FloatTensor(batch_size, num_steps, self.num_classes)
                 .fill_(0)
                 .to(device)
-            )
+            ) # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
 
             for i in range(num_steps):
                 embedd = self.embedding(targets)  # [B, HIDDEN]
@@ -304,8 +322,6 @@ class ASTERDecoder(nn.Module):
                 # NOTE: DecodingManager
                 if self.manager is not None:
                     targets = self.manager.sift(probs_step)
-                
-                # 기존 방식대로 진행
                 else:
                     targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
             
@@ -321,7 +337,7 @@ class ASTER(nn.Module):
         FLAGS,
         train_dataset,
         checkpoint=None,
-        manager=None # NOTE
+        decoding_manager=None # NOTE
     ):
         super(ASTER, self).__init__()
         self.encoder = ASTEREncoder(FLAGS)
@@ -333,7 +349,7 @@ class ASTER(nn.Module):
             pad_id=train_dataset.token_to_id["<PAD>"],
             st_id=train_dataset.token_to_id["<SOS>"],
             num_layers=FLAGS.ASTER.layer_num,
-            manager=manager # NOTE
+            decoding_manager=manager # NOTE
         )
 
         self.criterion = nn.CrossEntropyLoss(
