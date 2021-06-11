@@ -9,7 +9,7 @@ from networks.Attention import Attention
 from networks.SATRN import SATRN
 from networks.SWIN import SWIN
 from networks.My_SATRN import MySATRN
-# from networks.My_SATRN_v0 import MySATRN
+# from networks.My_SATRN_v0 import MySATRN # Attention 수정 안된 파일
 from networks.ASTER import ASTER
 
 import warnings
@@ -90,7 +90,6 @@ def id_to_string(tokens, data_loader, do_eval=0):
                 eos_id,
             ]
         )
-
     for example in tokens:
         string = ""
         if do_eval:
@@ -109,34 +108,6 @@ def id_to_string(tokens, data_loader, do_eval=0):
 
         result.append(string)
     return result
-
-
-# Old: deprecated
-# def id_to_string(tokens, data_loader,do_eval=0):
-#     result = []
-#     if do_eval:
-#         special_ids = [
-#             data_loader.dataset.token_to_id["<PAD>"],
-#             data_loader.dataset.token_to_id["<SOS>"],
-#             data_loader.dataset.token_to_id["<EOS>"]
-#             ]
-
-#     for example in tokens:
-#         string = ""
-#         if do_eval:
-#             for token in example:
-#                 token = token.item()
-#                 if token not in special_ids:
-#                     if token != -1:
-#                         string += data_loader.dataset.id_to_token[token] + " "
-#         else:
-#             for token in example:
-#                 token = token.item()
-#                 if token != -1:
-#                     string += data_loader.dataset.id_to_token[token] + " "
-
-#         result.append(string)
-#     return result
 
 
 def set_seed(seed: int = 21):

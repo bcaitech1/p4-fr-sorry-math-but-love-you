@@ -39,7 +39,6 @@ def main(parser):
     print(options.input_size.height)
 
     transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
-    # transformed = A.Compose([A.Resize(256, 512, p=1.0), ToTensorV2()])
 
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
