@@ -15,11 +15,11 @@ from train import get_valid_transforms
 from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
 from decoding import decode
-
-from postprocessing import RULES, DecodingManager
+from postprocessing import get_decoding_manager
 
 
 def main(parser):
+
     is_cuda = torch.cuda.is_available()
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
@@ -36,16 +36,17 @@ def main(parser):
             "[+] Checkpoint\n",
             "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
         )
-    print(options.input_size.height)
 
-    transformed = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
-
+    transformed = get_valid_transforms(
+        height=options.input_size.height, width=options.input_size.width
+    )
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
 
     root = os.path.join(os.path.dirname(parser.file_path), "images")
     with open(parser.file_path, "r") as fd:
         reader = csv.reader(fd, delimiter="\t")
         data = list(reader)
+
     test_data = [[os.path.join(root, x[0]), x[0], dummy_gt] for x in data]
     test_dataset = LoadEvalDataset(
         test_data,
@@ -67,17 +68,24 @@ def main(parser):
         "[+] Data\n",
         "The number of test samples : {}\n".format(len(test_dataset)),
     )
-
+    manager = (
+        get_decoding_manager(tokens_path="./configs/tokens.txt", batch_size=parser.batch_size)
+        if parser.decoding_manager
+        else None
+    )
+    
     model = get_network(
-        options.network,
-        options,
-        model_checkpoint,
-        device,
-        test_dataset,
+        model_type=options.network,
+        FLAGS=options,
+        model_checkpoint=model_checkpoint,
+        device=device,
+        dataset=test_dataset,
+        decoding_manager=manager
     )
     model.eval()
     results = []
     print("[+] Decoding Type:", parser.decode_type)
+
     with torch.no_grad():
         for d in tqdm(test_data_loader):
             input = d["image"].float().to(device)
@@ -101,9 +109,14 @@ def main(parser):
             w.write(path + "\t" + predicted + "\n")
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--inference_type",
+        default="single",
+        type=str,
+        help="추론 방법 설정 'single(단일모델추론)', 'ensemble앙상블()'",
+    )
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
@@ -139,7 +152,9 @@ if __name__ == "__main__":
         type=int,
         help="빔서치 사용 시 스텝별 후보 수 설정",
     )
-
+    parser.add_argument(
+        "--decoding_manager", default=True, type=bool, help="DecodingManager 활용 여부 설정"
+    )
     eval_dir = os.environ.get("SM_CHANNEL_EVAL", "/opt/ml/input/data/")
     file_path = os.path.join(eval_dir, "eval_dataset/input.txt")
     parser.add_argument(
@@ -149,7 +164,6 @@ if __name__ == "__main__":
         type=str,
         help="file path when doing inference",
     )
-
     output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "submit")
     parser.add_argument(
         "--output_dir",

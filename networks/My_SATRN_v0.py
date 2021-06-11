@@ -505,8 +505,9 @@ class SATRNDecoder(nn.Module):
     def text_embedding(self, texts):
         tgt = self.embedding(texts)
         tgt *= math.sqrt(tgt.size(2))
-
         return tgt
+
+    def 
 
     def forward(
         self, src, text, is_train=True, batch_max_length=50, teacher_forcing_ratio=1.0

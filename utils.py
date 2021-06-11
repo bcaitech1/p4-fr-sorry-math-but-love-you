@@ -8,8 +8,8 @@ import torch.optim as optim
 from networks.Attention import Attention
 from networks.SATRN import SATRN
 from networks.SWIN import SWIN
-from networks.My_SATRN import MySATRN
-# from networks.My_SATRN_v0 import MySATRN # Attention 수정 안된 파일
+# from networks.My_SATRN import MySATRN
+from networks.My_SATRN_v0 import MySATRN
 from networks.ASTER import ASTER
 
 import warnings
@@ -20,33 +20,26 @@ def get_network(
     FLAGS,
     model_checkpoint,
     device,
-    train_dataset,
+    dataset,
+    decoding_manager=None # NOTE. available for ASTER, MySATRN, SWIN
 ):
-    model = None
     if model_type == "Attention":
-        model = Attention(FLAGS, train_dataset, model_checkpoint).to(device)
-    elif model_type == "SATRN":
-        model = SATRN(FLAGS, train_dataset, model_checkpoint).to(device)
-    elif model_type == "SWIN":
-        model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
-        # checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
-        # model.encoder.load_state_dict(checkpoint['model'], strict=False)
-    elif model_type == "MySATRN":
-        # NOTE
-        from postprocessing import DecodingManager, RULES
-        from dataset import SPECIAL_TOKENS
-        batch_size = FLAGS.batch_size
-        tokens = open("../input/data/train_dataset/tokens.txt").readlines()
-        tokens = list(map(lambda x: x.strip(), tokens))
-        tokens = SPECIAL_TOKENS + tokens + [""]
-        rules = RULES
-        manager = DecodingManager(batch_size, rules, tokens)
+        model = Attention(FLAGS, dataset, model_checkpoint).to(device)
 
-        # NOTE: 마지막 arg에 None을 넣으면 기존대로, manager 넣으면 매니징
-        model = MySATRN(FLAGS, train_dataset, model_checkpoint, None).to(device)
+    elif model_type == "SATRN":
+        model = SATRN(FLAGS, dataset, model_checkpoint).to(device)
+
+    elif model_type == "SWIN":
+        model = SWIN(FLAGS, dataset, model_checkpoint, decoding_manager).to(device)
+        checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
+        model.encoder.load_state_dict(checkpoint['model'], strict=False)
+
+    elif model_type == "MySATRN":
+        model = MySATRN(FLAGS, dataset, model_checkpoint, decoding_manager).to(device)
         
     elif model_type == "ASTER":
-        model = ASTER(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = ASTER(FLAGS, dataset, model_checkpoint, decoding_manager).to(device)
+
     else:
         raise NotImplementedError
 
@@ -56,7 +49,6 @@ def get_network(
 def get_optimizer(optimizer, params, lr, weight_decay=None):
     if optimizer == "Adam":
         optimizer = optim.Adam(params, lr=lr)
-
     elif optimizer == "Adadelta":
         optimizer = optim.Adadelta(params, lr=lr, weight_decay=weight_decay)
     elif optimizer == "AdamW":

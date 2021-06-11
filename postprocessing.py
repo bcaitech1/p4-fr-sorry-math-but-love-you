@@ -2,7 +2,7 @@ from copy import deepcopy
 from typing import List
 import torch
 import torch.nn.functional as F
-
+from dataset import SPECIAL_TOKENS
 
 RULES = {
     # 한번도 첫번째로 등장한 적이 없는 토큰
@@ -184,13 +184,23 @@ RULES = {
         '\\sech':1, '\\Omega':1, '\\roman5':1, '\\triangle':1, '\\overarc':1, '\\circ':1, '\\infty':1, '^':1,
         '\\otimes':1, '\\approx':1, '\\max':1, '\\cosh':1
     },
-
-
 }
+
+def get_decoding_manager(tokens_path, batch_size: int=128):
+    tokens = []
+    tokens.extend(SPECIAL_TOKENS)
+    with open(tokens_path, "r") as fd:
+        reader = fd.read()
+        for token in reader.split("\n"):
+            if token not in tokens:
+                tokens.append(token)
+    assert len(tokens) == 245 # NOTE: for debug
+    manager = DecodingManager(batch_size=batch_size, rules=RULES, tokens=tokens)
+    return manager
 
 
 class MemoryNode:
-    def __init__(self, id: int, rules: dict, tokens: list, batch_size: int):
+    def __init__(self, id: int, rules: dict, tokens: list):
         self.id = id # 배치 내 샘플 순서(0~) NOTE: just for debugging
         self.rules = rules
         self.history = []  # 또는 텐서 - 현재까지 생성된 토큰 리스트 NOTE: just for debugging

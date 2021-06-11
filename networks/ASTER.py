@@ -209,6 +209,17 @@ class ASTERDecoder(nn.Module):
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
+    
+    
+    def step_forward(self, target):
+        self.features = []
+        ...
+        .
+        .
+        .
+        .
+        return _out
+
 
     def forward(
         self, src, text, is_train=True, teacher_forcing_ratio=1.0, batch_max_length=50

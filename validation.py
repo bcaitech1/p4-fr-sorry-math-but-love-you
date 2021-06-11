@@ -1,28 +1,21 @@
 import os
+import time
 import argparse
-import random
 from tqdm import tqdm
-import csv
 import torch
 from torch.utils.data import DataLoader
 
 from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
-from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
-from train import get_valid_transforms
+from dataset import collate_batch, PAD, LoadDataset, split_gt
+from augmentations import get_valid_transforms
 from flags import Flags
-from utils import id_to_string, get_network, get_optimizer, set_seed
+from utils import id_to_string, get_network, set_seed
 from decoding import decode
 
 
 def validate(parser):
-    """학습한 모델의 성능 검증을 위한 함수. NOTE: 제출용 함수가 아님!
-
-    Args:
-        parser ([type]): [description]
-    """
-    import time
-    from dataset import collate_batch, LoadDataset, split_gt
+    
 
     is_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if is_cuda else "cpu")

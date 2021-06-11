@@ -13,7 +13,7 @@ from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
 
 
-def main(parser):
+def ensemble(parser):
     set_seed(21)
     output_fname = "mysatrn-output-managerv0.csv"
 
@@ -104,64 +104,3 @@ def main(parser):
         with open(os.path.join(parser.output_dir, output_fname), "w") as w:
             for path, predicted in results:
                 w.write(path + "\t" + predicted + "\n")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--models",
-        default=[
-            "./log/my_satrn/checkpoints/0.7907 F0 dual opt MySATRN_best_model.pth"
-        ],
-        nargs="*",
-        help="Path of checkpoint file",
-    )
-    parser.add_argument(
-        "--heights",
-        default=[256],
-        nargs="*",
-        help="Height of input. SATRN(256), SWIN(384), ASTER(256)",
-    )
-    parser.add_argument(
-        "--width",
-        default=[512],
-        nargs="*",
-        help="Height of input. SATRN(512), SWIN(384), ASTER(1024)",
-    )
-    parser.add_argument(
-        "--max_sequence",
-        dest="max_sequence",
-        default=230,
-        type=int,
-        help="maximun sequence when doing inference",
-    )
-    parser.add_argument(
-        "--batch_size",
-        dest="batch_size",
-        default=128,
-        type=int,
-        help="batch size when doing inference",
-    )
-    parser.add_argument("--seed", default=21, type=int, help="seed number")
-
-    eval_dir = os.environ.get("SM_CHANNEL_EVAL", "/opt/ml/input/data/")
-    file_path = os.path.join(eval_dir, "train_dataset/gt.txt")
-    parser.add_argument(
-        "--file_path",
-        dest="file_path",
-        default=file_path,
-        type=str,
-        help="file path when doing inference",
-    )
-
-    output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "submit")
-    parser.add_argument(
-        "--output_dir",
-        dest="output_dir",
-        default=output_dir,
-        type=str,
-        help="output directory",
-    )
-
-    parser = parser.parse_args()
-    main(parser)
