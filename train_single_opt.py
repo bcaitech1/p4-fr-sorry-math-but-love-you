@@ -12,8 +12,6 @@ import torch
 from torch import nn, optim
 from torchvision import transforms
 from torch.cuda.amp import autocast, GradScaler
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
 import wandb
 from checkpoint import (
     default_checkpoint,
@@ -26,6 +24,7 @@ from checkpoint import (
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
 from utils import get_timestamp
+from augmentations import get_train_transforms, get_valid_transforms
 from dataset import dataset_loader, START, PAD, load_vocab
 from scheduler import (
     CircularLRBeta,
@@ -38,18 +37,17 @@ os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
 
-def train_one_epoch(
+def _train_one_epoch(
     data_loader,
     model,
     epoch_text,
     criterion,
     optimizer,
     lr_scheduler,
-    teacher_forcing_ratio,
     max_grad_norm,
     device,
     scaler,
-    tf_scheduler,  # NOTE. Teacher Forcing Scheduler
+    tf_scheduler,
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -71,25 +69,20 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
-            tf_ratio = tf_scheduler.step()  # NOTE. Teacher Forcing Scheduler
-
+            tf_ratio = tf_scheduler.step()  # Teacher Forcing Scheduler
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
-
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            # with autocast():
             output = model(
                 input, expected, True, tf_ratio
-            )  # NOTE. Teacher Forcing Scheduler
-            #             output = model(input, expected, True, teacher_forcing_ratio) # [B, MAX_LEN, VOCAB_SIZE]
+            )  # [B, MAX_LEN, VOCAB_SIZE]
 
             decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1)  # [B, 1, MAX_LEN]
-            sequence = sequence.squeeze(1)  # [B, MAX_LEN], Metric 측정을 위해
+            sequence = sequence.squeeze(1)  # [B, MAX_LEN]
 
             loss = criterion(decoded_values, expected[:, 1:])  # [SOS] 이후부터
-
             optim_params = [
                 p
                 for param_group in optimizer.param_groups
@@ -101,7 +94,6 @@ def train_one_epoch(
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
-            # cycle
             optimizer.step()
             losses.append(loss.item())
 
@@ -122,20 +114,9 @@ def train_one_epoch(
             if isinstance(lr_scheduler.get_lr(), float) or isinstance(
                 lr_scheduler.get_lr(), int
             ):
-                wandb.log(
-                    {
-                        "learning_rate": lr_scheduler.get_lr(),
-                        "tf_ratio": tf_ratio,  # NOTE. Teacher Forcing Scheduler
-                    }
-                )
+                wandb.log({"learning_rate": lr_scheduler.get_lr(), "tf_ratio": tf_ratio})
             else:
-                for lr_ in lr_scheduler.get_lr():
-                    wandb.log(
-                        {
-                            "learning_rate": lr_,
-                            "tf_ratio": tf_ratio,  # NOTE. Teacher Forcing Scheduler
-                        }
-                    )
+                wandb.log({"learning_rate": lr_scheduler.get_lr()[0], "tf_ratio": tf_ratio})
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -158,7 +139,7 @@ def train_one_epoch(
     return result
 
 
-def valid_one_epoch(
+def _valid_one_epoch(
     data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio
 ):
     model.eval()
@@ -185,7 +166,6 @@ def valid_one_epoch(
                 expected = d["truth"]["encoded"].to(device)
 
                 expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-                # with autocast():
                 output = model(input, expected, False, teacher_forcing_ratio)
 
                 decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
@@ -195,7 +175,6 @@ def valid_one_epoch(
                 sequence = sequence.squeeze(1)  # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
                 loss = criterion(decoded_values, expected[:, 1:])
-
                 losses.append(loss.item())
 
                 expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
@@ -227,40 +206,7 @@ def valid_one_epoch(
     return result
 
 
-def get_train_transforms(height, width):
-    return A.Compose(
-        [
-            A.Resize(height, width),
-            A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=0, p=0.3),
-            A.GridDistortion(
-                p=0.3,
-                num_steps=8,
-                distort_limit=(-0.5, 0.5),
-                interpolation=0,
-                border_mode=0,
-            ),
-            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ToTensorV2(p=1.0),
-        ],
-        p=1.0,
-    )
-
-
-def get_valid_transforms(height, width):
-    return A.Compose(
-        [
-            A.Resize(height, width),
-            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ToTensorV2(p=1.0),
-        ],
-        p=1.0,
-    )
-
-
 def main(config_file):
-    """
-    Train math formula recognition model
-    """
     options = Flags(config_file).get()
     timestamp = get_timestamp()
 
@@ -379,7 +325,7 @@ def main(config_file):
         # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
         total_steps = len(train_data_loader) * options.num_epochs  # 전체 스텝 수
-        t_0 = total_steps // 1  # 주기를 3으로 설정
+        t_0 = total_steps // 1  # 주기를 1로 설정
         t_up = int(t_0 * 0.1)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
@@ -391,10 +337,9 @@ def main(config_file):
             gamma=0.8,
         )
         print("TF-MAX", options.teacher_forcing_ratio)
-        # NOTE. Teacher Forcing Scheduler
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps,
-            tf_max=options.teacher_forcing_ratio,  # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
+            tf_max=options.teacher_forcing_ratio,
             tf_min=0.3,
         )
 
@@ -466,18 +411,17 @@ def main(config_file):
             pad=len(str(options.num_epochs)),
         )
 
-        train_result = train_one_epoch(
-            train_data_loader,
-            model,
-            epoch_text,
-            criterion,
-            optimizer,
-            lr_scheduler,
-            options.teacher_forcing_ratio,
-            options.max_grad_norm,
-            device,
-            scaler,
-            tf_scheduler,  # NOTE. Teacher Forcing Scheduler
+        train_result = _train_one_epoch(
+            data_loader=train_data_loader,
+            model=model,
+            epoch_text=epoch_text,
+            criterion=criterion,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            max_grad_norm=options.max_grad_norm,
+            device=device,
+            scaler=scaler,
+            tf_scheduler=tf_scheduler,  # NOTE. Teacher Forcing Scheduler
         )
 
         train_losses.append(train_result["loss"])
@@ -497,13 +441,12 @@ def main(config_file):
             sentence_acc=train_epoch_sentence_accuracy, word_error_rate=train_epoch_wer
         )
         epoch_lr = lr_scheduler.get_lr()  # cycle
-
-        validation_result = valid_one_epoch(
-            validation_data_loader,
-            model,
-            epoch_text,
-            criterion,
-            device,
+        validation_result = _valid_one_epoch(
+            data_loader=validation_data_loader,
+            model=model,
+            epoch_text=epoch_text,
+            criterion=criterion,
+            device=device,
             teacher_forcing_ratio=0.5,
         )
 
@@ -528,10 +471,10 @@ def main(config_file):
         # make config
         with open(config_file, "r") as f:
             option_dict = yaml.safe_load(f)
+
         if best_score < 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
             1 - validation_epoch_wer
         ):
-            # prefix = f"{parser.project_name}-{parser.exp_name}-{timestamp}"
             save_checkpoint(
                 {
                     "epoch": start_epoch + epoch + 1,
@@ -554,11 +497,11 @@ def main(config_file):
                     "scheduler": lr_scheduler.state_dict(),
                 },
                 prefix=options.prefix,
-                # prefix=prefix,
             )
-            best_score = 0.9 * validation_epoch_sentence_accuracy + 0.1 * (
-                1 - validation_epoch_wer
-            )
+            best_score = final_metric(
+                sentence_acc=validation_epoch_sentence_accuracy,
+                word_error_rate=validation_epoch_wer
+                )
             print(f"best score: {best_score}")
             print("model is saved")
 
