@@ -7,9 +7,8 @@ import torch
 import torch.optim as optim
 from networks.Attention import Attention
 from networks.SATRN import SATRN
+from networks.My_SATRN import MySATRN, MySATRN_en, MySATRN_de
 from networks.SWIN import SWIN
-from networks.My_SATRN import MySATRN
-
 import warnings
 
 def get_network(
@@ -24,9 +23,15 @@ def get_network(
         model = Attention(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == 'SATRN':
         model = SATRN(FLAGS, train_dataset, model_checkpoint).to(device)
+    elif model_type == 'MySATRN':
+        model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
+    elif model_type == 'MySATRN_en':
+        model = MySATRN_en(FLAGS, train_dataset, model_checkpoint).to(device)
+    elif model_type == 'MySATRN_de':
+        model = MySATRN_de(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == 'SWIN':
         model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
-        checkpoint = torch.load('/opt/ml/p4-fr-sorry-math-but-love-you_sub/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
+        checkpoint = torch.load('/opt/ml/sorry_math_but_love_you/pth/swin_tiny_patch4_window7_224.pth', map_location='cuda')
         model.encoder.load_state_dict(checkpoint['model'], strict=False)
     elif model_type == "MySATRN":
         model = MySATRN(FLAGS, train_dataset, model_checkpoint).to(device)
@@ -62,13 +67,13 @@ def print_system_envs():
 def id_to_string(tokens, data_loader, do_eval=0):
     result = []
     if do_eval:
-        eos_id = data_loader.dataset.token_to_id["<EOS>"]
+        eos_id = data_loader.dataset.token_to_id['<EOS>']
         special_ids = set([
-            data_loader.dataset.token_to_id["<PAD>"],
+            data_loader.dataset.token_to_id['<PAD>'],
             data_loader.dataset.token_to_id["<SOS>"],
             eos_id
             ])
-
+        
     for example in tokens:
         string = ""
         if do_eval:
@@ -84,7 +89,7 @@ def id_to_string(tokens, data_loader, do_eval=0):
                 token = token.item()
                 if token != -1:
                     string += data_loader.dataset.id_to_token[token] + " "
-
+        
         result.append(string)
     return result
 

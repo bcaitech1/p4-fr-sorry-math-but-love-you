@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-
 START = "<SOS>"
 END = "<EOS>"
 PAD = "<PAD>"
@@ -25,7 +24,7 @@ def encode_truth(truth, token_to_id):
     truth_tokens = truth.split()
     for token in truth_tokens:
         if token not in token_to_id:
-            raise Exception("Truth contains unknown token")
+            raise Exception(f"{token} Truth contains unknown token")
     truth_tokens = [token_to_id[x] for x in truth_tokens]
     if '' in truth_tokens: truth_tokens.remove('')
     return truth_tokens
@@ -68,6 +67,18 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         (2) split하지 않을 경우(test_percent == None): (학습용 이미지 경로, GT) 리스트
     """
     # root = os.path.join(os.path.dirname(groundtruth), "images")
+    # ####----------------------
+    # print(root)
+    # print(os.path.dirname(groundtruth))
+    # df = pd.read_csv('/opt/ml/input/data/formula_images_processed/total_df.csv')
+
+    # df['image'] = '/opt/ml/input/data/formula_images_processed/images/' + df['image']
+    # data = [[df.iloc[i].values.tolist()[1], df.iloc[i].values.tolist()[0]] for i in range(len(df))]
+    # return data[:85000], data[85000:]
+
+    # root = os.path.join(os.path.dirname(groundtruth), "images")
+    # df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'total_df.csv'))
+
     # with open(groundtruth, "r") as fd:
     #     data=[]
     #     for line in fd:
@@ -88,8 +99,11 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
-    val_image_names = set(df[df['fold']==3]['image_name'].values)
-    train_image_names = set(df[df['fold']!=3]['image_name'].values)
+    val_image_names = set(df[df['fold']==0]['image_name'].values)
+    train_image_names = set(df[df['fold']!=0]['image_name'].values)
+    # train_print_image_names = set(df[(df['fold']!=0) & (df['source']==0)]['image_name'].values)
+    # train_hand_image_names = set(df[(df['fold']!=0) & (df['source']==1)]['image_name'].values)
+    ####----------------------
     with open(groundtruth, "r") as fd:
         data=[]
         for line in fd:
@@ -100,6 +114,10 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
         train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
         val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
     return train_data, val_data
+    #     train_print_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_print_image_names]
+    #     train_hand_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_hand_image_names]
+    #     val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
+    # return train_print_data, train_hand_data, val_data
 
 
 
@@ -288,6 +306,7 @@ def dataset_loader(options, train_transform, valid_transform):
 
     # Read data
     train_data, valid_data = [], [] 
+    # train_print_data, train_hand_data, valid_data = [], [], []
     if options.data.random_split:
         for i, path in enumerate(options.data.train):
             prop = 1.0
@@ -295,6 +314,9 @@ def dataset_loader(options, train_transform, valid_transform):
                 prop = options.data.dataset_proportions[i]
             train, valid = split_gt(path, prop, options.data.test_proportions)
             train_data += train
+            # train_print, train_hand, valid = split_gt(path, prop, options.data.test_proportions)
+            # train_print_data += train_print
+            # train_hand_data += train_hand
             valid_data += valid
     else:
         for i, path in enumerate(options.data.train):
@@ -305,20 +327,51 @@ def dataset_loader(options, train_transform, valid_transform):
         for i, path in enumerate(options.data.test):
             valid = split_gt(path)
             valid_data += valid
-
+    # print(len(train_print_data))
+    # print(len(train_hand_data))
     # Load data
     train_dataset = LoadDataset(
         # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
         train_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
     )
+
     train_data_loader = DataLoader(
         train_dataset,
         batch_size=options.batch_size,
         shuffle=True,
         num_workers=options.num_workers,
+        pin_memory=True,
         collate_fn=collate_batch,
         drop_last=True,
     )
+
+    # train_print_dataset = LoadDataset(
+    #     train_print_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
+    # )
+
+    # train_hand_dataset = LoadDataset(
+    #     train_hand_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
+    # )
+    
+    # train_print_loader = DataLoader(
+    #     train_print_dataset,
+    #     batch_size=options.batch_size//2,
+    #     shuffle=True,
+    #     num_workers=options.num_workers,
+    #     pin_memory=True,
+    #     collate_fn=collate_batch,
+    #     drop_last=True
+    # )
+    
+    # train_hand_loader = DataLoader(
+    #     train_hand_dataset,
+    #     batch_size=options.batch_size//2,
+    #     shuffle=True,
+    #     num_workers=options.num_workers,
+    #     pin_memory=True,
+    #     collate_fn=collate_batch,
+    #     drop_last=True
+    # )
 
     valid_dataset = LoadDataset(
         # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
@@ -326,11 +379,12 @@ def dataset_loader(options, train_transform, valid_transform):
     )
     valid_data_loader = DataLoader(
         valid_dataset,
-        batch_size=options.batch_size,
+        batch_size=options.batch_size*4,
         shuffle=False,
-        num_workers=options.num_workers,
+        num_workers=1,
         collate_fn=collate_batch,
         drop_last=True,
     )
 
     return train_data_loader, valid_data_loader, train_dataset, valid_dataset
+    # return train_print_loader, train_hand_loader, valid_data_loader, train_print_dataset, train_hand_dataset, valid_dataset
