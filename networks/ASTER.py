@@ -327,7 +327,7 @@ class ASTERDecoder(nn.Module):
             
             if self.manager is not None:
                 self.manager.reset()
-
+                
         return probs
 
 

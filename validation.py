@@ -5,8 +5,6 @@ from tqdm import tqdm
 import csv
 import torch
 from torch.utils.data import DataLoader
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
 
 from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
