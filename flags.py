@@ -7,14 +7,13 @@ import collections
 
 
 def dict_to_namedtuple(d):
-    """ Convert dictionary to named tuple.
-    """
-    FLAGSTuple = collections.namedtuple('FLAGS', sorted(d.keys()))
+    """Convert dictionary to named tuple."""
+    FLAGSTuple = collections.namedtuple("FLAGS", sorted(d.keys()))
 
     for k, v in d.items():
-        
-        if k == 'prefix':
-            v = os.path.join('./', v)
+
+        if k == "prefix":
+            v = os.path.join("./", v)
 
         if type(v) is dict:
             d[k] = dict_to_namedtuple(v)
@@ -31,16 +30,15 @@ def dict_to_namedtuple(d):
 
 
 class Flags:
-    """ Flags object.
-    """
+    """Flags object."""
 
     def __init__(self, config_file):
+        assert os.path.isfile(config_file)
         try:
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 d = yaml.safe_load(f)
         except:
             d = config_file
-
 
         self.flags = dict_to_namedtuple(d)
 

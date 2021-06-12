@@ -16,17 +16,17 @@ default_checkpoint = {
     "validation_sentence_accuracy": [],
     "validation_wer": [],
     "lr": [],
-    "grad_norm": [],  
+    "grad_norm": [],
     "model": {},
-    "configs":{},
-    "token_to_id":{},
-    "id_to_token":{},
-    "scheduler":{},
-    "scheduler_name":""
+    "configs": {},
+    "token_to_id": {},
+    "id_to_token": {},
+    "scheduler": {},
+    "scheduler_name": "",
 }
 
 
-def save_checkpoint(checkpoint, dir="./", prefix=""):
+def save_checkpoint(checkpoint, dir="./checkpoints", prefix=""):
     filename = f"{checkpoint['network']}_best_model.pth"
     if not os.path.exists(os.path.join(prefix, dir)):
         os.makedirs(os.path.join(prefix, dir))
@@ -61,12 +61,14 @@ def write_tensorboard(
 ):
     writer.add_scalar("train_loss", train_loss, epoch)
     writer.add_scalar("train_symbol_accuracy", train_symbol_accuracy, epoch)
-    writer.add_scalar("train_sentence_accuracy",train_sentence_accuracy,epoch)
+    writer.add_scalar("train_sentence_accuracy", train_sentence_accuracy, epoch)
     writer.add_scalar("train_wer", train_wer, epoch)
     writer.add_scalar("validation_loss", validation_loss, epoch)
     writer.add_scalar("validation_symbol_accuracy", validation_symbol_accuracy, epoch)
-    writer.add_scalar("validation_sentence_accuracy",validation_sentence_accuracy,epoch)
-    writer.add_scalar("validation_wer",validation_wer,epoch)
+    writer.add_scalar(
+        "validation_sentence_accuracy", validation_sentence_accuracy, epoch
+    )
+    writer.add_scalar("validation_wer", validation_wer, epoch)
     writer.add_scalar("grad_norm", grad_norm, epoch)
 
     for name, param in model.encoder.named_parameters():
@@ -87,6 +89,7 @@ def write_tensorboard(
                 "decoder/{}/grad".format(name), param.grad.detach().cpu().numpy(), epoch
             )
 
+
 def write_wandb(
     epoch,
     grad_norm,
@@ -99,8 +102,8 @@ def write_wandb(
     validation_symbol_accuracy,
     validation_sentence_accuracy,
     validation_wer,
-    validation_score
-): 
+    validation_score,
+):
     wandb.log(
         dict(
             epoch=epoch,
@@ -114,6 +117,6 @@ def write_wandb(
             validation_sentence_accuracy=validation_sentence_accuracy,
             validation_wer=validation_wer,
             validation_score=validation_score,
-            grad_norm=grad_norm
+            grad_norm=grad_norm,
         )
     )

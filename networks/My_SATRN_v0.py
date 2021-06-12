@@ -1,4 +1,4 @@
-"""NOTE: TransformerDecoderLayer 수정 후 My_SATRN"""
+"""NOTE: TransformerDecoderLayer 수정 전 My_SATRN"""
 from copy import deepcopy
 import math
 import random
@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import timm
+
 from dataset import START, PAD
 from decoding import BeamSearchNode
 
@@ -55,6 +56,7 @@ class ShallowCNN(nn.Module):
         x = self.batch_norm2(x)
         x = self.relu2(x)
         x = self.pool2(x)
+
         return x  # (batch, hidden_size, h/8, w/8)
 
 
@@ -85,89 +87,89 @@ class EfficientNet(nn.Module):
         return x  # [b, c, h/32, w/32]
 
 
-class ScaledStdConv2d(nn.Conv2d):
-    """Conv2d layer with Scaled Weight Standardization.
-    Paper: `Characterizing signal propagation to close the performance gap in unnormalized ResNets` -
-        https://arxiv.org/abs/2101.08692
-    NOTE: the operations used in this impl differ slightly from the DeepMind Haiku impl. The impact is minor.
-    NOTE: MySATRN에 사용되지 않음
-    """
+# class ScaledStdConv2d(nn.Conv2d):
+#     """Conv2d layer with Scaled Weight Standardization.
+#     Paper: `Characterizing signal propagation to close the performance gap in unnormalized ResNets` -
+#         https://arxiv.org/abs/2101.08692
+#     NOTE: the operations used in this impl differ slightly from the DeepMind Haiku impl. The impact is minor.
+#     NOTE: MySATRN에 사용되지 않음
+#     """
 
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride=1,
-        padding=None,
-        dilation=1,
-        groups=1,
-        bias=True,
-        gamma=1.0,
-        eps=1e-5,
-        gain_init=1.0,
-        use_layernorm=False,
-    ):
-        if padding is None:
-            padding = get_padding(kernel_size, stride, dilation)
-        super().__init__(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
-        )
-        self.gain = nn.Parameter(torch.full((self.out_channels, 1, 1, 1), gain_init))
-        self.scale = gamma * self.weight[0].numel() ** -0.5  # gamma * 1 / sqrt(fan-in)
-        self.eps = eps ** 2 if use_layernorm else eps
-        self.use_layernorm = use_layernorm  # experimental, slightly faster/less GPU memory to hijack LN kernel
+#     def __init__(
+#         self,
+#         in_channels,
+#         out_channels,
+#         kernel_size,
+#         stride=1,
+#         padding=None,
+#         dilation=1,
+#         groups=1,
+#         bias=True,
+#         gamma=1.0,
+#         eps=1e-5,
+#         gain_init=1.0,
+#         use_layernorm=False,
+#     ):
+#         if padding is None:
+#             padding = get_padding(kernel_size, stride, dilation)
+#         super().__init__(
+#             in_channels,
+#             out_channels,
+#             kernel_size,
+#             stride=stride,
+#             padding=padding,
+#             dilation=dilation,
+#             groups=groups,
+#             bias=bias,
+#         )
+#         self.gain = nn.Parameter(torch.full((self.out_channels, 1, 1, 1), gain_init))
+#         self.scale = gamma * self.weight[0].numel() ** -0.5  # gamma * 1 / sqrt(fan-in)
+#         self.eps = eps ** 2 if use_layernorm else eps
+#         self.use_layernorm = use_layernorm  # experimental, slightly faster/less GPU memory to hijack LN kernel
 
-    def get_weight(self):
-        if self.use_layernorm:
-            weight = self.scale * F.layer_norm(
-                self.weight, self.weight.shape[1:], eps=self.eps
-            )
-        else:
-            std, mean = torch.std_mean(
-                self.weight, dim=[1, 2, 3], keepdim=True, unbiased=False
-            )
-            weight = self.scale * (self.weight - mean) / (std + self.eps)
-        return self.gain * weight
+#     def get_weight(self):
+#         if self.use_layernorm:
+#             weight = self.scale * F.layer_norm(
+#                 self.weight, self.weight.shape[1:], eps=self.eps
+#             )
+#         else:
+#             std, mean = torch.std_mean(
+#                 self.weight, dim=[1, 2, 3], keepdim=True, unbiased=False
+#             )
+#             weight = self.scale * (self.weight - mean) / (std + self.eps)
+#         return self.gain * weight
 
-    def forward(self, x):
-        return F.conv2d(
-            x,
-            self.get_weight(),
-            self.bias,
-            self.stride,
-            self.padding,
-            self.dilation,
-            self.groups,
-        )
+#     def forward(self, x):
+#         return F.conv2d(
+#             x,
+#             self.get_weight(),
+#             self.bias,
+#             self.stride,
+#             self.padding,
+#             self.dilation,
+#             self.groups,
+#         )
 
 
-class NFNet(nn.Module):
-    """NOTE: MySATRN에 사용되지 않음"""
+# class NFNet(nn.Module):
+#     """NOTE: MySATRN에 사용되지 않음"""
 
-    def __init__(self, input_channel, output_channel):
-        super(NFNet, self).__init__()
-        m = timm.create_model("eca_nfnet_l0", pretrained=True)
-        self.prelayer = m.stem
-        self.nf_block = m.stages
-        self.conv_last = ScaledStdConv2d(
-            1536, output_channel, kernel_size=1, stride=1, bias=False
-        )
-        self.act2 = nn.SiLU(inplace=True)
+#     def __init__(self, input_channel, output_channel):
+#         super(NFNet, self).__init__()
+#         m = timm.create_model("eca_nfnet_l0", pretrained=True)
+#         self.prelayer = m.stem
+#         self.nf_block = m.stages
+#         self.conv_last = ScaledStdConv2d(
+#             1536, output_channel, kernel_size=1, stride=1, bias=False
+#         )
+#         self.act2 = nn.SiLU(inplace=True)
 
-    def forward(self, x):
-        x = self.prelayer(x)
-        x = self.nf_block(x)
-        x = self.conv_last(x)
-        x = self.act2(x)
-        return x  # [b, c, h/32, w/32]
+#     def forward(self, x):
+#         x = self.prelayer(x)
+#         x = self.nf_block(x)
+#         x = self.conv_last(x)
+#         x = self.act2(x)
+#         return x  # [b, c, h/32, w/32]
 
 
 class PositionalEncoding(nn.Module):
@@ -218,12 +220,15 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         features = x
         b, c, h, w = x.size()
+
         h_encoding = self.tiling(self.h_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(
             device
         )
+        # print(h_encoding.shape)
         w_encoding = self.tiling(self.w_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(
             device
         )
+        # print
         x = torch.mean(x, [2, 3])
         x = self.dense0(x)
         x = self.relu(x)
@@ -234,6 +239,8 @@ class PositionalEncoding(nn.Module):
         x = torch.reshape(x, [-1, 2, 1, self.hidden_size])
         x = x[:, 0:1, :, :] * h_encoding + x[:, 1:2, :, :] * w_encoding
         x = x.permute(0, 3, 1, 2)
+        # print(x.shape)
+
         return x + features  # (batch, hidden_size, h, w)
 
 
@@ -460,8 +467,7 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt, tgt, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-            # att = self.attention_layer(tgt, src, src)
-            att = self.attention_layer(out, src, src)  # NOTE
+            att = self.attention_layer(tgt, src, src)
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
@@ -471,8 +477,7 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt_prev, tgt_prev, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-            # att = self.attention_layer(tgt, src, src)
-            att = self.attention_layer(out, src, src)  # NOTE
+            att = self.attention_layer(tgt, src, src)
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
@@ -643,11 +648,7 @@ class SATRNDecoder(nn.Module):
             out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
             out = out.squeeze(2)  # [b, max length, class length]
 
-            if self.manager is not None:
-                self.manager.reset()
-
         return out
-
 
 class SATRNDecoder_soft(nn.Module):
     """NOTE: 그리디 디코딩 앙상블에 활용"""

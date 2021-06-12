@@ -9,80 +9,71 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-
-sys.path.insert(0, "../")
-from dataset import START, PAD
+import timm
 from decoding import BeamSearchNode
-from criterion import LabelSmoothingLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class CNN(nn.Module):
-    """베이스라인 모델(Semi-ASTER)의 인코더 역할을 수행하는 CNN"""
+class DeepCNN(nn.Module):
+    def __init__(self, nc: int, leaky_relu=False):
+        super(DeepCNN, self).__init__()
+        m = timm.create_model("tf_efficientnetv2_s_in21ft1k", pretrained=True)
+        self.conv_stem = nn.Conv2d(
+            nc, 24, kernel_size=(3, 3), stride=(2, 2), bias=False
+        )
+        self.bn1 = nn.BatchNorm2d(
+            24, eps=1e-3, momentum=0.1, affine=True, track_running_stats=True
+        )
+        self.act1 = nn.SiLU(inplace=True)
+        self.eff_blocks = m.blocks
+        self.pooling1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
+        self.conv1 = self.convRelu(nc, 4, leaky_relu=leaky_relu, bn=True)
+        self.conv2 = self.convRelu(nc, 5, leaky_relu=leaky_relu)
+        self.pooling2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
+        self.conv3 = self.convRelu(nc, 6, leaky_relu=leaky_relu, bn=True)
 
-    def __init__(self, nc: int, leakyRelu=False):
-        """
+    def forward(self, input):
+        out = self.conv_stem(input)  # [B, 24, 127, 511]
+        out = self.bn1(out)  # [B, 24, 127, 511]
+        out = self.act1(out)  # [B, 24, 127, 511]
+        out = self.eff_blocks(out)  # [B, 256, 8, 32]
+        out = self.pooling1(out)  # [B, 256, 4, 33]
+        out = self.conv1(out)  # [B, 384, 4, 33]
+        out = self.pooling2(out)  # [B, 384, 2, 34]
+        out = self.conv3(out)  # [B, 384, 1, 33]
+        return out
+
+    @staticmethod
+    def convRelu(nc, i, leaky_relu: bool, bn=False) -> nn.Module:
+        """Conv 레이어를 생성하는 함수
         Args:
-            nc (int): 입력 이미지 채널
-            leakyRelu (bool, optional): Leacky ReLu 사용 여부. Defaults to False.
+            i (int): ks, ps, ss, nm으로부터 가져올 element의 인덱스
+            batchNormalization (bool, optional): BN 적용 여부. Defaults to False.
         """
-        super(CNN, self).__init__()
-
         ks = [3, 3, 3, 3, 3, 3, 2]  # kernel size
         ps = [1, 1, 1, 1, 1, 1, 0]  # padding size
         ss = [1, 1, 1, 1, 1, 1, 1]  # strides
-        nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
+        # nm = [64, 128, 256, 256, 512, 512, 512]  # output channel list
+        nm = [64, 128, 256, 256, 384, 384, 384]  # output channel list
 
-        def convRelu(i, batchNormalization=False) -> nn.Module:
-            """Conv 레이어를 생성하는 함수
-            Args:
-                i (int): ks, ps, ss, nm으로부터 가져올 element의 인덱스
-                batchNormalization (bool, optional): BN 적용 여부. Defaults to False.
-            """
-            cnn = nn.Sequential()
-            nIn = nc if i == 0 else nm[i - 1]
-            nOut = nm[i]
-            cnn.add_module(
-                "conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i])
-            )
-            if batchNormalization:
-                cnn.add_module("batchnorm{0}".format(i), nn.BatchNorm2d(nOut))
-            if leakyRelu:
-                cnn.add_module("relu{0}".format(i), nn.LeakyReLU(0.2, inplace=True))
-            else:
-                cnn.add_module("relu{0}".format(i), nn.ReLU(True))
-            return cnn
+        cnn = nn.Sequential()
+        nIn = nc if i == 0 else nm[i - 1]
+        nOut = nm[i]
+        cnn.add_module("conv{0}".format(i), nn.Conv2d(nIn, nOut, ks[i], ss[i], ps[i]))
+        if bn:
+            cnn.add_module("batchnorm{0}".format(i), nn.BatchNorm2d(nOut))
 
-        self.conv0 = convRelu(0)
-        self.pooling0 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv1 = convRelu(1)
-        self.pooling1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = convRelu(2, True)
-        self.conv3 = convRelu(3)
-        self.pooling3 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
-        self.conv4 = convRelu(4, True)
-        self.conv5 = convRelu(5)
-        self.pooling5 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 1), padding=(0, 1))
-        self.conv6 = convRelu(6, True)
+        if leaky_relu:
+            cnn.add_module("relu{0}".format(i), nn.LeakyReLU(0.2, inplace=True))
+        else:
+            cnn.add_module("relu{0}".format(i), nn.ReLU(True))
 
-    def forward(self, input):
-        out = self.conv0(input)  # [batch size, 64, 128, 128]
-        out = self.pooling0(out)  # [batch size, 64, 64, 64]
-        out = self.conv1(out)  # [batch size, 128, 64, 64]
-        out = self.pooling1(out)  # [batch size, 128, 32, 32]
-        out = self.conv2(out)  # [batch size, 256, 32, 32]
-        out = self.conv3(out)  # [batch size, 256, 32, 32]
-        out = self.pooling3(out)  # [batch size, 256, 16, 33]
-        out = self.conv4(out)  # [batch size, 512, 16, 33]
-        out = self.conv5(out)  # [batch size, 512, 16, 33]
-        out = self.pooling5(out)  # [batch size, 512, 8, 34]
-        out = self.conv6(out)  # [batch size, 512, 7, 33] heigth가 점점 눌리네
-        return out
+        return cnn
 
 
 class AttentionCell(nn.Module):
-    """디코더(AttentionDecoder) 내 Attention 계산에 활용할 attention cell 클래스"""
+    """디코더(ASTERDecoder) 내 Attention 계산에 활용할 attention cell 클래스"""
 
     def __init__(
         self,
@@ -90,7 +81,6 @@ class AttentionCell(nn.Module):
         hidden_dim: int,
         embedding_dim: int,
         num_layers=1,
-        cell_type="LSTM",
     ):
         """
         Args:
@@ -114,33 +104,14 @@ class AttentionCell(nn.Module):
             hidden_dim, hidden_dim
         )  # either i2i or h2h should have bias <- why?
         self.score = nn.Linear(hidden_dim, 1, bias=False)  # to get attention logit
-        if num_layers == 1:
-            if cell_type == "LSTM":
-                self.rnn = nn.LSTMCell(src_dim + embedding_dim, hidden_dim)
-            elif cell_type == "GRU":
-                self.rnn = nn.GRUCell(src_dim + embedding_dim, hidden_dim)
-            else:
-                raise NotImplementedError
-        else:
-            if cell_type == "LSTM":
-                self.rnn = nn.ModuleList(
-                    [nn.LSTMCell(src_dim + embedding_dim, hidden_dim)]
-                    + [
-                        nn.LSTMCell(hidden_dim, hidden_dim)
-                        for _ in range(num_layers - 1)
-                    ]
-                )
-            elif cell_type == "GRU":
-                self.rnn = nn.ModuleList(
-                    [nn.GRUCell(src_dim + embedding_dim, hidden_dim)]
-                    + [
-                        nn.GRUCell(hidden_dim, hidden_dim)
-                        for _ in range(num_layers - 1)
-                    ]
-                )
-            else:
-                raise NotImplementedError
 
+        if num_layers == 1:
+            self.rnn = nn.LSTMCell(src_dim + embedding_dim, hidden_dim)
+        else:
+            self.rnn = nn.ModuleList(
+                [nn.LSTMCell(src_dim + embedding_dim, hidden_dim)]
+                + [nn.LSTMCell(hidden_dim, hidden_dim) for _ in range(num_layers - 1)]
+            )
         self.hidden_dim = hidden_dim
 
     def forward(self, prev_hidden, src, tgt):  # src: [b, L, c]
@@ -181,7 +152,31 @@ class AttentionCell(nn.Module):
         return cur_hidden, alpha
 
 
-class AttentionDecoder(nn.Module):
+class ASTEREncoder(nn.Module):
+    def __init__(self, FLAGS):
+        super(ASTEREncoder, self).__init__()
+        self.cnn = DeepCNN(nc=FLAGS.data.rgb)
+        self.blstm = nn.LSTM(
+            input_size=384,  # H*C = 256*7
+            hidden_size=FLAGS.ASTER.hidden_dim,
+            num_layers=2,
+            bidirectional=True,
+        )
+        self.proj = nn.Linear(
+            in_features=FLAGS.ASTER.hidden_dim * 2, out_features=FLAGS.ASTER.hidden_dim
+        )
+
+    def forward(self, input):
+        out = self.cnn(input)  # [B, SEQ_LEN, HIDDEN]
+        b, c, h, w = out.size()
+        out = out.view(b, c * h, w).permute(2, 0, 1)  # [SEQ_LEN, B, INPUT_SIZE]
+        out, _ = self.blstm(out)  # [SEQ_LEN, B, HIDDEN*2]
+        out = self.proj(out)  # [SEQ_LEN, B, HIDDEN]
+        out = out.transpose(0, 1)  # [B, SEQ_LEN, HIDDEN]
+        return out
+
+
+class ASTERDecoder(nn.Module):
     def __init__(
         self,
         num_classes,
@@ -191,14 +186,13 @@ class AttentionDecoder(nn.Module):
         pad_id,
         st_id,
         num_layers=1,
-        cell_type="LSTM",
         checkpoint=None,
+        decoding_manager=None,
     ):
-        super(AttentionDecoder, self).__init__()
-
+        super(ASTERDecoder, self).__init__()
         self.embedding = nn.Embedding(num_classes + 1, embedding_dim)
         self.attention_cell = AttentionCell(
-            src_dim, hidden_dim, embedding_dim, num_layers, cell_type
+            src_dim, hidden_dim, embedding_dim, num_layers
         )
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
@@ -206,6 +200,7 @@ class AttentionDecoder(nn.Module):
         self.generator = nn.Linear(hidden_dim, num_classes)
         self.pad_id = pad_id
         self.st_id = st_id
+        self.manager = decoding_manager
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
@@ -221,13 +216,6 @@ class AttentionDecoder(nn.Module):
         """
         batch_size = src.size(0)
         num_steps = batch_max_length - 1  # +1 for [s] at end of sentence.
-
-        # hidden 만들어놓고
-        output_hiddens = (
-            torch.FloatTensor(batch_size, num_steps, self.hidden_dim)
-            .fill_(0)
-            .to(device)
-        )
 
         # LSTM case
         if self.num_layers == 1:
@@ -253,34 +241,65 @@ class AttentionDecoder(nn.Module):
             ]
 
         # teacher forcing할 경우
-        if is_train and random.random() < teacher_forcing_ratio:
-            # 배치 내 모든 sample에 대해 일괄 계산
-            for i in range(num_steps):
-                embedd = self.embedding(text[:, i])  # 샘플 각각의 i번째 캐릭터 임베딩
-                hidden, alpha = self.attention_cell(
-                    prev_hidden=hidden,  # [hidden_state, cell_state] for LSTM, [B, HIDDEN]
-                    src=src,  # [B, WxH, C]
-                    tgt=embedd,  # [B, HIDDEN]
-                )  # hidden: [B, HIDDEN] x2
-                if self.num_layers == 1:
-                    output_hiddens[:, i, :] = hidden[0]  # for LSTM (0: hidden, 1: Cell)
-                else:
-                    output_hiddens[:, i, :] = hidden[-1][0]  # 다중 레이어 - 마지막 레이어 사용
-            probs = self.generator(output_hiddens)
+        if is_train:
+            if random.random() < teacher_forcing_ratio:
+                # hidden 만들어놓고
+                output_hiddens = (
+                    torch.FloatTensor(batch_size, num_steps, self.hidden_dim)
+                    .fill_(0)
+                    .to(device)
+                )
+                # 배치 내 모든 sample에 대해 일괄 계산
+                for i in range(num_steps):
+                    embedd = self.embedding(text[:, i])  # 샘플 각각의 i번째 캐릭터 임베딩
+                    hidden, alpha = self.attention_cell(
+                        prev_hidden=hidden,  # [hidden_state, cell_state] for LSTM, [B, HIDDEN]
+                        src=src,  # [B, WxH, C]
+                        tgt=embedd,  # [B, HIDDEN]
+                    )  # hidden: [B, HIDDEN] x2
+                    if self.num_layers == 1:
+                        output_hiddens[:, i, :] = hidden[
+                            0
+                        ]  # for LSTM (0: hidden, 1: Cell)
+                    else:
+                        output_hiddens[:, i, :] = hidden[-1][0]  # 다중 레이어 - 마지막 레이어 사용
+                probs = self.generator(output_hiddens)
 
-        # teacher forcing하지 않을 경우
+            else:
+                # [SOS] - [B]
+                targets = torch.LongTensor(batch_size).fill_(self.st_id).to(device)
+                probs = (
+                    torch.FloatTensor(batch_size, num_steps, self.num_classes)
+                    .fill_(0)
+                    .to(device)
+                )  # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
+
+                for i in range(num_steps):
+                    embedd = self.embedding(targets)  # [B, HIDDEN]
+                    hidden, alpha = self.attention_cell(
+                        prev_hidden=hidden,  # [hidden_state, cell_state] for LSTM, [B, HIDDEN]
+                        src=src,  # [B, WxH, C]
+                        tgt=embedd,  # [B, HIDDEN]
+                    )  # hidden: [B, HIDDEN] x2
+                    probs_step = (
+                        self.generator(hidden[0])
+                        if self.num_layers == 1
+                        else self.generator(hidden[-1][0])
+                    )  # [B, VOCAB_SIZE]
+
+                    probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
+                    _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
+                    targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
+
         else:
-            # 배치 내 모든 샘플에 대해 첫 시작에 [START] 마련
-
-            # [SOS] - [B]
             targets = torch.LongTensor(batch_size).fill_(self.st_id).to(device)
-
-            # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
             probs = (
                 torch.FloatTensor(batch_size, num_steps, self.num_classes)
                 .fill_(0)
                 .to(device)
-            )
+            )  # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
+            if self.manager is not None:
+                self.manager.reset(sequence_length=num_steps)
 
             for i in range(num_steps):
                 embedd = self.embedding(targets)  # [B, HIDDEN]
@@ -295,42 +314,45 @@ class AttentionDecoder(nn.Module):
                     else self.generator(hidden[-1][0])
                 )  # [B, VOCAB_SIZE]
 
-                probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
-                _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
-                targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
+                # NOTE: DecodingManager
+                if self.manager is not None:
+                    next_input, probs_step = self.manager.sift(probs_step)
+                    probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
+                    targets = next_input
+                else:
+                    probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
+                    _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
+                    targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
 
         return probs
 
 
-class Attention(nn.Module):
+class ASTER(nn.Module):
     def __init__(
-        self,
-        FLAGS,
-        train_dataset,
-        checkpoint=None,
+        self, FLAGS, train_dataset, checkpoint=None, decoding_manager=None  # NOTE
     ):
-        super(Attention, self).__init__()
-        self.encoder = CNN(FLAGS.data.rgb)
-        self.decoder = AttentionDecoder(
+        super(ASTER, self).__init__()
+        self.encoder = ASTEREncoder(FLAGS)
+        self.decoder = ASTERDecoder(
             num_classes=len(train_dataset.id_to_token),
-            src_dim=FLAGS.Attention.src_dim,
-            embedding_dim=FLAGS.Attention.embedding_dim,
-            hidden_dim=FLAGS.Attention.hidden_dim,
-            pad_id=train_dataset.token_to_id[PAD],
-            st_id=train_dataset.token_to_id[START],
-            num_layers=FLAGS.Attention.layer_num,
-            cell_type=FLAGS.Attention.cell_type,
+            src_dim=FLAGS.ASTER.src_dim,
+            embedding_dim=FLAGS.ASTER.embedding_dim,
+            hidden_dim=FLAGS.ASTER.hidden_dim,
+            pad_id=train_dataset.token_to_id["<PAD>"],
+            st_id=train_dataset.token_to_id["<SOS>"],
+            num_layers=FLAGS.ASTER.layer_num,
+            decoding_manager=decoding_manager,  # NOTE
         )
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.CrossEntropyLoss(
+            ignore_index=train_dataset.token_to_id["<PAD>"]
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)
 
     def forward(self, input, expected, is_train, teacher_forcing_ratio):
-        out = self.encoder(input)
-        b, c, h, w = out.size()
-        out = out.view(b, c, h * w).transpose(1, 2)  # [b, h x w, c]
+        out = self.encoder(input)  # [b, C, H, W]
         output = self.decoder(
             src=out,
             text=expected,
@@ -346,8 +368,7 @@ class Attention(nn.Module):
         data_loader: DataLoader,
         topk: int = 1,  # 상위 몇 개의 결과를 얻을 것인지
         beam_width: int = 10,  # 각 스텝마다 몇 개의 후보군을 선별할지
-        max_sequence: int = 230
-        # step: int=None
+        max_sequence: int = 230,
     ):
         """빔서치 디코딩을 수행하는 함수. inference시에만 활용
 
@@ -372,15 +393,11 @@ class Attention(nn.Module):
         pad_token_id = data_loader.dataset.token_to_id["<PAD>"]
 
         batch_size = len(input)
-        encoder_output = self.encoder(input)  # [B, C, H, W]
-        b, c, h, w = encoder_output.size()
-        src = encoder_output.view(b, c, h * w).transpose(
-            1, 2
-        )  # [B, C, HxW] => [B, HxW, C]
+        src = self.encoder(input)
 
         decoded_batch = []
         with torch.no_grad():
-            hidden = self.get_initialized_hidden_states(
+            hiddens = self.get_initialized_hidden_states(
                 batch_size=batch_size
             )  # [B, HIDDEN]x2
 
@@ -394,13 +411,14 @@ class Attention(nn.Module):
                 nodes = PriorityQueue()
 
                 # 시작 토큰 초기화
-                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, HxW, C]
+                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, W=33, C=384]
                 current_input = torch.LongTensor([sos_token_id])  # [1]
-                current_hidden = [
-                    h[data_idx].unsqueeze(0) for h in hidden
-                ]  # [B=1, HIDDEN]x2
+                current_hiddens = [
+                    (h[data_idx, :].unsqueeze(0), c[data_idx, :].unsqueeze(0))
+                    for (h, c) in hiddens
+                ]
                 node = BeamSearchNode(
-                    hidden_state=deepcopy(current_hidden),
+                    hidden_state=deepcopy(current_hiddens),
                     prev_node=None,
                     token_id=deepcopy(current_input),
                     log_prob=0,
@@ -419,7 +437,7 @@ class Attention(nn.Module):
                     # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
                     score, n = nodes.get()
                     current_input = n.token_id  # 토큰 ID # [B=1]
-                    current_hidden = n.hidden_state  # hidden state
+                    current_hiddens = n.hidden_state  # hidden state
 
                     # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
                     if n.token_id.item() == eos_token_id and n.prev_node != None:
@@ -430,16 +448,15 @@ class Attention(nn.Module):
                             continue
 
                     # ------디코딩------
-                    input_embedded = self.decoder.embedding(
-                        current_input.to(input.get_device())
-                    )
+                    # input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
+                    input_embedded = self.decoder.embedding(current_input.to(device))
 
                     # Hidden state 갱신
-                    current_hidden, alpha = self.decoder.attention_cell(
-                        prev_hidden=current_hidden, src=current_src, tgt=input_embedded
+                    current_hiddens, alpha = self.decoder.attention_cell(
+                        prev_hidden=current_hiddens, src=current_src, tgt=input_embedded
                     )  # hidden state 갱신
                     prob_step = self.decoder.generator(
-                        current_hidden[0]
+                        current_hiddens[-1][0]
                     )  # [1, VOCAB_SIZE] (num_layers=1) ***앙상블에 필요한 로짓
 
                     # 모델의 로짓을 확률화
@@ -452,7 +469,7 @@ class Attention(nn.Module):
                         decoded_t = indices[0][new_k].view(-1)
                         log_p = log_prob[0][new_k].item()
                         node = BeamSearchNode(
-                            hidden_state=deepcopy(current_hidden),
+                            hidden_state=deepcopy(current_hiddens),
                             prev_node=n,
                             token_id=deepcopy(decoded_t),
                             log_prob=n.logp + log_p,
@@ -502,7 +519,6 @@ class Attention(nn.Module):
         return outputs
 
     def get_initialized_hidden_states(self, batch_size: int):
-        # LSTM case
         if self.decoder.num_layers == 1:
             hidden = (
                 torch.FloatTensor(batch_size, self.decoder.hidden_dim)
