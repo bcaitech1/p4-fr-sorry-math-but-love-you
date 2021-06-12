@@ -1,30 +1,21 @@
 import os
+import time
 import argparse
-import random
 from tqdm import tqdm
-import csv
 import torch
 from torch.utils.data import DataLoader
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
 
 from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
-from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
-from train import get_valid_transforms
+from dataset import collate_batch, PAD, LoadDataset, split_gt
+from augmentations import get_valid_transforms
 from flags import Flags
-from utils import id_to_string, get_network, get_optimizer, set_seed
+from utils import id_to_string, get_network, set_seed
 from decoding import decode
 
 
 def validate(parser):
-    """학습한 모델의 성능 검증을 위한 함수. NOTE: 제출용 함수가 아님!
-
-    Args:
-        parser ([type]): [description]
-    """
-    import time
-    from dataset import collate_batch, LoadDataset, split_gt
+    
 
     is_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if is_cuda else "cpu")
@@ -42,7 +33,9 @@ def validate(parser):
         )
 
     # Load data
-    valid_transform = get_valid_transforms(height=options.input_size.height, width=options.input_size.width)
+    valid_transform = get_valid_transforms(
+        height=options.input_size.height, width=options.input_size.width
+    )
 
     valid_data = []
     for i, path in enumerate(options.data.train):
@@ -53,7 +46,11 @@ def validate(parser):
         valid_data += valid
 
     valid_dataset = LoadDataset(
-        valid_data, options.data.token_paths, crop=options.data.crop, transform=valid_transform, rgb=options.data.rgb
+        valid_data,
+        options.data.token_paths,
+        crop=options.data.crop,
+        transform=valid_transform,
+        rgb=options.data.rgb,
     )
     valid_data_loader = DataLoader(
         valid_dataset,
@@ -77,14 +74,14 @@ def validate(parser):
         valid_dataset,
     )
     model.eval()
-    
+
     correct_symbols = 0
     total_symbols = 0
     wer = 0
     num_wer = 0
     sent_acc = 0
     num_sent_acc = 0
-    
+
     # Infernce
     print("[+] Decoding Type:", parser.decode_type)
     start = time.time()
@@ -103,12 +100,12 @@ def validate(parser):
                 expected[expected == -1] = valid_data_loader.dataset.token_to_id[PAD]
 
                 sequence = decode(
-                    model=model, 
-                    input=input, 
-                    data_loader=valid_data_loader, 
-                    expected=expected, 
-                    method=parser.decode_type, 
-                    beam_width=parser.beam_width
+                    model=model,
+                    input=input,
+                    data_loader=valid_data_loader,
+                    expected=expected,
+                    method=parser.decode_type,
+                    beam_width=parser.beam_width,
                 )
 
                 expected[expected == valid_data_loader.dataset.token_to_id[PAD]] = -1
@@ -118,18 +115,24 @@ def validate(parser):
                 num_wer += 1
                 sent_acc += sentence_acc(sequence_str, expected_str)
                 num_sent_acc += 1
-                correct_symbols += torch.sum(sequence.to(device) == expected[:, 1:], dim=(0, 1)).item()
+                correct_symbols += torch.sum(
+                    sequence.to(device) == expected[:, 1:], dim=(0, 1)
+                ).item()
                 total_symbols += torch.sum(expected[:, 1:] != -1, dim=(0, 1)).item()
 
                 pbar.update(curr_batch_size)
 
     # Validation
-    inference_time = (time.time() - start) / 60 # minutes
+    inference_time = (time.time() - start) / 60  # minutes
     valid_sentence_accuracy = sent_acc / num_sent_acc
     valid_wer = wer / num_wer
-    valid_score = final_metric(sentence_acc=valid_sentence_accuracy, word_error_rate=valid_wer)
-    print(f'INFERENCE TIME: {inference_time}')
-    print(f'SCORE: {valid_score} SENTENCE ACC: {valid_sentence_accuracy} WER: {valid_wer}')
+    valid_score = final_metric(
+        sentence_acc=valid_sentence_accuracy, word_error_rate=valid_wer
+    )
+    print(f"INFERENCE TIME: {inference_time}")
+    print(
+        f"SCORE: {valid_score} SENTENCE ACC: {valid_sentence_accuracy} WER: {valid_wer}"
+    )
 
 
 if __name__ == "__main__":
@@ -137,7 +140,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/MySATRN_best_model.pth",
+        default="./log/my_satrn/checkpoints/MySATRN_best_model.pth",
         type=str,
         help="Path of checkpoint file",
     )
@@ -151,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default='greedy', # 'greedy'로 설정하면 기존과 동일하게 inference
+        default="greedy",  # 'greedy'로 설정하면 기존과 동일하게 inference
         type=str,
         help="디코딩 방식 설정. 'greedy', 'beam'",
     )
@@ -164,4 +167,4 @@ if __name__ == "__main__":
     )
 
     parser = parser.parse_args()
-    validate(parser) # 성능 검증 시 활용 NOTE. 제출 전용이 아님!
+    validate(parser)  # 성능 검증 시 활용 NOTE. 제출 전용이 아님!
