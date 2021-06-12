@@ -1,3 +1,4 @@
+"""NOTE: TransformerDecoderLayer 수정 전 My_SATRN"""
 from copy import deepcopy
 import math
 import random
@@ -646,7 +647,7 @@ class SATRNDecoder(nn.Module):
 
             out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
             out = out.squeeze(2)  # [b, max length, class length]
-            
+
         return out
 
 class SATRNDecoder_soft(nn.Module):

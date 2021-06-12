@@ -1,3 +1,4 @@
+"""NOTE: TransformerDecoderLayer 수정 후 My_SATRN"""
 from copy import deepcopy
 import math
 import random
