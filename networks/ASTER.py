@@ -13,7 +13,6 @@ import timm
 from decoding import BeamSearchNode
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# device = 'cpu'
 
 
 class DeepCNN(nn.Module):
@@ -35,14 +34,14 @@ class DeepCNN(nn.Module):
         self.conv3 = self.convRelu(nc, 6, leaky_relu=leaky_relu, bn=True)
 
     def forward(self, input):
-        out = self.conv_stem(input)  # [B, 24, 511, 511]
-        out = self.bn1(out)  # [B, 24, 511, 511]
-        out = self.act1(out)  # [B, 24, 511, 511]
-        out = self.eff_blocks(out)  # [B, 256, 32, 32]
-        out = self.pooling1(out)  # [B, 256, 16, 33]
-        out = self.conv1(out)  # [B, 512, 16, 33] # NOTE [B, 256, 16, 33]
-        out = self.pooling2(out)  # [B, 512, 8, 34] # NOTE [B, 256, 16, 33]
-        out = self.conv3(out)  # [B, 512, 7, 33] # NOTE [B, 256, 16, 33]
+        out = self.conv_stem(input)  # [B, 24, 127, 511]
+        out = self.bn1(out)  # [B, 24, 127, 511]
+        out = self.act1(out)  # [B, 24, 127, 511]
+        out = self.eff_blocks(out)  # [B, 256, 8, 32]
+        out = self.pooling1(out)  # [B, 256, 4, 33]
+        out = self.conv1(out)  # [B, 384, 4, 33]
+        out = self.pooling2(out)  # [B, 384, 2, 34]
+        out = self.conv3(out)  # [B, 384, 1, 33]
         return out
 
     @staticmethod
@@ -123,19 +122,15 @@ class AttentionCell(nn.Module):
             tgt (torch.Tensor): START 토큰 등 RNN의 입력으로 들어가는 텐서
         output:
         """
-        print('src', src.size())
         src_features = self.i2h(src)  # [b, L, h]
-        print('attn src size', src_features.size())
         if self.num_layers == 1:
             prev_hidden_proj = self.h2h(prev_hidden[0]).unsqueeze(1)  # [b, 1, h]
         else:
             prev_hidden_proj = self.h2h(prev_hidden[-1][0]).unsqueeze(1)  # [b, 1, h]
-        print('prev_hidden_proj', prev_hidden_proj.size())
         attention_logit = self.score(
             torch.tanh(src_features + prev_hidden_proj)  # [b, L, h]
         )  # [b, L, 1]
         alpha = F.softmax(attention_logit, dim=1)  # [b, L, 1]
-        print('alpha', alpha.size())
         context = torch.bmm(alpha.permute(0, 2, 1), src).squeeze(
             1
         )  # [b, c], values applied attention
@@ -192,7 +187,7 @@ class ASTERDecoder(nn.Module):
         st_id,
         num_layers=1,
         checkpoint=None,
-        decoding_manager=None
+        decoding_manager=None,
     ):
         super(ASTERDecoder, self).__init__()
         self.embedding = nn.Embedding(num_classes + 1, embedding_dim)
@@ -209,17 +204,6 @@ class ASTERDecoder(nn.Module):
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
-    
-    
-    def step_forward(self, target):
-        self.features = []
-        ...
-        .
-        .
-        .
-        .
-        return _out
-
 
     def forward(
         self, src, text, is_train=True, teacher_forcing_ratio=1.0, batch_max_length=50
@@ -232,13 +216,6 @@ class ASTERDecoder(nn.Module):
         """
         batch_size = src.size(0)
         num_steps = batch_max_length - 1  # +1 for [s] at end of sentence.
-
-        # hidden 만들어놓고
-        output_hiddens = (
-            torch.FloatTensor(batch_size, num_steps, self.hidden_dim)
-            .fill_(0)
-            .to(device)
-        )
 
         # LSTM case
         if self.num_layers == 1:
@@ -266,6 +243,12 @@ class ASTERDecoder(nn.Module):
         # teacher forcing할 경우
         if is_train:
             if random.random() < teacher_forcing_ratio:
+                # hidden 만들어놓고
+                output_hiddens = (
+                    torch.FloatTensor(batch_size, num_steps, self.hidden_dim)
+                    .fill_(0)
+                    .to(device)
+                )
                 # 배치 내 모든 sample에 대해 일괄 계산
                 for i in range(num_steps):
                     embedd = self.embedding(text[:, i])  # 샘플 각각의 i번째 캐릭터 임베딩
@@ -275,7 +258,9 @@ class ASTERDecoder(nn.Module):
                         tgt=embedd,  # [B, HIDDEN]
                     )  # hidden: [B, HIDDEN] x2
                     if self.num_layers == 1:
-                        output_hiddens[:, i, :] = hidden[0]  # for LSTM (0: hidden, 1: Cell)
+                        output_hiddens[:, i, :] = hidden[
+                            0
+                        ]  # for LSTM (0: hidden, 1: Cell)
                     else:
                         output_hiddens[:, i, :] = hidden[-1][0]  # 다중 레이어 - 마지막 레이어 사용
                 probs = self.generator(output_hiddens)
@@ -287,7 +272,7 @@ class ASTERDecoder(nn.Module):
                     torch.FloatTensor(batch_size, num_steps, self.num_classes)
                     .fill_(0)
                     .to(device)
-                ) # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
+                )  # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
 
                 for i in range(num_steps):
                     embedd = self.embedding(targets)  # [B, HIDDEN]
@@ -312,7 +297,9 @@ class ASTERDecoder(nn.Module):
                 torch.FloatTensor(batch_size, num_steps, self.num_classes)
                 .fill_(0)
                 .to(device)
-            ) # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
+            )  # Prob Table - [B, MAX_LEN, VOCAB_SIZE]
+            if self.manager is not None:
+                self.manager.reset(sequence_length=num_steps)
 
             for i in range(num_steps):
                 embedd = self.embedding(targets)  # [B, HIDDEN]
@@ -327,28 +314,22 @@ class ASTERDecoder(nn.Module):
                     else self.generator(hidden[-1][0])
                 )  # [B, VOCAB_SIZE]
 
-                probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
-                _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
-                
                 # NOTE: DecodingManager
                 if self.manager is not None:
-                    targets = self.manager.sift(probs_step)
+                    next_input, probs_step = self.manager.sift(probs_step)
+                    probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
+                    targets = next_input
                 else:
+                    probs[:, i, :] = probs_step  # step_{i}에 추가. 실제로는 소프트맥스 이전 값이 들어감
+                    _, next_input = probs_step.max(1)  # next_input: [B](=targets 사이즈)
                     targets = next_input  # 이전 스텝 출력을 현재 스텝 입력으로
-            
-            if self.manager is not None:
-                self.manager.reset()
-                
+
         return probs
 
 
 class ASTER(nn.Module):
     def __init__(
-        self,
-        FLAGS,
-        train_dataset,
-        checkpoint=None,
-        decoding_manager=None # NOTE
+        self, FLAGS, train_dataset, checkpoint=None, decoding_manager=None  # NOTE
     ):
         super(ASTER, self).__init__()
         self.encoder = ASTEREncoder(FLAGS)
@@ -360,7 +341,7 @@ class ASTER(nn.Module):
             pad_id=train_dataset.token_to_id["<PAD>"],
             st_id=train_dataset.token_to_id["<SOS>"],
             num_layers=FLAGS.ASTER.layer_num,
-            decoding_manager=manager # NOTE
+            decoding_manager=decoding_manager,  # NOTE
         )
 
         self.criterion = nn.CrossEntropyLoss(
@@ -387,8 +368,7 @@ class ASTER(nn.Module):
         data_loader: DataLoader,
         topk: int = 1,  # 상위 몇 개의 결과를 얻을 것인지
         beam_width: int = 10,  # 각 스텝마다 몇 개의 후보군을 선별할지
-        max_sequence: int = 230
-        # step: int=None
+        max_sequence: int = 230,
     ):
         """빔서치 디코딩을 수행하는 함수. inference시에만 활용
 
@@ -414,11 +394,10 @@ class ASTER(nn.Module):
 
         batch_size = len(input)
         src = self.encoder(input)
-        print('src', src.size())
 
         decoded_batch = []
         with torch.no_grad():
-            hidden = self.get_initialized_hidden_states(
+            hiddens = self.get_initialized_hidden_states(
                 batch_size=batch_size
             )  # [B, HIDDEN]x2
 
@@ -432,13 +411,14 @@ class ASTER(nn.Module):
                 nodes = PriorityQueue()
 
                 # 시작 토큰 초기화
-                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, W, C]
+                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, W=33, C=384]
                 current_input = torch.LongTensor([sos_token_id])  # [1]
-                current_hidden = [
-                    h[data_idx].unsqueeze(0) for h in hidden
-                ]  # [B=1, HIDDEN]x2
+                current_hiddens = [
+                    (h[data_idx, :].unsqueeze(0), c[data_idx, :].unsqueeze(0))
+                    for (h, c) in hiddens
+                ]
                 node = BeamSearchNode(
-                    hidden_state=deepcopy(current_hidden),
+                    hidden_state=deepcopy(current_hiddens),
                     prev_node=None,
                     token_id=deepcopy(current_input),
                     log_prob=0,
@@ -457,7 +437,7 @@ class ASTER(nn.Module):
                     # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
                     score, n = nodes.get()
                     current_input = n.token_id  # 토큰 ID # [B=1]
-                    current_hidden = n.hidden_state  # hidden state
+                    current_hiddens = n.hidden_state  # hidden state
 
                     # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
                     if n.token_id.item() == eos_token_id and n.prev_node != None:
@@ -470,14 +450,13 @@ class ASTER(nn.Module):
                     # ------디코딩------
                     # input_embedded = self.decoder.embedding(current_input.to(input.get_device()))
                     input_embedded = self.decoder.embedding(current_input.to(device))
-                    print('input_embedded', input_embedded.size())
 
                     # Hidden state 갱신
-                    current_hidden, alpha = self.decoder.attention_cell(
-                        prev_hidden=current_hidden, src=current_src, tgt=input_embedded
+                    current_hiddens, alpha = self.decoder.attention_cell(
+                        prev_hidden=current_hiddens, src=current_src, tgt=input_embedded
                     )  # hidden state 갱신
                     prob_step = self.decoder.generator(
-                        current_hidden[0]
+                        current_hiddens[-1][0]
                     )  # [1, VOCAB_SIZE] (num_layers=1) ***앙상블에 필요한 로짓
 
                     # 모델의 로짓을 확률화
@@ -490,7 +469,7 @@ class ASTER(nn.Module):
                         decoded_t = indices[0][new_k].view(-1)
                         log_p = log_prob[0][new_k].item()
                         node = BeamSearchNode(
-                            hidden_state=deepcopy(current_hidden),
+                            hidden_state=deepcopy(current_hiddens),
                             prev_node=n,
                             token_id=deepcopy(decoded_t),
                             log_prob=n.logp + log_p,

@@ -1,11 +1,12 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
 import math
 import random
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+import numpy as np
+import torch
+from torch import nn, optim
+import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
+from torch.utils.data import DataLoader
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
 # from dataset import START, PAD
 ###
@@ -1123,3 +1124,164 @@ class SWIN(nn.Module):
             teacher_forcing_ratio,
         )
         return dec_result
+
+    def beam_search(
+        self,
+        input: torch.Tensor,
+        data_loader: DataLoader,
+        topk: int = 1,
+        beam_width: int = 5,
+        max_sequence: int = 230,
+    ):
+        # 사용할 토큰
+        sos_token_id = data_loader.dataset.token_to_id["<SOS>"]
+        eos_token_id = data_loader.dataset.token_to_id["<EOS>"]
+        pad_token_id = data_loader.dataset.token_to_id["<PAD>"]
+
+        batch_size = len(input)
+        src = self.encoder(input)  # [B, HxW, C]
+
+        decoded_batch = []
+        with torch.no_grad():
+
+            # 문장 단위 생성
+            for data_idx in range(batch_size):
+
+                end_nodes = []
+                number_required = min((topk + 1), topk - len(end_nodes))  # 최대 생성 횟수
+
+                # 빔서치 과정 상 역추적을 위한 우선순위큐 선언
+                nodes = PriorityQueue()
+
+                # 시작 토큰 초기화
+                current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, HxW, C]
+                current_input = torch.LongTensor([sos_token_id])  # [B=1]
+                current_hidden = [None] * self.decoder.layer_num
+                node = BeamSearchNode(
+                    hidden_state=deepcopy(current_hidden),
+                    prev_node=None,
+                    token_id=deepcopy(current_input),  # [1]
+                    log_prob=0,
+                    length=1,  # NOTE: P.E에 사용
+                )
+                score = -node.eval()
+
+                # 최대힙: 확률 높은 토큰을 추출하기 위함
+                nodes.put((score, node))
+
+                num_steps = 0
+                while True:
+                    if num_steps >= (max_sequence - 1) * beam_width:
+                        break
+
+                    # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
+                    score, n = nodes.get()
+                    current_input = n.token_id  # [B=1]
+                    current_hidden = n.hidden_state
+                    current_point = n.len - 1  # P.E 적용 시 활용
+
+                    # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
+                    if n.token_id.item() == eos_token_id and n.prev_node != None:
+                        end_nodes.append((score, n))
+                        if len(end_nodes) >= number_required:
+                            break
+                        else:
+                            continue
+
+                    current_input = current_input.unsqueeze(1)  # [B=1, 1]
+
+                    tgt = self.decoder.text_embedding(
+                        texts=current_input.to(input.get_device())
+                    )  # [B=1, 1, HIDDEN]
+                    tgt = self.decoder.pos_encoder(
+                        x=tgt, point=current_point
+                    )  # [B=1, 1, HIDDEN]
+                    tgt_mask = self.decoder.order_mask(
+                        length=current_point + 1
+                    )  # [B=1, LEN, LEN]
+                    tgt_mask = tgt_mask[:, -1].unsqueeze(1)  # [B=1, 1, LEN]
+
+                    # 어텐션 레이어 통과
+                    for l, layer in enumerate(self.decoder.attention_layers):
+                        tgt = layer(
+                            tgt=tgt,  # [B=1, 1, HIDDEN]
+                            tgt_prev=current_hidden[l],
+                            src=current_src,
+                            tgt_mask=tgt_mask,
+                        )  # [1, 1, HIDDEN]
+
+                        # Hidden state 갱신
+                        # 첫 state: [1, 1, HIDDEN]
+                        # 이후: [B=1, 1, HIDDEN] -> [B=1, 2, HIDDEN] -> [B=1, 3, HIDDEN] -> ...
+                        current_hidden[l] = (
+                            tgt
+                            if current_hidden[l] is None
+                            else torch.cat([current_hidden[l], tgt], dim=1)
+                        )
+
+                    # 확률화하기 전 모델의 로짓
+                    prob_step = self.decoder.generator(tgt)  # [B=1, 1, VOCAB_SIZE]
+
+                    # 모델의 로짓을  확률화
+                    log_prob_step = F.log_softmax(
+                        prob_step, dim=-1
+                    )  # [B=1, 1, VOCAB_SIZE]
+                    log_prob, indices = torch.topk(log_prob_step, beam_width)
+
+                    # 다음 state에 활용할 {beam_width}개 후보 노드를 우선순위큐에 삽입
+                    next_nodes = []
+                    for new_k in range(beam_width):
+                        decoded_t = indices[:, :, new_k].squeeze(0)
+                        log_p = log_prob[:, :, new_k].item()
+
+                        node = BeamSearchNode(
+                            hidden_state=deepcopy(current_hidden),
+                            prev_node=n,
+                            token_id=deepcopy(decoded_t),
+                            log_prob=n.logp + log_p,
+                            length=n.len + 1,
+                        )
+                        score = -node.eval()
+                        next_nodes.append((score, node))
+
+                    for i in range(len(next_nodes)):
+                        score, next_node = next_nodes[i]
+                        nodes.put((score, next_node))
+
+                    num_steps += beam_width
+
+                # <EOS> 토큰이 한번도 등장하지 않았을 경우 - 최대 확률 노드
+                if len(end_nodes) == 0:
+                    end_nodes = [nodes.get() for _ in range(topk)]
+
+                utterances = []
+                for score, n in sorted(
+                    end_nodes, key=operator.itemgetter(0)
+                ):  # 가장 마지막 노드에서 역추적
+                    utterance = []
+                    utterance.append(n.token_id.item())
+                    # back trace
+                    while n.prev_node != None:
+                        n = n.prev_node
+                        utterance.append(n.token_id.item())
+
+                    utterance = utterance[::-1]  # 뒤집기
+                    utterances.append(utterance)
+
+                if topk == 1:
+                    decoded_batch.append(utterances[0])
+                else:
+                    decoded_batch.append(utterances)
+
+        # id_to_string의 입력에 맞게 텐서로 변경
+        outputs = []
+        for decoded_sample in decoded_batch:
+            if len(decoded_sample) < max_sequence:
+                num_pads = max_sequence - len(decoded_sample)
+                decoded_sample += [pad_token_id] * num_pads
+            elif len(decoded_sample) > max_sequence:
+                decoded_sample = decoded_sample[:max_sequence]
+            outputs.append(decoded_sample)
+        outputs = torch.tensor(outputs)
+
+        return outputs

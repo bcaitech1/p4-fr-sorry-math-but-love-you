@@ -89,8 +89,8 @@ def split_gt(
     # Author: Junchul Choi
     root = os.path.join(os.path.dirname(groundtruth), "images")
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), "data_info.txt"))
-    val_image_names = set(df[df["fold"] == 3]["image_name"].values)
-    train_image_names = set(df[df["fold"] != 3]["image_name"].values)
+    val_image_names = set(df[df["fold"] == 4]["image_name"].values)
+    train_image_names = set(df[df["fold"] != 4]["image_name"].values)
     with open(groundtruth, "r") as fd:
         data = []
         for line in fd:
@@ -192,10 +192,8 @@ class LoadDataset(Dataset):
         image = Image.open(item["path"])
         if self.rgb == 3:
             image = image.convert("RGB")
-            # image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
             image = image.convert("L")
-            # image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
@@ -268,10 +266,8 @@ class LoadEvalDataset(Dataset):
         image = Image.open(item["path"])
         if self.rgb == 3:
             image = image.convert("RGB")
-            # image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
             image = image.convert("L")
-            # image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
@@ -296,7 +292,6 @@ class LoadEvalDataset(Dataset):
         }
 
 
-# def dataset_loader(options, transformed):
 def dataset_loader(options, train_transform, valid_transform):
 
     # Read data
@@ -321,7 +316,6 @@ def dataset_loader(options, train_transform, valid_transform):
 
     # Load data
     train_dataset = LoadDataset(
-        # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
         train_data,
         options.data.token_paths,
         crop=options.data.crop,
@@ -334,12 +328,10 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=True,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
-        drop_last=True,  # NOTE 추가
+        drop_last=True,
         pin_memory=True,
     )
-
     valid_dataset = LoadDataset(
-        # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
         valid_data,
         options.data.token_paths,
         crop=options.data.crop,
@@ -348,12 +340,11 @@ def dataset_loader(options, train_transform, valid_transform):
     )
     valid_data_loader = DataLoader(
         valid_dataset,
-        # batch_size=options.batch_size,
-        batch_size=64,
+        batch_size=options.batch_size,
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
-        drop_last=True,  # NOTE 추가
+        drop_last=True,
         pin_memory=True,
     )
 

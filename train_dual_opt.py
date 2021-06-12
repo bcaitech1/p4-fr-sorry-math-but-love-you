@@ -8,8 +8,6 @@ import shutil
 import numpy as np
 import torch
 from torch import nn, optim
-# import albumentations as A # NOTE
-# from albumentations.pytorch import ToTensorV2 # NOTE
 from transformers import get_constant_schedule_with_warmup
 import wandb
 from checkpoint import (
@@ -22,7 +20,7 @@ from checkpoint import (
 )
 from flags import Flags
 from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
-from augmentations import get_train_transforms, get_valid_transforms # NOTE
+from augmentations import get_train_transforms, get_valid_transforms  # NOTE
 from dataset import dataset_loader, START, PAD, load_vocab
 from scheduler import (
     CircularLRBeta,
@@ -35,20 +33,18 @@ os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
 
-def train_one_epoch(
+def _train_one_epoch(
     data_loader,
     model,
     epoch_text,
     criterion,
-    enc_optimizer,  # NOTE
-    dec_optimizer,  # NOTE
-    enc_lr_scheduler,  # NOTE
-    dec_lr_scheduler,  # NOTE
-    teacher_forcing_ratio,
+    enc_optimizer,
+    dec_optimizer,
+    enc_lr_scheduler,
+    dec_lr_scheduler,
     max_grad_norm,
     device,
-    scaler,
-    tf_scheduler,  # NOTE. Teacher Forcing Scheduler
+    tf_scheduler,  # Teacher Forcing Scheduler
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -70,16 +66,14 @@ def train_one_epoch(
     ) as pbar:
         for d in data_loader:
             input = d["image"].to(device).float()
-            tf_ratio = tf_scheduler.step()  # NOTE. Teacher Forcing Scheduler
+            tf_ratio = tf_scheduler.step()
 
             curr_batch_size = len(input)
             expected = d["truth"]["encoded"].to(device)
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            output = model(
-                input, expected, True, tf_ratio
-            )  # [B, MAX_LEN, VOCAB_SIZE]
-            
+            output = model(input, expected, True, tf_ratio)  # [B, MAX_LEN, VOCAB_SIZE]
+
             decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1)  # [B, 1, MAX_LEN]
             sequence = sequence.squeeze(1)  # [B, MAX_LEN], Metric 측정을 위해
@@ -159,9 +153,7 @@ def train_one_epoch(
     return result
 
 
-def valid_one_epoch(
-    data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio
-):
+def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
     model.eval()
 
     losses = []
@@ -171,6 +163,8 @@ def valid_one_epoch(
     num_wer = 0
     sent_acc = 0
     num_sent_acc = 0
+    
+    NO_TEACHER_FORCING = 0.0
 
     with torch.no_grad():
         with tqdm(
@@ -186,7 +180,7 @@ def valid_one_epoch(
                 expected = d["truth"]["encoded"].to(device)
 
                 expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-                output = model(input, expected, False, teacher_forcing_ratio)
+                output = model(input, expected, False, NO_TEACHER_FORCING)
 
                 decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
                 _, sequence = torch.topk(
@@ -226,9 +220,6 @@ def valid_one_epoch(
     return result
 
 
-
-
-
 def main(config_file):
     """
     Train math formula recognition model
@@ -242,7 +233,7 @@ def main(config_file):
     device = torch.device(hardware)
     print("--------------------------------")
     print("Running {} on device {}\n".format(options.network, device))
-    print_system_envs() # Print system environments
+    print_system_envs()  # Print system environments
 
     # Load checkpoint and print result
     checkpoint = (
@@ -332,8 +323,8 @@ def main(config_file):
     enc_t_up = int(t_0 * options.scheduler.warmup_ratio)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
     dec_t_up = int(t_0 * options.scheduler.warmup_ratio)
 
-    enc_optimizer = optim.AdamW(enc_params_to_optimise, lr=0)
-    dec_optimizer = optim.AdamW(dec_params_to_optimise, lr=options.optimizer.dec_lr)
+    enc_optimizer = optim.Adam(enc_params_to_optimise, lr=0)
+    dec_optimizer = optim.Adam(dec_params_to_optimise, lr=5e-4)
 
     enc_optimizer_state = checkpoint.get("enc_optimizer", None)
     if enc_optimizer_state is not None:
@@ -363,12 +354,26 @@ def main(config_file):
         optimizer=dec_optimizer, num_warmup_steps=dec_t_up
     )
 
+    enc_lr_scheduler_state = checkpoint.get("enc_scheduler", None)
+    if enc_lr_scheduler_state is not None:
+        enc_lr_scheduler.load_state_dict(enc_lr_scheduler_state)
 
-    # NOTE. Teacher Forcing Scheduler
+    dec_lr_scheduler_state = checkpoint.get("dec_scheduler", None)
+    if dec_lr_scheduler_state is not None:
+        dec_lr_scheduler.load_state_dict(dec_lr_scheduler_state)
+
+    # Define Teacher Forcing Scheduler
     tf_scheduler = TeacherForcingScheduler(
         num_steps=total_steps,
-        tf_max=options.teacher_forcing_ratio,  # NOTE. yaml 파일의 tf-ratio 1.0으로 수정할 것!
-        tf_min=0.4,
+        tf_max=options.teacher_forcing_ratio.tf_max,
+        tf_min=options.teacher_forcing_ratio.tf_min,
+    )
+    print(
+        "[+] Teacher Forcing\n",
+        "Type: Arctan\n",
+        f"Steps: {total_steps}\n"
+        f"TF-MAX: {options.teacher_forcing_ratio.tf_max}\n",
+        f"TF-MIN: {options.teacher_forcing_ratio.tf_min}\n",
     )
 
     # Log for W&B
@@ -408,7 +413,7 @@ def main(config_file):
         )
 
         # NOTE
-        train_result = train_one_epoch(
+        train_result = _train_one_epoch(
             data_loader=train_data_loader,
             model=model,
             epoch_text=epoch_text,
@@ -417,10 +422,8 @@ def main(config_file):
             dec_optimizer=dec_optimizer,
             enc_lr_scheduler=enc_lr_scheduler,
             dec_lr_scheduler=dec_lr_scheduler,
-            teacher_forcing_ratio=options.teacher_forcing_ratio,
             max_grad_norm=options.max_grad_norm,
             device=device,
-            scaler=scaler,
             tf_scheduler=tf_scheduler,
         )
 
@@ -442,13 +445,12 @@ def main(config_file):
         )
         epoch_lr = enc_lr_scheduler.get_lr()[0]  # cycle
 
-        validation_result = valid_one_epoch(
+        validation_result = _valid_one_epoch(
             validation_data_loader,
             model,
             epoch_text,
             criterion,
             device,
-            teacher_forcing_ratio=0.5,
         )
 
         validation_losses.append(validation_result["loss"])
@@ -572,11 +574,11 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="REFACTORING-TEST", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
-        default="TF(8>3&(-5,5)) & SSR(.3)>GD(.3)>Norm & Dual Opt & Dec(256_1024) & Fold0",
+        default="train_dual_opt.py(SATRN)",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
