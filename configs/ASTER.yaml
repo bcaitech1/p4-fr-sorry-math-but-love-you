@@ -1,0 +1,50 @@
+network: "ASTER"
+input_size:
+  height: 256
+  width: 1024
+ASTER:
+  src_dim: 384
+  hidden_dim: 384
+  embedding_dim: 384
+  layer_num: 2
+checkpoint: ""
+prefix: "./log/aster"
+
+data:
+  train:
+    - "../input/data/train_dataset/gt.txt" # UPSTAGE
+    # - "/content/data/train_dataset/gt.txt" #  COLAB
+  test:
+    - ""
+  token_paths:
+    - "../input/data/train_dataset/tokens.txt" # UPSTAGE
+    # - "/content/data/train_dataset/tokens.txt"  # COLAB
+  dataset_proportions:  # proportion of data to take from train (not test)
+    - 1.0
+  random_split: True # if True, random split from train files
+  test_proportions: 0.2 # only if random_split is True
+  crop: True
+  rgb: 3   # 3 for color, 1 for greyscale
+  
+batch_size: 16
+num_workers: 0
+num_epochs: 5
+print_epochs: 1
+dropout_rate: 0.1
+teacher_forcing_ratio:
+  tf_max: 0.8
+  tf_min: 0.4
+max_grad_norm: 2.0
+seed: 21
+optimizer:
+  optimizer: 'Adam' # Adam, Adadelta
+  lr: 5e-4 # 1e-4
+  weight_decay: 1e-4
+  is_cycle: True
+  enc_lr: 5e-4
+  dec_lr: 5e-4
+scheduler:
+  scheduler: "CustomCosine"
+  cycle: 1
+  warmup_ratio: 0.1
+
