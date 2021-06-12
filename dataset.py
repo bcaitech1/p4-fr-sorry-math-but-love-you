@@ -104,8 +104,6 @@ def split_gt(
         val_data = [
             [os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names
         ]
-    train_data = train_data[:200]
-    val_data = val_data[:200]
     return train_data, val_data
 
 
