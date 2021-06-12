@@ -74,9 +74,7 @@ def _train_one_epoch(
             expected = d["truth"]["encoded"].to(device)
             expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
 
-            output = model(
-                input, expected, True, tf_ratio
-            )  # [B, MAX_LEN, VOCAB_SIZE]
+            output = model(input, expected, True, tf_ratio)  # [B, MAX_LEN, VOCAB_SIZE]
 
             decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
             _, sequence = torch.topk(decoded_values, k=1, dim=1)  # [B, 1, MAX_LEN]
@@ -114,9 +112,13 @@ def _train_one_epoch(
             if isinstance(lr_scheduler.get_lr(), float) or isinstance(
                 lr_scheduler.get_lr(), int
             ):
-                wandb.log({"learning_rate": lr_scheduler.get_lr(), "tf_ratio": tf_ratio})
+                wandb.log(
+                    {"learning_rate": lr_scheduler.get_lr(), "tf_ratio": tf_ratio}
+                )
             else:
-                wandb.log({"learning_rate": lr_scheduler.get_lr()[0], "tf_ratio": tf_ratio})
+                wandb.log(
+                    {"learning_rate": lr_scheduler.get_lr()[0], "tf_ratio": tf_ratio}
+                )
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -140,7 +142,7 @@ def _train_one_epoch(
 
 
 def _valid_one_epoch(
-    data_loader, model, epoch_text, criterion, device, teacher_forcing_ratio
+    data_loader, model, epoch_text, criterion, device
 ):
     model.eval()
 
@@ -151,6 +153,8 @@ def _valid_one_epoch(
     num_wer = 0
     sent_acc = 0
     num_sent_acc = 0
+
+    NO_TEACHER_FORCING = 0.0
 
     with torch.no_grad():
         with tqdm(
@@ -166,7 +170,7 @@ def _valid_one_epoch(
                 expected = d["truth"]["encoded"].to(device)
 
                 expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-                output = model(input, expected, False, teacher_forcing_ratio)
+                output = model(input, expected, False, NO_TEACHER_FORCING)
 
                 decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
                 _, sequence = torch.topk(
@@ -336,12 +340,20 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
-        print("TF-MAX", options.teacher_forcing_ratio)
+        
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps,
-            tf_max=options.teacher_forcing_ratio,
-            tf_min=0.3,
+            tf_max=options.teacher_forcing_ratio.tf_max,
+            tf_min=options.teacher_forcing_ratio.tf_min,
         )
+        print(
+            "[+] Teacher Forcing\n",
+            "Type: Arctan\n",
+            f"Steps: {total_steps}\n"
+            f"TF-MAX: {options.teacher_forcing_ratio.tf_max}\n",
+            f"TF-MIN: {options.teacher_forcing_ratio.tf_min}\n",
+        )
+        
 
     else:
         optimizer = get_optimizer(
@@ -447,7 +459,6 @@ def main(config_file):
             epoch_text=epoch_text,
             criterion=criterion,
             device=device,
-            teacher_forcing_ratio=0.5,
         )
 
         validation_losses.append(validation_result["loss"])
@@ -500,8 +511,8 @@ def main(config_file):
             )
             best_score = final_metric(
                 sentence_acc=validation_epoch_sentence_accuracy,
-                word_error_rate=validation_epoch_wer
-                )
+                word_error_rate=validation_epoch_wer,
+            )
             print(f"best score: {best_score}")
             print("model is saved")
 
@@ -551,7 +562,7 @@ def main(config_file):
             #     validation_wer=validation_epoch_wer,
             #     model=model,
             # )
-            
+
             write_wandb(
                 epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
@@ -571,11 +582,11 @@ def main(config_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--project_name", default="SATRN", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+        "--project_name", default="REFACTORING-TEST", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
     )
     parser.add_argument(
         "--exp_name",
-        default="FINAL-FOLD3",
+        default="train.py - SATRN",
         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
     )
     parser.add_argument(
