@@ -19,7 +19,6 @@ from postprocessing import get_decoding_manager
 
 
 def main(parser):
-
     is_cuda = torch.cuda.is_available()
     checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
     options = Flags(checkpoint["configs"]).get()
