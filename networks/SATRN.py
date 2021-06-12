@@ -8,10 +8,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-
-import sys  # for DEBUG
-
-sys.path.insert(0, "/opt/ml/code")  # for DEBUG
 from dataset import START, PAD
 from decoding import BeamSearchNode
 
