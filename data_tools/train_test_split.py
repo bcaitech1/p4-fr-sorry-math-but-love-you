@@ -11,14 +11,14 @@ output_dir = "gt-split"
 def split_gt(groundtruth, test_percent=0.2, data_num=None):
     with open(groundtruth, "r") as fd:
         data = fd.read()
-        data = data.split('\n')
-        data = [x.split('\t') for x in data]
+        data = data.split("\n")
+        data = [x.split("\t") for x in data]
         random.shuffle(data)
         if data_num:
             assert sum(data_num) < len(data)
-            return data[:data_num[0]], data[data_num[0]:data_num[0] + data_num[1]]
+            return data[: data_num[0]], data[data_num[0] : data_num[0] + data_num[1]]
         test_len = round(len(data) * test_percent)
-        return data[test_len:], data[:test_len] # train, test
+        return data[test_len:], data[:test_len]  # train, test
 
 
 def write_tsv(data, path):
@@ -35,7 +35,7 @@ def parse_args():
         dest="test_percent",
         default=test_percent,
         type=float,
-        help="Percent of data to use for test [Default: {}]".format(test_percent)
+        help="Percent of data to use for test [Default: {}]".format(test_percent),
     )
     parser.add_argument(
         "-n",

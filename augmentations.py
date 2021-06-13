@@ -33,7 +33,6 @@ def get_valid_transforms(height, width):
         ]
     )
 
-# NOTE: 수정 - soft_voting.py에 있던 transform을 옮김
 def get_test_transform(height, width):
     return A.Compose(
         [

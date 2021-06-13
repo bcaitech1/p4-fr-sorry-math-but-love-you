@@ -6,7 +6,7 @@ submit/**
 download.sh
 
 # model config
-configs/**
+# configs/**
 
 # sketches
 sketches/**
@@ -21,7 +21,7 @@ tensorboard/**
 *.pth
 .DS_Store
 wandb/**
-*.yaml
+# *.yaml
 
 # etc
 .empty/**
