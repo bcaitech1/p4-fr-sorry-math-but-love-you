@@ -88,9 +88,14 @@ def split_gt(
 
     # Author: Junchul Choi
     root = os.path.join(os.path.dirname(groundtruth), "images")
-    df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), "data_info.txt"))
-    val_image_names = set(df[df["fold"] == 4]["image_name"].values)
-    train_image_names = set(df[df["fold"] != 4]["image_name"].values)
+
+    print(root)
+    print(os.path.dirname(groundtruth))
+    df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info_2.txt'))
+    val_image_names = set(df[df['fold']==2]['image_name'].values)
+    train_image_names = set(df[df['fold']!=2]['image_name'].values)
+    ####----------------------
+
     with open(groundtruth, "r") as fd:
         data = []
         for line in fd:
@@ -328,8 +333,9 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=True,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
-        drop_last=True,
         pin_memory=True,
+        drop_last=True
+
     )
     valid_dataset = LoadDataset(
         valid_data,
@@ -344,8 +350,8 @@ def dataset_loader(options, train_transform, valid_transform):
         shuffle=False,
         num_workers=options.num_workers,
         collate_fn=collate_batch,
-        drop_last=True,
         pin_memory=True,
+        drop_last=True
     )
 
     return train_data_loader, valid_data_loader, train_dataset, valid_dataset

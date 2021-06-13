@@ -1,4 +1,7 @@
+# NOTE: 수정 - 사소한 리패터링만 수행. 복붙 ㄱㄱ!
 from copy import deepcopy
+import math
+import warnings
 from typing import List
 import torch
 import torch.nn.functional as F
@@ -16,17 +19,17 @@ RULES = {
         '\\omicron', '}', '\\Omega', '\\roman5'
         ],
 
-    # 매우 높은 확률로 뒤에 '_' 토큰이 붙는 토큰 # NOTE 성능 저하를 일으켜 제거함
+    # 매우 높은 확률로 뒤에 '_' 토큰이 붙는 토큰 # NOTE 성능 저하를 유발해 제거
     'next_underbar': [
         # '\\lim', '\\iint'
     ],
 
-    # 매우 높은 확률로 뒤에 '{' 토큰이 붙는 토큰 # NOTE 성능 저하를 일으켜 제거함
+    # 매우 높은 확률로 뒤에 '{' 토큰이 붙는 토큰 # NOTE 성능 저하를 유발해 제거
     'next_lbracket': [
         # '^', '_', '\\sqrt', '\\frac', '\\overline'
         ],
 
-    # 매우 높은 확률로 뒤에 '_' 토큰이 붙지 않는 토큰 # NOTE 성능 저하를 일으켜 제거함
+    # 매우 높은 확률로 뒤에 '_' 토큰이 붙지 않는 토큰 # NOTE 성능 저하를 유발해 제거
     'cannot_next_underbar': [
         # NOTE: V3
         # "'", '\\right)', '\\alpha', '\\gamma', '\\pi', '/', '{', '|',
@@ -75,31 +78,6 @@ RULES = {
         # '|', 'C', '\\epsilon', '\\nabla', '<', 'f', 'g', '\\left.', '\\Pi', '&', '\\left\\{', '.',
         # '\\pm', 'd', '\\beta', '\\right\\}', 'b', '3', 'a', '9', 'S', '\\omega', '!', '\\cup', '\\forall',
         # 'r', '\\right|', '\\notin', '\\mu', 'l', 'B', '\\approx', '\\cot', 'z', '\\left\\|', 's', '\\square'
-        ],
-
-    # 한번도 자기 자신이 연속으로 등장한 적이 없는 토큰
-    'cannot_series': [
-        '\\prod', '\\downarrow', '\\widehat', '\\iiint', '\\ddot', '\\supsetneq',
-        '_', '\\log', '\\dot', '\\sqrt', '\\ominus', ';', '\\leqq', 'I', '\\tanh',
-        '\\subset', '\\pm', '\\oint', '\\rightharpoonup', '\\tau', '\\underset',
-        '\\not', '\\theta', '\\rho', '\\epsilon', '\\roman1', '\\ln', '\\cong', 'X',
-        '\\sec', 'K', '\\zeta', 'V', '\\rightleftarrows', '\\wedge', '\\stackrel',
-        'M', '?', '\\leq', '\\cup', '\\square', '\\kappa', '\\exists', '\\eta', '\\vdots',
-        '\\left\\|', '\\end{matrix}', '\\uparrow', 'N', '\\neq', '\\phi', '\\Rightarrow',
-        '\\frac', '\\because', '\\sim', '\\perp', '\\nsubseteq', 'L', '\\Psi', '\\cosec',
-        '\\fallingdotseq', '\\Pi', '\\sinh', '\\beta', '\\nu', '$', '\\subsetneq',
-        '\\forall', '\\tan', '\\notin', '\\xi', '\\upsilon', '\\rightarrow', '\\angle',
-        '\\backslash', 'G', '\\sum', '\\nexists', '\\frown', '\\div', '\\cot', '\\right\\|',
-        '\\overrightarrow', '*', '\\Gamma', '\\doteq', '\\varnothing', '\\mp', '"',
-        '\\delta', '\\leftarrow', '\\overleftrightarrow', '\\searrow', '\\equiv', 'J',
-        '\\geq', '\\propto', '\\vee', '\\sigma', '\\cap', '\\supset', '\\Theta', '\\sin',
-        '\\partial', '\\csc', '\\to', 'H', '\\hbar', '\\lim', '\\Lambda', '\\begin{matrix}',
-        '\\mu', '\\roman2', '\\alpha', '\\geqq', 'W', '\\therefore', '\\subseteq', '%',
-        '\\leftrightarrow', '\\csch', '\\overline', '\\odot', '\\varphi', '\\min', '\\iint',
-        '\\oplus', '\\widetilde', 'U', '\\simeq', '\\ni', '\\omicron', '\\Delta', '\\Leftarrow',
-        '\\lambda', '\\varrho', '\\Leftrightarrow', '\\roman4', '\\Phi', '\\psi', '\\coth',
-        '\\sech', '\\Omega', '\\roman5', '\\triangle', '\\overarc', '\\circ', '\\infty', '^',
-        '\\otimes', '\\approx', '\\max', '\\cosh'
         ],
 
     # 최대 연속 생성 횟수를 규제할 토큰
@@ -186,7 +164,10 @@ RULES = {
     },
 }
 
-def get_decoding_manager(tokens_path, batch_size: int=128):
+
+def get_decoding_manager(
+    tokens_path, batch_size: int = 128
+):
     tokens = []
     tokens.extend(SPECIAL_TOKENS)
     with open(tokens_path, "r") as fd:
@@ -194,14 +175,19 @@ def get_decoding_manager(tokens_path, batch_size: int=128):
         for token in reader.split("\n"):
             if token not in tokens:
                 tokens.append(token)
-    assert len(tokens) == 245 # NOTE: for debug
-    manager = DecodingManager(batch_size=batch_size, rules=RULES, tokens=tokens)
+    assert len(tokens) == 245
+    manager = DecodingManager(
+        batch_size=batch_size,
+        rules=RULES,
+        tokens=tokens,
+        # sequence_length=sequence_length,
+    )
     return manager
 
 
 class MemoryNode:
-    def __init__(self, id: int, rules: dict, tokens: list):
-        self.id = id # 배치 내 샘플 순서(0~) NOTE: just for debugging
+    def __init__(self, id: int, rules: dict, tokens: list, sequence_length: int):
+        self.id = id  # 배치 내 샘플 순서(0~) NOTE: just for debugging
         self.rules = rules
         self.history = []  # 또는 텐서 - 현재까지 생성된 토큰 리스트 NOTE: just for debugging
         self.tokens = tokens
@@ -212,11 +198,13 @@ class MemoryNode:
 
         self.cumul_lbrackets = 0
         self.cumul_rbrackets = 0
-        self.residual_lbrackets = len(tokens)
-        
+        # self.residual_length = sequence_length
+        # self.lbrackets_limit = self._get_lbrackets_limit(
+        #     self.residual_length, self.cumul_lbrackets
+        # )  # 최대 생성 가능한 좌괄호 수
+
         # 다음 step때 생성하면 안되는 토큰 확인
-        self.blacklist = self._look_back()  
-        
+        self.blacklist = self._look_back()
 
     def record(self, target_id: int):
         self.history.append(target_id)  # 아직 복잡한 로직이 없어서 필요하지는 않음
@@ -229,22 +217,31 @@ class MemoryNode:
 
         if target_id == self._encode("{"):
             self.cumul_lbrackets += 1
+
         elif target_id == self._encode("}"):
             self.cumul_rbrackets += 1
 
         self.current_token_id = target_id  # 타깃ID 갱신
+        # self.residual_length -= 1
+        # self.lbrackets_limit = self._get_lbrackets_limit(
+        #     self.residual_length, self.cumul_lbrackets
+        # )
         self.blacklist = self._look_back()  # 블랙리스트 갱신
 
     def _look_back(self) -> list:
         current_token = self._decode(self.current_token_id)
         blacklist = [
-            self._encode("<SOS>"), 
-            # self._encode(""),
-            ]  # 다음 step에서 생성을 금지할 토큰
-        
+            self._encode("<SOS>"),
+            self._encode(""),
+        ]  # 다음 step에서 생성을 금지할 토큰
+
         # 괄호 수 균형
         if self.cumul_lbrackets == self.cumul_rbrackets:
-            blacklist.append(self._encode('}'))
+            blacklist.append(self._encode("}"))
+
+        # 좌괄호 수 제한
+        # if self.lbrackets_limit == 0:
+        #     blacklist.append(self._encode("{"))
 
         # =====CHECK #1 - 첫 step에서 등장할 수 없는 토큰=====
         if current_token == "<EOS>":
@@ -295,6 +292,16 @@ class MemoryNode:
         blacklist = sorted(list(set(blacklist)))
         return blacklist
 
+    @staticmethod
+    def _get_lbrackets_limit(residual_length: int, cumul_lbrackets: int):
+        """생성 가능한 좌괄호('{') 개수를 계산하는 함수
+        (잔여 좌괄호 생성 가능 횟수) = (남은 생성 횟수) - (현재 좌괄호 생성 횟수) // 2
+        """
+        limit = (residual_length - cumul_lbrackets) // 2
+        if limit <= 0:
+            return 0
+        return limit
+
     def _encode(self, token: str) -> int:
         return self.token2id[token]
 
@@ -304,12 +311,14 @@ class MemoryNode:
 
 class DecodingManager:
     def __init__(self, batch_size: int, rules: list, tokens: list):
-        assert tokens[0] == "<SOS>", 'It looks wrong tokens. Check again.'
+        assert tokens[0] == "<SOS>", "It looks wrong tokens. Check again."
         self.tokens = tokens
         self.rules = rules
         self.batch_size = batch_size
         self.vocab_size = len(tokens)
-        self.memories = self._initialize_memories(batch_size, rules, tokens)
+        self.memories = None
+        self.sequence_length = None
+        
 
     def sift(self, probs_step: torch.Tensor) -> torch.Tensor:
         """
@@ -318,24 +327,29 @@ class DecodingManager:
         Returns:
             targets(torch.Tensor): 다음 스텝에 입력될 target 텐서, [B]
         """
-        dimension_flag = None # SATRN과 ASTER의 probs_step 형태가 다르기 때문에 flag 마련
+        dimension_flag = None  # SATRN과 ASTER의 probs_step 형태가 다르기 때문에 flag 마련
 
         # last batch 등 학습/추론 중 배치 사이즈가 달라질 경우 조정
         if len(probs_step) != self.batch_size:
-            import warnings
-            warnings.warn(f"batch size has been changed! {self.batch_size}->{len(probs_step)}")
-            self.memories = self._initialize_memories(len(probs_step), self.rules, self.tokens)
+            warnings.warn(
+                f"batch size has been changed! {self.batch_size}->{len(probs_step)}"
+            )
+            self.memories = self._initialize_memories(
+                len(probs_step), self.rules, self.tokens, self.sequence_length
+            )
             self.batch_size = len(probs_step)
-            
+
         if probs_step.ndim != 2:
             dimension_flag = 3
             probs_step = probs_step.squeeze(1).clone()
-            
+
         mask = list(map(lambda x: self._mask(x, self.vocab_size), self.memories))
         mask = torch.vstack(mask)
 
         probs_softmax = F.softmax(probs_step, dim=-1)
-        probs_softmax = probs_softmax.masked_fill(mask.to(probs_softmax.get_device()), 0)
+        probs_softmax = probs_softmax.masked_fill(
+            mask.to(probs_softmax.get_device()), 0
+        )
 
         assert (probs_softmax == 0).sum().item() == mask.sum().item()
         targets = torch.argmax(probs_softmax, dim=-1)
@@ -345,15 +359,26 @@ class DecodingManager:
             probs_softmax = probs_softmax.unsqueeze(1)
             assert probs_softmax.size(1) == 1
 
-        return targets, probs_softmax # 두가지를 다 보내줘야 추론에 반영 가능
+        return targets, probs_softmax  # 두가지를 다 보내줘야 추론에 반영 가능
 
-    def reset(self) -> None:
+    def reset(self, sequence_length: int) -> None:
         self.memories = self._initialize_memories(
-            batch_size=self.batch_size, rules=self.rules, tokens=self.tokens
+            batch_size=self.batch_size,
+            rules=self.rules,
+            tokens=self.tokens,
+            sequence_length=sequence_length,
         )
-
-    def _initialize_memories(self, batch_size: int, rules: dict, tokens: list) -> List[MemoryNode]:
-        memories = [MemoryNode(id=idx, rules=rules, tokens=tokens) for idx, _ in enumerate(range(batch_size))]
+        self.sequence_length = sequence_length
+        
+    def _initialize_memories(
+        self, batch_size: int, rules: dict, tokens: list, sequence_length: int
+    ) -> List[MemoryNode]:
+        memories = [
+            MemoryNode(
+                id=idx, rules=rules, tokens=tokens, sequence_length=sequence_length
+            )
+            for idx, _ in enumerate(range(batch_size))
+        ]
         return memories
 
     def _update(self, targets: torch.Tensor) -> None:

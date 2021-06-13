@@ -3,6 +3,7 @@ train_dataset/**
 input/**
 submission.txt
 submit/**
+download.sh
 
 # model config
 # configs/**

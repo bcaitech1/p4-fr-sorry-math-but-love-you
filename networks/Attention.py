@@ -326,10 +326,11 @@ class Attention(nn.Module):
             pad_id=train_dataset.token_to_id[PAD],
             st_id=train_dataset.token_to_id[START],
             num_layers=FLAGS.Attention.layer_num,
-            cell_type=FLAGS.Attention.cell_type,
-        )
+            cell_type=FLAGS.Attention.cell_type)
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = (
+            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)

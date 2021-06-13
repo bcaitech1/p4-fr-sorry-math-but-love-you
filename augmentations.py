@@ -33,7 +33,6 @@ def get_valid_transforms(height, width):
         ]
     )
 
-
 def get_test_transform(height, width):
     return A.Compose(
         [
