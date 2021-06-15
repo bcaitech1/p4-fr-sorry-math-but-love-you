@@ -19,8 +19,6 @@ from checkpoint import (
     default_checkpoint,
     load_checkpoint,
     save_checkpoint,
-    init_tensorboard,
-    write_tensorboard,
     write_wandb
 )
 from flags import Flags
@@ -413,14 +411,12 @@ def main(config_file):
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
 
-    # Log for tensorboard
     if not os.path.exists(options.prefix):
         os.makedirs(options.prefix)
     log_file = open(os.path.join(options.prefix, "log.txt"), "w")
     shutil.copy(config_file, os.path.join(options.prefix, "train_config.yaml"))
     if options.print_epochs is None:
         options.print_epochs = options.num_epochs
-    writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
     train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
@@ -576,20 +572,6 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
-            write_tensorboard(
-                writer=writer,
-                epoch=start_epoch + epoch + 1,
-                grad_norm=train_result["grad_norm"],
-                train_loss=train_result["loss"],
-                train_symbol_accuracy=train_epoch_symbol_accuracy,
-                train_sentence_accuracy=train_epoch_sentence_accuracy,
-                train_wer=train_epoch_wer,
-                validation_loss=validation_result["loss"],
-                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer,
-                model=model,
-            )
             write_wandb(
                 epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
