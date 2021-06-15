@@ -647,8 +647,8 @@ class SATRN(nn.Module):
         )
 
         self.criterion = (
-            nn.CrossEntropyLoss()
-        )  # without ignore_index=train_dataset.token_to_id[PAD]
+            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
+        )
 
         if checkpoint:
             self.load_state_dict(checkpoint)

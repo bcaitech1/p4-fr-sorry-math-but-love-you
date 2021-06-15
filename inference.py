@@ -1,12 +1,19 @@
 import os
+from glob import glob
+import gc
+from collections import OrderedDict
+from copy import deepcopy
 import argparse
 import random
 from tqdm import tqdm
+import time
+from typing import List
 import csv
+import pandas as pd
 import torch
-from torch.utils.data import DataLoader
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
+import torch.nn.functional as F
 
 from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
@@ -15,6 +22,29 @@ from train import get_valid_transforms
 from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
 from decoding import decode
+from postprocessing import get_decoding_manager
+from augmentations import get_test_transform
+from utils import print_gpu_status, print_ram_status
+from ensemble_utils import (
+    load_encoder_models,
+    load_decoder_models,
+    make_encoder_values,
+    make_decoder_values,
+    compose_test_dataloader,
+    remap_model_idx,
+    remap_test_dataloaders,
+    truncate_aligned_models,
+    remove_all_files_in_dir,
+    DecoderDataset
+)
+
+NO_TEACHER_FORCING = 0.0
+SATRN_IDX = 0
+SWIN_IDX = 1
+ASTER_IDX = 2
+ORDER = dict(MySATRN=SATRN_IDX, SWIN=SWIN_IDX, ASTER=ASTER_IDX) # 디폴트 모델별 ID
+VERBOSE_DEC_INFO = True
+VERBOSE_ENC_INFO = True
 
 
 def get_test_transform(height, width):
@@ -46,6 +76,7 @@ def main(parser):
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
 
+    # NOTE: Load Test Data
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
     
     transformed = get_test_transform(256, 512)
@@ -101,6 +132,12 @@ def main(parser):
             for path, predicted in results:
                 w.write(path + "\t" + predicted + "\n")
 
+    loading_time = (time.time() - start) / 60
+    print(
+        "[+] Time Check\n",
+        f"Total Inference Time(min) : {loading_time:.2f}\n",
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -112,6 +149,15 @@ if __name__ == "__main__":
                 "/opt/ml/sorry_math_but_love_you/log/my_satrn/MySATRN_fold4.pth"],
         nargs='*',
         help="Path of checkpoint file",
+    )
+    parser.add_argument(
+    "--weight_list",
+    dest="weight_list",
+    default=[
+        1,1,1,1,1,1,1,1,1,1,1,1,1
+    ],
+    type=list,
+    help="weight list for ensemble",
     )
     parser.add_argument(
         "--max_sequence",
@@ -130,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default='greedy', # 'greedy'로 설정하면 기존과 동일하게 inference
+        default="greedy",
         type=str,
         help="디코딩 방식 설정. 'greedy', 'beam'",
     )
@@ -141,8 +187,20 @@ if __name__ == "__main__":
         type=int,
         help="빔서치 사용 시 스텝별 후보 수 설정",
     )
-
-    eval_dir = os.environ.get('SM_CHANNEL_EVAL', '/opt/ml/input/data/')
+    parser.add_argument(
+        "--decoding_manager", 
+        default=True, 
+        help="DecodingManager 사용 여부 결정"
+    )
+    parser.add_argument(
+        "--tokens_path",
+        default="/opt/ml/code/configs/tokens.txt",
+        help="DecodingManager 사용시 활용할 토큰 파일 경로",
+    )
+    parser.add_argument(
+        "--max_cache", type=int, default=50, help="최대 몇 개의 피클 파일을 저장할 지 결정"
+    )
+    eval_dir = os.environ.get("SM_CHANNEL_EVAL", "../input/data/")
     file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
     parser.add_argument(
         "--file_path",
@@ -152,7 +210,7 @@ if __name__ == "__main__":
         help="file path when doing inference",
     )
 
-    output_dir = os.environ.get('SM_OUTPUT_DATA_DIR', 'submit')
+    output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "submit")
     parser.add_argument(
         "--output_dir",
         dest="output_dir",
@@ -160,6 +218,6 @@ if __name__ == "__main__":
         type=str,
         help="output directory",
     )
-
     parser = parser.parse_args()
+    
     main(parser)

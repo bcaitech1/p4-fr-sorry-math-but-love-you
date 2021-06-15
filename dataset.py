@@ -26,7 +26,8 @@ def encode_truth(truth, token_to_id):
         if token not in token_to_id:
             raise Exception(f"{token} Truth contains unknown token")
     truth_tokens = [token_to_id[x] for x in truth_tokens]
-    if '' in truth_tokens: truth_tokens.remove('')
+    if "" in truth_tokens:
+        truth_tokens.remove("")
     return truth_tokens
 
 
@@ -51,7 +52,9 @@ def load_vocab(tokens_paths: str) -> Tuple[Dict[str, int], Dict[int, str]]:
     return token_to_id, id_to_token
 
 
-def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
+def split_gt(
+    groundtruth: str, proportion: float = 1.0, test_percent=None
+) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
     """Ground Truth 이미지 디렉토리로부터 일부만을 불러온 뒤, split하는 함수
 
     Args:
@@ -87,7 +90,7 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     #     dataset_len = round(len(data) * proportion)
     #     data = data[:dataset_len]
     #     data = [[os.path.join(root, x[0]), x[1]] for x in data]
-    
+
     # if test_percent:
     #     test_len = round(len(data) * test_percent)
     #     return data[test_len:], data[:test_len]
@@ -96,6 +99,7 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
 
     # Author: Junchul Choi
     root = os.path.join(os.path.dirname(groundtruth), "images")
+
     print(root)
     print(os.path.dirname(groundtruth))
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), 'data_info.txt'))
@@ -105,20 +109,23 @@ def split_gt(groundtruth: str, proportion: float=1.0, test_percent=None) -> Tupl
     # train_hand_image_names = set(df[(df['fold']!=0) & (df['source']==1)]['image_name'].values)
     ####----------------------
     with open(groundtruth, "r") as fd:
-        data=[]
+        data = []
         for line in fd:
             data.append(line.strip().split("\t"))
         random.shuffle(data)
         dataset_len = round(len(data) * proportion)
         data = data[:dataset_len]
-        train_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names]
-        val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
+        train_data = [
+            [os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_image_names
+        ]
+        val_data = [
+            [os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names
+        ]
     return train_data, val_data
     #     train_print_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_print_image_names]
     #     train_hand_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in train_hand_image_names]
     #     val_data = [[os.path.join(root, x[0]), x[1]] for x in data if x[0] in val_image_names]
     # return train_print_data, train_hand_data, val_data
-
 
 
 def collate_batch(data):
@@ -133,9 +140,10 @@ def collate_batch(data):
         "image": torch.stack([d["image"] for d in data], dim=0),
         "truth": {
             "text": [d["truth"]["text"] for d in data],
-            "encoded": torch.tensor(padded_encoded)
+            "encoded": torch.tensor(padded_encoded),
         },
     }
+
 
 def collate_eval_batch(data):
     max_len = max([len(d["truth"]["encoded"]) for d in data])
@@ -146,13 +154,14 @@ def collate_eval_batch(data):
     ]
     return {
         "path": [d["path"] for d in data],
-        "file_path":[d["file_path"] for d in data],
+        "file_path": [d["file_path"] for d in data],
         "image": torch.stack([d["image"] for d in data], dim=0),
         "truth": {
             "text": [d["truth"]["text"] for d in data],
-            "encoded": torch.tensor(padded_encoded)
+            "encoded": torch.tensor(padded_encoded),
         },
     }
+
 
 class LoadDataset(Dataset):
     """Load Dataset"""
@@ -204,10 +213,8 @@ class LoadDataset(Dataset):
         image = Image.open(item["path"])
         if self.rgb == 3:
             image = image.convert("RGB")
-            # image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
             image = image.convert("L")
-            # image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
@@ -222,9 +229,10 @@ class LoadDataset(Dataset):
             if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
-            image = self.transform(image=image)['image']
+            image = self.transform(image=image)["image"]
 
         return {"path": item["path"], "truth": item["truth"], "image": image}
+
 
 class LoadEvalDataset(Dataset):
     """Load Dataset"""
@@ -258,7 +266,7 @@ class LoadEvalDataset(Dataset):
         self.data = [
             {
                 "path": p,
-                "file_path":p1,
+                "file_path": p1,
                 "truth": {
                     "text": truth,
                     "encoded": [
@@ -268,7 +276,7 @@ class LoadEvalDataset(Dataset):
                     ],
                 },
             }
-            for p, p1,truth in groundtruth
+            for p, p1, truth in groundtruth
         ]
 
     def __len__(self):
@@ -279,10 +287,8 @@ class LoadEvalDataset(Dataset):
         image = Image.open(item["path"])
         if self.rgb == 3:
             image = image.convert("RGB")
-            # image = cv2.cvtColor(cv2.imread(item["path"]), cv2.COLOR_BGR2RGB)
         elif self.rgb == 1:
             image = image.convert("L")
-            # image = cv2.imread(item["path"], 2)
         else:
             raise NotImplementedError
 
@@ -291,17 +297,22 @@ class LoadEvalDataset(Dataset):
             # not white ones.
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
-                
+
         if self.transform:
             w, h = image.size
             if h / w > 2:
                 image = image.rotate(90, expand=True)
             image = np.array(image)
-            image = self.transform(image=image)['image']
+            image = self.transform(image=image)["image"]
 
-        return {"path": item["path"], "file_path":item["file_path"],"truth": item["truth"], "image": image}
+        return {
+            "path": item["path"],
+            "file_path": item["file_path"],
+            "truth": item["truth"],
+            "image": image,
+        }
 
-# def dataset_loader(options, transformed):
+
 def dataset_loader(options, train_transform, valid_transform):
 
     # Read data
@@ -331,8 +342,11 @@ def dataset_loader(options, train_transform, valid_transform):
     # print(len(train_hand_data))
     # Load data
     train_dataset = LoadDataset(
-        # train_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
-        train_data, options.data.token_paths, crop=options.data.crop, transform=train_transform, rgb=options.data.rgb
+        train_data,
+        options.data.token_paths,
+        crop=options.data.crop,
+        transform=train_transform,
+        rgb=options.data.rgb,
     )
 
     train_data_loader = DataLoader(
@@ -374,8 +388,11 @@ def dataset_loader(options, train_transform, valid_transform):
     # )
 
     valid_dataset = LoadDataset(
-        # valid_data, options.data.token_paths, crop=options.data.crop, transform=transformed, rgb=options.data.rgb
-        valid_data, options.data.token_paths, crop=options.data.crop, transform=valid_transform, rgb=options.data.rgb
+        valid_data,
+        options.data.token_paths,
+        crop=options.data.crop,
+        transform=valid_transform,
+        rgb=options.data.rgb,
     )
     valid_data_loader = DataLoader(
         valid_dataset,

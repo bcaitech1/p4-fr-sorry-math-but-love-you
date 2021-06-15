@@ -149,7 +149,7 @@ class TeacherForcingScheduler:
         tf_max (float): 최대 teacher forcing ratio. tf_max에서 시작해서 코사인 함수를 그리며 0으로 마무리 됨
         tf_min (float, optional): 최소 teacher forcing ratio. Defaults to 0.4
     """
-    def __init__(self, num_steps: int, tf_max: float=1.0, tf_min: float=0.4):
+    def __init__(self, num_steps: int, tf_max: float=0.8, tf_min: float=0.3):
         linspace = self._get_arctan(num_steps, tf_max, tf_min)
         self.__scheduler = iter(linspace)
         self.tf_max = tf_max

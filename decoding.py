@@ -5,12 +5,12 @@ from queue import PriorityQueue
 
 def decode(
     model,
-    input: torch.Tensor, 
-    data_loader: DataLoader=None, 
-    expected: torch.Tensor=None, 
-    method: str='greedy', 
-    beam_width: int=3
-    ) -> torch.Tensor:
+    input: torch.Tensor,
+    data_loader: DataLoader = None,
+    expected: torch.Tensor = None,
+    method: str = "greedy",
+    beam_width: int = 3,
+) -> torch.Tensor:
     """디코딩을 수행하는 함수. NOTE: inference/validation에만 활용!
 
     Args:
@@ -26,30 +26,26 @@ def decode(
             - 'greedy': 그리디 디코딩
             - 'beam': 빔서치
         beam_width (int, optional): 빔서치 활용 시 채택할 beam size. Defaults to 3.
-        
+
     Returns:
         squence (torch.Tensor): id_to_string에 입력 가능한 output sequence 텐서
     """
 
-    if method == 'greedy':
+    if method == "greedy":
         output = model(
-            input=input, 
-            expected=expected, 
-            is_train=False,
-            teacher_forcing_ratio=0.0
-            )
-        decoded_values = output.transpose(1, 2) # [B, VOCAB_SIZE, MAX_LEN]
-        _, sequence = torch.topk(decoded_values, 1, dim=1) # sequence: [B, 1, MAX_LEN]
-        sequence = sequence.squeeze(1) # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
+            input=input, expected=expected, is_train=False, teacher_forcing_ratio=0.0
+        )
+        decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
+        _, sequence = torch.topk(decoded_values, 1, dim=1)  # sequence: [B, 1, MAX_LEN]
+        sequence = sequence.squeeze(1)  # [B, MAX_LEN], 각 샘플에 대해 시퀀스가 생성 상태
 
-    elif method == 'beam':
+    elif method == "beam":
         sequence = model.beam_search(
             input=input,
             data_loader=data_loader,
             beam_width=beam_width,
-            max_sequence=expected.size(-1)-1 # expected에는 이미 시작 토큰 개수까지 포함
+            max_sequence=expected.size(-1) - 1,  # expected에는 이미 시작 토큰 개수까지 포함
         )
-    
 
     else:
         raise NotImplementedError(f"There's no '{method}' type yet.")
@@ -75,13 +71,13 @@ class BeamSearchNode(object):
 
         Returns:
             score (float): 점수
-        
+
         References:
             - Beam Search, Dive into Deep Learning,
               https://d2l.ai/chapter_recurrent-modern/beam-search.html#id1
         """
 
-        return self.logp / (float(self.len)) # **alpha)
+        return self.logp / (float(self.len))  # **alpha)
         # return self.logp / float(self.len - 1 + 1e-6) + alpha * reward
 
     def __lt__(self, other):
@@ -90,6 +86,6 @@ class BeamSearchNode(object):
     def __gt__(self, other):
         return self.len > other.len
 
-    def get_penalty(self, length, alpha: float=1.2, min_length: int=5):
-        p = ((1+length) / (1+min_length)) ** alpha
+    def get_penalty(self, length, alpha: float = 1.2, min_length: int = 5):
+        p = ((1 + length) / (1 + min_length)) ** alpha
         return p

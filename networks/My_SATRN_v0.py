@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
-"""NOTE: TransformerDecoderLayer 수정 후 My_SATRN"""
->>>>>>> upstream/master
+"""NOTE: TransformerDecoderLayer 수정 전 My_SATRN"""
 from copy import deepcopy
 import math
 import random
@@ -13,10 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import timm
-<<<<<<< HEAD
 
-=======
->>>>>>> upstream/master
 from dataset import START, PAD
 from decoding import BeamSearchNode
 
@@ -26,14 +20,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class ShallowCNN(nn.Module):
     def __init__(self, input_channels, hidden_size):
         super(ShallowCNN, self).__init__()
-<<<<<<< HEAD
-        self.conv0 = nn.Conv2d(input_channels, hidden_size//2, 3, bias=False, padding=1)
-        self.batch_norm0 = nn.BatchNorm2d(hidden_size//2)
-        self.relu0 = nn.ReLU()
-        self.pool0 = nn.MaxPool2d(kernel_size=2, stride=2)
-
-        self.conv1 = nn.Conv2d(hidden_size//2, hidden_size, 3, bias=False, padding=1)
-=======
         self.conv0 = nn.Conv2d(
             input_channels, hidden_size // 2, 3, bias=False, padding=1
         )
@@ -42,16 +28,11 @@ class ShallowCNN(nn.Module):
         self.pool0 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         self.conv1 = nn.Conv2d(hidden_size // 2, hidden_size, 3, bias=False, padding=1)
->>>>>>> upstream/master
         self.batch_norm1 = nn.BatchNorm2d(hidden_size)
         self.relu1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-<<<<<<< HEAD
-        self.conv2 = nn.Conv2d(hidden_size, hidden_size ,3, bias=False, padding=1)
-=======
         self.conv2 = nn.Conv2d(hidden_size, hidden_size, 3, bias=False, padding=1)
->>>>>>> upstream/master
         self.batch_norm2 = nn.BatchNorm2d(hidden_size)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -59,11 +40,7 @@ class ShallowCNN(nn.Module):
         torch.nn.init.xavier_normal_(self.conv0.weight)
         torch.nn.init.xavier_normal_(self.conv1.weight)
         torch.nn.init.xavier_normal_(self.conv2.weight)
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> upstream/master
     def forward(self, x):
         x = self.conv0(x)
         x = self.batch_norm0(x)
@@ -79,25 +56,13 @@ class ShallowCNN(nn.Module):
         x = self.batch_norm2(x)
         x = self.relu2(x)
         x = self.pool2(x)
-<<<<<<< HEAD
 
-        return x # (batch, hidden_size, h/8, w/8)
-=======
         return x  # (batch, hidden_size, h/8, w/8)
 
->>>>>>> upstream/master
 
 class EfficientNet(nn.Module):
     def __init__(self, input_channel, output_channel):
         super(EfficientNet, self).__init__()
-<<<<<<< HEAD
-        m = timm.create_model('tf_efficientnetv2_s_in21ft1k', pretrained=True)
-        self.conv_stem= nn.Conv2d(input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False)
-        self.bn1 = nn.BatchNorm2d(24, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
-        self.act1 = nn.SiLU(inplace=True)
-        self.eff_block = m.blocks
-        self.conv_last = nn.Conv2d(256, output_channel, kernel_size=(1,1), stride=(1,1), bias=False)
-=======
         m = timm.create_model("tf_efficientnetv2_s_in21ft1k", pretrained=True)
         self.conv_stem = nn.Conv2d(
             input_channel, 24, kernel_size=(3, 3), stride=(2, 2), bias=False
@@ -110,153 +75,101 @@ class EfficientNet(nn.Module):
         self.conv_last = nn.Conv2d(
             256, output_channel, kernel_size=(1, 1), stride=(1, 1), bias=False
         )
->>>>>>> upstream/master
         self.bn2 = nn.BatchNorm2d(output_channel)
         self.act2 = nn.SiLU(inplace=True)
 
     def forward(self, x):
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/master
         x = self.conv_stem(x)
         x = self.act1(self.bn1(x))
         x = self.eff_block(x)
         x = self.conv_last(x)
         x = self.act2(self.bn2(x))
-<<<<<<< HEAD
-
-        return x #[b, c, h/32, w/32]
-=======
         return x  # [b, c, h/32, w/32]
 
->>>>>>> upstream/master
 
-class ScaledStdConv2d(nn.Conv2d):
-    """Conv2d layer with Scaled Weight Standardization.
-    Paper: `Characterizing signal propagation to close the performance gap in unnormalized ResNets` -
-        https://arxiv.org/abs/2101.08692
-    NOTE: the operations used in this impl differ slightly from the DeepMind Haiku impl. The impact is minor.
-<<<<<<< HEAD
-    """
+# class ScaledStdConv2d(nn.Conv2d):
+#     """Conv2d layer with Scaled Weight Standardization.
+#     Paper: `Characterizing signal propagation to close the performance gap in unnormalized ResNets` -
+#         https://arxiv.org/abs/2101.08692
+#     NOTE: the operations used in this impl differ slightly from the DeepMind Haiku impl. The impact is minor.
+#     NOTE: MySATRN에 사용되지 않음
+#     """
 
-    def __init__(
-            self, in_channels, out_channels, kernel_size, stride=1, padding=None, dilation=1, groups=1,
-            bias=True, gamma=1.0, eps=1e-5, gain_init=1.0, use_layernorm=False):
-        if padding is None:
-            padding = get_padding(kernel_size, stride, dilation)
-        super().__init__(
-            in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation,
-            groups=groups, bias=bias)
-=======
-    NOTE: MySATRN에 사용되지 않음
-    """
+#     def __init__(
+#         self,
+#         in_channels,
+#         out_channels,
+#         kernel_size,
+#         stride=1,
+#         padding=None,
+#         dilation=1,
+#         groups=1,
+#         bias=True,
+#         gamma=1.0,
+#         eps=1e-5,
+#         gain_init=1.0,
+#         use_layernorm=False,
+#     ):
+#         if padding is None:
+#             padding = get_padding(kernel_size, stride, dilation)
+#         super().__init__(
+#             in_channels,
+#             out_channels,
+#             kernel_size,
+#             stride=stride,
+#             padding=padding,
+#             dilation=dilation,
+#             groups=groups,
+#             bias=bias,
+#         )
+#         self.gain = nn.Parameter(torch.full((self.out_channels, 1, 1, 1), gain_init))
+#         self.scale = gamma * self.weight[0].numel() ** -0.5  # gamma * 1 / sqrt(fan-in)
+#         self.eps = eps ** 2 if use_layernorm else eps
+#         self.use_layernorm = use_layernorm  # experimental, slightly faster/less GPU memory to hijack LN kernel
 
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride=1,
-        padding=None,
-        dilation=1,
-        groups=1,
-        bias=True,
-        gamma=1.0,
-        eps=1e-5,
-        gain_init=1.0,
-        use_layernorm=False,
-    ):
-        if padding is None:
-            padding = get_padding(kernel_size, stride, dilation)
-        super().__init__(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias,
-        )
->>>>>>> upstream/master
-        self.gain = nn.Parameter(torch.full((self.out_channels, 1, 1, 1), gain_init))
-        self.scale = gamma * self.weight[0].numel() ** -0.5  # gamma * 1 / sqrt(fan-in)
-        self.eps = eps ** 2 if use_layernorm else eps
-        self.use_layernorm = use_layernorm  # experimental, slightly faster/less GPU memory to hijack LN kernel
+#     def get_weight(self):
+#         if self.use_layernorm:
+#             weight = self.scale * F.layer_norm(
+#                 self.weight, self.weight.shape[1:], eps=self.eps
+#             )
+#         else:
+#             std, mean = torch.std_mean(
+#                 self.weight, dim=[1, 2, 3], keepdim=True, unbiased=False
+#             )
+#             weight = self.scale * (self.weight - mean) / (std + self.eps)
+#         return self.gain * weight
 
-    def get_weight(self):
-        if self.use_layernorm:
-<<<<<<< HEAD
-            weight = self.scale * F.layer_norm(self.weight, self.weight.shape[1:], eps=self.eps)
-        else:
-            std, mean = torch.std_mean(self.weight, dim=[1, 2, 3], keepdim=True, unbiased=False)
-=======
-            weight = self.scale * F.layer_norm(
-                self.weight, self.weight.shape[1:], eps=self.eps
-            )
-        else:
-            std, mean = torch.std_mean(
-                self.weight, dim=[1, 2, 3], keepdim=True, unbiased=False
-            )
->>>>>>> upstream/master
-            weight = self.scale * (self.weight - mean) / (std + self.eps)
-        return self.gain * weight
-
-    def forward(self, x):
-<<<<<<< HEAD
-        return F.conv2d(x, self.get_weight(), self.bias, self.stride, self.padding, self.dilation, self.groups)
+#     def forward(self, x):
+#         return F.conv2d(
+#             x,
+#             self.get_weight(),
+#             self.bias,
+#             self.stride,
+#             self.padding,
+#             self.dilation,
+#             self.groups,
+#         )
 
 
+# class NFNet(nn.Module):
+#     """NOTE: MySATRN에 사용되지 않음"""
 
-class NFNet(nn.Module):
-    def __init__(self, input_channel, output_channel):
-        super(NFNet, self).__init__()
-        m = timm.create_model('eca_nfnet_l0', pretrained=True)
-        self.prelayer = m.stem
-        self.nf_block = m.stages
-        self.conv_last = ScaledStdConv2d(1536, output_channel, kernel_size=1, stride=1, bias=False)
-        self.act2 = nn.SiLU(inplace=True)
+#     def __init__(self, input_channel, output_channel):
+#         super(NFNet, self).__init__()
+#         m = timm.create_model("eca_nfnet_l0", pretrained=True)
+#         self.prelayer = m.stem
+#         self.nf_block = m.stages
+#         self.conv_last = ScaledStdConv2d(
+#             1536, output_channel, kernel_size=1, stride=1, bias=False
+#         )
+#         self.act2 = nn.SiLU(inplace=True)
 
-    def forward(self, x):
-
-=======
-        return F.conv2d(
-            x,
-            self.get_weight(),
-            self.bias,
-            self.stride,
-            self.padding,
-            self.dilation,
-            self.groups,
-        )
-
-
-class NFNet(nn.Module):
-    """NOTE: MySATRN에 사용되지 않음"""
-
-    def __init__(self, input_channel, output_channel):
-        super(NFNet, self).__init__()
-        m = timm.create_model("eca_nfnet_l0", pretrained=True)
-        self.prelayer = m.stem
-        self.nf_block = m.stages
-        self.conv_last = ScaledStdConv2d(
-            1536, output_channel, kernel_size=1, stride=1, bias=False
-        )
-        self.act2 = nn.SiLU(inplace=True)
-
-    def forward(self, x):
->>>>>>> upstream/master
-        x = self.prelayer(x)
-        x = self.nf_block(x)
-        x = self.conv_last(x)
-        x = self.act2(x)
-<<<<<<< HEAD
-
-        return x #[b, c, h/32, w/32]
-=======
-        return x  # [b, c, h/32, w/32]
->>>>>>> upstream/master
+#     def forward(self, x):
+#         x = self.prelayer(x)
+#         x = self.nf_block(x)
+#         x = self.conv_last(x)
+#         x = self.act2(x)
+#         return x  # [b, c, h/32, w/32]
 
 
 class PositionalEncoding(nn.Module):
@@ -271,31 +184,15 @@ class PositionalEncoding(nn.Module):
         self.w_pos_encoding = self.w_pos_encoding.unsqueeze(0)
 
         self.dropout = nn.Dropout(p=dropout)
-<<<<<<< HEAD
-        self.dense0 = nn.Linear(hidden_size, hidden_size//2)
-        self.relu = nn.ReLU()
-
-        self.dense1 = nn.Linear(hidden_size//2, hidden_size*2)
-=======
         self.dense0 = nn.Linear(hidden_size, hidden_size // 2)
         self.relu = nn.ReLU()
 
         self.dense1 = nn.Linear(hidden_size // 2, hidden_size * 2)
->>>>>>> upstream/master
         self.sigmoid = nn.Sigmoid()
 
         torch.nn.init.xavier_normal_(self.dense0.weight)
         torch.nn.init.xavier_normal_(self.dense1.weight)
 
-<<<<<<< HEAD
-    def get_position_encoding(self, length, hidden_size, min_timescale=1.0, max_timescale=1.0e4):
-        position = torch.arange(length).float()
-        num_timescales = [hidden_size // 2]
-        log_timescale_incretement = (
-            math.log(float(max_timescale) / float(min_timescale)) / (torch.FloatTensor(num_timescales) - 1)
-        )
-        inv_timescales = min_timescale * torch.exp(torch.FloatTensor(torch.arange(num_timescales[0]) * -log_timescale_incretement))
-=======
     def get_position_encoding(
         self, length, hidden_size, min_timescale=1.0, max_timescale=1.0e4
     ):
@@ -309,28 +206,10 @@ class PositionalEncoding(nn.Module):
                 torch.arange(num_timescales[0]) * -log_timescale_incretement
             )
         )
->>>>>>> upstream/master
         scaled_time = torch.unsqueeze(position, 1) * torch.unsqueeze(inv_timescales, 0)
         signal = torch.cat((torch.sin(scaled_time), torch.cos(scaled_time)), axis=1)
 
         return signal
-<<<<<<< HEAD
-    
-    def tiling(self, arr, b, c, h, w):
-        arr_numpy = arr.numpy()
-        arr_tile = np.tile(arr_numpy,(b,c,h,w))
-
-        return torch.from_numpy(arr_tile)
-    
-    def forward(self, x):
-        features = x
-        b,c,h,w = x.size()
-
-        h_encoding = self.tiling(self.h_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(device)
-        # print(h_encoding.shape)
-        w_encoding = self.tiling(self.w_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(device)
-        # print
-=======
 
     def tiling(self, arr, b, c, h, w):
         arr_numpy = arr.numpy()
@@ -341,13 +220,15 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         features = x
         b, c, h, w = x.size()
+
         h_encoding = self.tiling(self.h_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(
             device
         )
+        # print(h_encoding.shape)
         w_encoding = self.tiling(self.w_pos_encoding.unsqueeze(0), b, 1, 1, 1).to(
             device
         )
->>>>>>> upstream/master
+        # print
         x = torch.mean(x, [2, 3])
         x = self.dense0(x)
         x = self.relu(x)
@@ -356,18 +237,12 @@ class PositionalEncoding(nn.Module):
         x = self.dense1(x)
         x = self.sigmoid(x)
         x = torch.reshape(x, [-1, 2, 1, self.hidden_size])
-<<<<<<< HEAD
-        x = x[:,0:1, : ,:] * h_encoding + x[:,1:2,:,:]*w_encoding
+        x = x[:, 0:1, :, :] * h_encoding + x[:, 1:2, :, :] * w_encoding
         x = x.permute(0, 3, 1, 2)
         # print(x.shape)
 
-        return x + features #(batch, hidden_size, h, w)
-=======
-        x = x[:, 0:1, :, :] * h_encoding + x[:, 1:2, :, :] * w_encoding
-        x = x.permute(0, 3, 1, 2)
         return x + features  # (batch, hidden_size, h, w)
 
->>>>>>> upstream/master
 
 class ScaledDotProductAttention(nn.Module):
     def __init__(self, temperature, dropout=0.1):
@@ -442,10 +317,7 @@ class MultiHeadAttention(nn.Module):
 
         return out
 
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/master
 class EncoderLayer(nn.Module):
     def __init__(self, hidden_size, filter_size, head_num, dropout_rate=0.2):
         super(EncoderLayer, self).__init__()
@@ -460,14 +332,9 @@ class EncoderLayer(nn.Module):
         self.dropout0 = nn.Dropout(dropout_rate)
         self.conv0 = nn.Conv2d(hidden_size, filter_size, 1, bias=False)
         self.norm0 = nn.BatchNorm2d(filter_size)
-<<<<<<< HEAD
-        self.depthwise = nn.Conv2d(filter_size, filter_size,
-                                    kernel_size=3, padding=1, groups=filter_size)
-=======
         self.depthwise = nn.Conv2d(
             filter_size, filter_size, kernel_size=3, padding=1, groups=filter_size
         )
->>>>>>> upstream/master
         self.depthwise_norm = nn.BatchNorm2d(filter_size)
         self.conv1 = nn.Conv2d(filter_size, hidden_size, 1, bias=False)
         self.norm1 = nn.BatchNorm2d(hidden_size)
@@ -501,16 +368,6 @@ class EncoderLayer(nn.Module):
         x = self.norm1(x)
         x = self.relu1(x)
 
-<<<<<<< HEAD
-        return x + features # (batch, hidden_size, h, w)
-
-class SATRNEncoder(nn.Module):
-    def __init__(self, 
-        input_height,
-        input_width,
-        input_channel, 
-        hidden_size, 
-=======
         return x + features  # (batch, hidden_size, h, w)
 
 
@@ -521,7 +378,6 @@ class SATRNEncoder(nn.Module):
         input_width,
         input_channel,
         hidden_size,
->>>>>>> upstream/master
         filter_size,
         head_num,
         layer_num,
@@ -529,20 +385,10 @@ class SATRNEncoder(nn.Module):
         checkpoint=None,
     ):
         super(SATRNEncoder, self).__init__()
-<<<<<<< HEAD
-
-        # self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
-        self.shallow_cnn = EfficientNet(input_channel, hidden_size)
-        self.positional_encoding = PositionalEncoding(hidden_size, 
-                                                    h=input_height//32, 
-                                                    w=input_width//32, 
-                                                    dropout=dropout_rate)
-=======
         self.shallow_cnn = EfficientNet(input_channel, hidden_size)
         self.positional_encoding = PositionalEncoding(
             hidden_size, h=input_height // 32, w=input_width // 32, dropout=dropout_rate
         )
->>>>>>> upstream/master
         self.attention_layers = nn.ModuleList(
             [
                 EncoderLayer(hidden_size, filter_size, head_num, dropout_rate)
@@ -551,11 +397,7 @@ class SATRNEncoder(nn.Module):
         )
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> upstream/master
     def forward(self, x):
         # x - [b, c, h, w]
         out = self.shallow_cnn(x)  # [b, c, h//32, w//32]
@@ -568,29 +410,12 @@ class SATRNEncoder(nn.Module):
         b, c, h, w = out.size()
         out = out.view(b, c, h * w).transpose(1, 2)  # [b, h x w, c]
 
-<<<<<<< HEAD
-        return out
-=======
         return out  # 4, 128, 512
->>>>>>> upstream/master
 
 
 class Feedforward(nn.Module):
     def __init__(self, filter_size=2048, hidden_dim=512, dropout=0.1):
         super(Feedforward, self).__init__()
-<<<<<<< HEAD
-
-        # self.layers = nn.Sequential(
-        #     nn.Linear(hidden_dim, filter_size, True),
-        #     nn.ReLU(True),
-        #     nn.Dropout(p=dropout),
-        #     nn.Linear(filter_size, hidden_dim, True),
-        #     nn.ReLU(True),
-        #     nn.Dropout(p=dropout),
-        # )
-
-=======
->>>>>>> upstream/master
         self.linear0 = nn.Linear(hidden_dim, filter_size, True)
         self.relu0 = nn.ReLU()
         self.dropout0 = nn.Dropout(p=dropout)
@@ -602,26 +427,15 @@ class Feedforward(nn.Module):
         torch.nn.init.xavier_normal_(self.linear1.weight)
 
     def forward(self, input):
-<<<<<<< HEAD
-        # return self.layers(input)
-
-=======
->>>>>>> upstream/master
         x = self.linear0(input)
         x = self.relu0(x)
         x = self.dropout0(x)
         x = self.linear1(x)
         x = self.relu1(x)
         x = self.dropout1(x)
-<<<<<<< HEAD
-
-        return x
-
-=======
         return x
 
 
->>>>>>> upstream/master
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, input_size, src_size, filter_size, head_num, dropout_rate=0.2):
         super(TransformerDecoderLayer, self).__init__()
@@ -653,12 +467,7 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt, tgt, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-<<<<<<< HEAD
             att = self.attention_layer(tgt, src, src)
-=======
-            # att = self.attention_layer(tgt, src, src)
-            att = self.attention_layer(out, src, src)  # NOTE
->>>>>>> upstream/master
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
@@ -668,12 +477,7 @@ class TransformerDecoderLayer(nn.Module):
             att = self.self_attention_layer(tgt, tgt_prev, tgt_prev, tgt_mask)
             out = self.self_attention_norm(att + tgt)
 
-<<<<<<< HEAD
             att = self.attention_layer(tgt, src, src)
-=======
-            # att = self.attention_layer(tgt, src, src)
-            att = self.attention_layer(out, src, src)  # NOTE
->>>>>>> upstream/master
             out = self.attention_norm(att + out)
 
             ff = self.feedforward_layer(out)
@@ -723,31 +527,17 @@ class SATRNDecoder(nn.Module):
         st_id,
         layer_num=1,
         checkpoint=None,
-<<<<<<< HEAD
-    ):
-        super(SATRNDecoder, self).__init__()
-
-=======
         decoding_manager=None,
     ):
         super(SATRNDecoder, self).__init__()
->>>>>>> upstream/master
         self.embedding = nn.Embedding(num_classes + 1, hidden_dim)
         self.hidden_dim = hidden_dim
         self.filter_dim = filter_dim
         self.num_classes = num_classes
         self.layer_num = layer_num
-<<<<<<< HEAD
-
         self.pos_encoder = PositionEncoder1D(
             in_channels=hidden_dim, dropout=dropout_rate
         )
-
-=======
-        self.pos_encoder = PositionEncoder1D(
-            in_channels=hidden_dim, dropout=dropout_rate
-        )
->>>>>>> upstream/master
         self.attention_layers = nn.ModuleList(
             [
                 TransformerDecoderLayer(
@@ -757,15 +547,9 @@ class SATRNDecoder(nn.Module):
             ]
         )
         self.generator = nn.Linear(hidden_dim, num_classes)
-<<<<<<< HEAD
-
-        self.pad_id = pad_id
-        self.st_id = st_id
-=======
         self.pad_id = pad_id
         self.st_id = st_id
         self.manager = decoding_manager
->>>>>>> upstream/master
 
         if checkpoint is not None:
             self.load_state_dict(checkpoint)
@@ -774,10 +558,6 @@ class SATRNDecoder(nn.Module):
         pad_mask = text == self.pad_id
         pad_mask[:, 0] = False
         pad_mask = pad_mask.unsqueeze(1)
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/master
         return pad_mask
 
     def order_mask(self, length):
@@ -788,31 +568,11 @@ class SATRNDecoder(nn.Module):
     def text_embedding(self, texts):
         tgt = self.embedding(texts)
         tgt *= math.sqrt(tgt.size(2))
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/master
         return tgt
 
     def forward(
         self, src, text, is_train=True, batch_max_length=50, teacher_forcing_ratio=1.0
     ):
-<<<<<<< HEAD
-
-        if is_train and random.random() < teacher_forcing_ratio:
-            tgt = self.text_embedding(text)
-            tgt = self.pos_encoder(tgt)
-            tgt_mask = self.pad_mask(text) | self.order_mask(text.size(1))
-            for layer in self.attention_layers:
-                tgt = layer(tgt, None, src, tgt_mask)
-            out = self.generator(tgt)
-        else:
-            out = []
-            num_steps = batch_max_length - 1
-            target = torch.LongTensor(src.size(0)).fill_(self.st_id).to(device) # [START] token
-            features = [None] * self.layer_num
-
-=======
         if is_train:
             if random.random() < teacher_forcing_ratio:
                 tgt = self.text_embedding(text)
@@ -864,7 +624,6 @@ class SATRNDecoder(nn.Module):
             if self.manager is not None:
                 self.manager.reset(sequence_length=num_steps)
 
->>>>>>> upstream/master
             for t in range(num_steps):
                 target = target.unsqueeze(1)
                 tgt = self.text_embedding(target)
@@ -878,14 +637,6 @@ class SATRNDecoder(nn.Module):
                     )
 
                 _out = self.generator(tgt)  # [b, 1, c]
-<<<<<<< HEAD
-                target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
-                target = target.squeeze()   # [b]
-                out.append(_out)
-            
-            out = torch.stack(out, dim=1).to(device)    # [b, max length, 1, class length]
-            out = out.squeeze(2)    # [b, max length, class length]
-=======
 
                 if self.manager is not None:
                     target, _out = self.manager.sift(_out[:, -1:, :])
@@ -897,19 +648,8 @@ class SATRNDecoder(nn.Module):
             out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
             out = out.squeeze(2)  # [b, max length, class length]
 
-            if self.manager is not None:
-                self.manager.reset()
->>>>>>> upstream/master
-
         return out
 
-
-<<<<<<< HEAD
-class MySATRN(nn.Module):
-    def __init__(self, FLAGS, train_dataset, checkpoint=None):
-        super(MySATRN, self).__init__()
-
-=======
 class SATRNDecoder_soft(nn.Module):
     """NOTE: 그리디 디코딩 앙상블에 활용"""
 
@@ -1008,7 +748,6 @@ class SATRNDecoder_soft(nn.Module):
 class MySATRN(nn.Module):
     def __init__(self, FLAGS, train_dataset, checkpoint=None, decoding_manager=None):
         super(MySATRN, self).__init__()
->>>>>>> upstream/master
         self.encoder = SATRNEncoder(
             input_height=FLAGS.input_size.height,
             input_width=FLAGS.input_size.width,
@@ -1030,19 +769,11 @@ class MySATRN(nn.Module):
             pad_id=train_dataset.token_to_id[PAD],
             st_id=train_dataset.token_to_id[START],
             layer_num=FLAGS.SATRN.decoder.layer_num,
-<<<<<<< HEAD
-        )
-
-        self.criterion = (
-            nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
-        )  # without ignore_index=train_dataset.token_to_id[PAD]
-=======
             decoding_manager=decoding_manager,
         )
         self.criterion = nn.CrossEntropyLoss(
             ignore_index=train_dataset.token_to_id[PAD]
         )
->>>>>>> upstream/master
 
         if checkpoint:
             self.load_state_dict(checkpoint)
@@ -1059,22 +790,6 @@ class MySATRN(nn.Module):
         return dec_result
 
     def beam_search(
-<<<<<<< HEAD
-        self, 
-        input: torch.Tensor, 
-        data_loader: DataLoader,
-        topk: int=1, 
-        beam_width: int=5, 
-        max_sequence: int=230
-        ):
-        # 사용할 토큰
-        sos_token_id = data_loader.dataset.token_to_id['<SOS>']
-        eos_token_id = data_loader.dataset.token_to_id['<EOS>']
-        pad_token_id = data_loader.dataset.token_to_id['<PAD>']
-
-        batch_size = len(input)
-        src = self.encoder(input) # [B, HxW, C]
-=======
         self,
         input: torch.Tensor,
         data_loader: DataLoader,
@@ -1089,7 +804,6 @@ class MySATRN(nn.Module):
 
         batch_size = len(input)
         src = self.encoder(input)  # [B, HxW, C]
->>>>>>> upstream/master
 
         decoded_batch = []
         with torch.no_grad():
@@ -1104,56 +818,31 @@ class MySATRN(nn.Module):
                 nodes = PriorityQueue()
 
                 # 시작 토큰 초기화
-<<<<<<< HEAD
-                current_src = src[data_idx, :, :].unsqueeze(0) # [B=1, HxW, C]
-                current_input = torch.LongTensor([sos_token_id]) # [B=1]
-=======
                 current_src = src[data_idx, :, :].unsqueeze(0)  # [B=1, HxW, C]
                 current_input = torch.LongTensor([sos_token_id])  # [B=1]
->>>>>>> upstream/master
                 current_hidden = [None] * self.decoder.layer_num
                 node = BeamSearchNode(
                     hidden_state=deepcopy(current_hidden),
                     prev_node=None,
-<<<<<<< HEAD
-                    token_id=deepcopy(current_input), # [1]
-                    log_prob=0,
-                    length=1 # NOTE: P.E에 사용
-=======
                     token_id=deepcopy(current_input),  # [1]
                     log_prob=0,
                     length=1,  # NOTE: P.E에 사용
->>>>>>> upstream/master
                 )
                 score = -node.eval()
 
                 # 최대힙: 확률 높은 토큰을 추출하기 위함
-<<<<<<< HEAD
-                nodes.put((score, node)) 
-
-                num_steps = 0
-                while True:
-                    if num_steps >= (max_sequence-1)*beam_width:
-=======
                 nodes.put((score, node))
 
                 num_steps = 0
                 while True:
                     if num_steps >= (max_sequence - 1) * beam_width:
->>>>>>> upstream/master
                         break
 
                     # 최대확률샘플 추출/제거, score: 로그확률, n: BeamSearchNode
                     score, n = nodes.get()
-<<<<<<< HEAD
-                    current_input = n.token_id # [B=1]
-                    current_hidden = n.hidden_state
-                    current_point = n.len - 1 # P.E 적용 시 활용
-=======
                     current_input = n.token_id  # [B=1]
                     current_hidden = n.hidden_state
                     current_point = n.len - 1  # P.E 적용 시 활용
->>>>>>> upstream/master
 
                     # 종료 토큰이 생성될 경우(종료 토큰 & 이전 노드 존재)
                     if n.token_id.item() == eos_token_id and n.prev_node != None:
@@ -1162,15 +851,6 @@ class MySATRN(nn.Module):
                             break
                         else:
                             continue
-<<<<<<< HEAD
-                        
-                    current_input = current_input.unsqueeze(1) # [B=1, 1]
-                    
-                    tgt = self.decoder.text_embedding(texts=current_input.to(input.get_device())) # [B=1, 1, HIDDEN]
-                    tgt = self.decoder.pos_encoder(x=tgt, point=current_point) # [B=1, 1, HIDDEN]
-                    tgt_mask = self.decoder.order_mask(length=current_point+1) # [B=1, LEN, LEN]
-                    tgt_mask = tgt_mask[:, -1].unsqueeze(1) # [B=1, 1, LEN]
-=======
 
                     current_input = current_input.unsqueeze(1)  # [B=1, 1]
 
@@ -1184,37 +864,19 @@ class MySATRN(nn.Module):
                         length=current_point + 1
                     )  # [B=1, LEN, LEN]
                     tgt_mask = tgt_mask[:, -1].unsqueeze(1)  # [B=1, 1, LEN]
->>>>>>> upstream/master
 
                     # 어텐션 레이어 통과
                     for l, layer in enumerate(self.decoder.attention_layers):
                         tgt = layer(
-<<<<<<< HEAD
-                            tgt=tgt, # [B=1, 1, HIDDEN]
-                            tgt_prev=current_hidden[l], 
-                            src=current_src, 
-                            tgt_mask=tgt_mask
-                            ) # [1, 1, HIDDEN]
-=======
                             tgt=tgt,  # [B=1, 1, HIDDEN]
                             tgt_prev=current_hidden[l],
                             src=current_src,
                             tgt_mask=tgt_mask,
                         )  # [1, 1, HIDDEN]
->>>>>>> upstream/master
 
                         # Hidden state 갱신
                         # 첫 state: [1, 1, HIDDEN]
                         # 이후: [B=1, 1, HIDDEN] -> [B=1, 2, HIDDEN] -> [B=1, 3, HIDDEN] -> ...
-<<<<<<< HEAD
-                        current_hidden[l] = (tgt if current_hidden[l] is None else torch.cat([current_hidden[l], tgt], dim=1))
-
-                    # 확률화하기 전 모델의 로짓
-                    prob_step = self.decoder.generator(tgt) # [B=1, 1, VOCAB_SIZE]
-
-                    # 모델의 로짓을  확률화
-                    log_prob_step = F.log_softmax(prob_step, dim=-1) # [B=1, 1, VOCAB_SIZE]
-=======
                         current_hidden[l] = (
                             tgt
                             if current_hidden[l] is None
@@ -1228,7 +890,6 @@ class MySATRN(nn.Module):
                     log_prob_step = F.log_softmax(
                         prob_step, dim=-1
                     )  # [B=1, 1, VOCAB_SIZE]
->>>>>>> upstream/master
                     log_prob, indices = torch.topk(log_prob_step, beam_width)
 
                     # 다음 state에 활용할 {beam_width}개 후보 노드를 우선순위큐에 삽입
@@ -1241,31 +902,18 @@ class MySATRN(nn.Module):
                             hidden_state=deepcopy(current_hidden),
                             prev_node=n,
                             token_id=deepcopy(decoded_t),
-<<<<<<< HEAD
-                            log_prob=n.logp+log_p,
-                            length=n.len+1,
-                        )
-                        score = -node.eval()
-                        next_nodes.append((score, node))
-                    
-=======
                             log_prob=n.logp + log_p,
                             length=n.len + 1,
                         )
                         score = -node.eval()
                         next_nodes.append((score, node))
 
->>>>>>> upstream/master
                     for i in range(len(next_nodes)):
                         score, next_node = next_nodes[i]
                         nodes.put((score, next_node))
 
                     num_steps += beam_width
-<<<<<<< HEAD
-                
-=======
 
->>>>>>> upstream/master
                 # <EOS> 토큰이 한번도 등장하지 않았을 경우 - 최대 확률 노드
                 if len(end_nodes) == 0:
                     end_nodes = [nodes.get() for _ in range(topk)]
@@ -1294,24 +942,13 @@ class MySATRN(nn.Module):
         for decoded_sample in decoded_batch:
             if len(decoded_sample) < max_sequence:
                 num_pads = max_sequence - len(decoded_sample)
-<<<<<<< HEAD
-                decoded_sample += [pad_token_id]*num_pads
-=======
                 decoded_sample += [pad_token_id] * num_pads
->>>>>>> upstream/master
             elif len(decoded_sample) > max_sequence:
                 decoded_sample = decoded_sample[:max_sequence]
             outputs.append(decoded_sample)
         outputs = torch.tensor(outputs)
 
         return outputs
-<<<<<<< HEAD
-    
-
-
-
-        
-=======
 
 
 class MySATRN_en(nn.Module):
@@ -1538,4 +1175,3 @@ class MySATRN_de(nn.Module):
         outputs = torch.tensor(outputs)
 
         return outputs
->>>>>>> upstream/master
