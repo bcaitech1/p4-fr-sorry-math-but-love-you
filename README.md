@@ -41,6 +41,52 @@ pip install tensorboardX tqdm pyyaml psutil
     └── *.jpg
 ```
 
+폴더 구조
+```
+[folder]
+│
+├── configs/
+│	├── EfficientASTER.yaml
+│	├── EfficientSATRN.yaml
+│	├── SATRN.yaml
+│	├── SWIN.yaml
+│	├── data_info.txt
+│	└── tokens.txt
+│
+├── data_tools/
+│	├── augmentations.py
+│	├── dataset.py
+│	└── loader.py
+│
+├── networks/
+│	├── EfficientASTER.py
+│	├── EfficientSATRN.py
+│	└── SWIN.py
+│
+├── postprocessing/
+│	├── (decoding).py
+│	└── (postprocessing).py
+│
+├── schedulers/
+│	├── circular_lr.py
+│	├── cosineannealing.py
+│	└── tf_scheduler.py
+│
+├── utils/
+│	├── checkpoint.py
+│	├── ensemble_utils.py
+│	├── data_utils.py
+│	├── flags.py
+│	├── metrics.py
+│	└── utils.py
+│
+├── README.md
+├── requirements.txt
+├── train.py
+├── ensemble_v2.py
+└── inference.py
+
+```
 
 ## Usage
 

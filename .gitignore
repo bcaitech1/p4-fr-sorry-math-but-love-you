@@ -3,7 +3,6 @@ train_dataset/**
 input/**
 submission.txt
 submit/**
-download.sh
 
 # model config
 # configs/**
@@ -21,9 +20,12 @@ tensorboard/**
 *.pth
 .DS_Store
 wandb/**
-# *.yaml
+*.yaml
 
 # etc
 .empty/**
 .vscode/**
 .ipynb_checkpoints/**
+
+# wandb
+wandb
