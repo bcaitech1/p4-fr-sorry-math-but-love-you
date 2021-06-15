@@ -14,6 +14,8 @@ from checkpoint import (
     default_checkpoint,
     load_checkpoint,
     save_checkpoint,
+    init_tensorboard,
+    write_tensorboard,
     write_wandb,
 )
 from flags import Flags
@@ -161,8 +163,6 @@ def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
     num_wer = 0
     sent_acc = 0
     num_sent_acc = 0
-    
-    NO_TEACHER_FORCING = 0.0
 
     with torch.no_grad():
         with tqdm(
@@ -178,7 +178,7 @@ def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
                 expected = d["truth"]["encoded"].to(device)
 
                 expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-                output = model(input, expected, False, NO_TEACHER_FORCING)
+                output = model(input, expected, False, 0.0)
 
                 decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
                 _, sequence = torch.topk(
@@ -377,12 +377,14 @@ def main(config_file):
     # Log for W&B
     wandb.config.update(dict(options._asdict()))  # logging to W&B
 
+    # Log for tensorboard
     if not os.path.exists(options.prefix):
         os.makedirs(options.prefix)
     log_file = open(os.path.join(options.prefix, "log.txt"), "w")
     shutil.copy(config_file, os.path.join(options.prefix, "train_config.yaml"))
     if options.print_epochs is None:
         options.print_epochs = options.num_epochs
+    writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
     train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
@@ -537,6 +539,20 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
+            write_tensorboard(
+                writer=writer,
+                epoch=start_epoch + epoch + 1,
+                grad_norm=train_result["grad_norm"],
+                train_loss=train_result["loss"],
+                train_symbol_accuracy=train_epoch_symbol_accuracy,
+                train_sentence_accuracy=train_epoch_sentence_accuracy,
+                train_wer=train_epoch_wer,
+                validation_loss=validation_result["loss"],
+                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                validation_wer=validation_epoch_wer,
+                model=model,
+            )
             write_wandb(
                 epoch=start_epoch + epoch + 1,
                 grad_norm=train_result["grad_norm"],
