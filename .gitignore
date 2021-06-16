@@ -20,7 +20,6 @@ tensorboard/**
 *.pth
 .DS_Store
 wandb/**
-*.yaml
 
 # etc
 .empty/**
