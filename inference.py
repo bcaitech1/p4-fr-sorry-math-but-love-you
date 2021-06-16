@@ -1,19 +1,10 @@
 import os
-from glob import glob
-import gc
-from collections import OrderedDict
-from copy import deepcopy
 import argparse
 import random
 from tqdm import tqdm
-import time
-from typing import List
 import csv
-import pandas as pd
 import torch
-from torch import nn
-from torch.utils.data import DataLoader, Dataset
-import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
 from metrics import word_error_rate, sentence_acc, final_metric
 from checkpoint import load_checkpoint
@@ -23,297 +14,114 @@ from flags import Flags
 from utils import id_to_string, get_network, get_optimizer, set_seed
 from decoding import decode
 from postprocessing import get_decoding_manager
-from augmentations import get_test_transform
-from utils import print_gpu_status, print_ram_status
-from ensemble_utils import (
-    load_encoder_models,
-    load_decoder_models,
-    make_encoder_values,
-    make_decoder_values,
-    compose_test_dataloader,
-    remap_model_idx,
-    remap_test_dataloaders,
-    truncate_aligned_models,
-    remove_all_files_in_dir,
-    DecoderDataset
-)
-
-NO_TEACHER_FORCING = 0.0
-SATRN_IDX = 0
-SWIN_IDX = 1
-ASTER_IDX = 2
-ORDER = dict(MySATRN=SATRN_IDX, SWIN=SWIN_IDX, ASTER=ASTER_IDX) # 디폴트 모델별 ID
-VERBOSE_DEC_INFO = True
-VERBOSE_ENC_INFO = True
 
 
 def main(parser):
-    def get_st_disk():
-        # 디스크 파일 시스템 정보
-        st = os.statvfs("/")
-
-        # 총, 남은 디스크 용량 계산
-        total = st.f_blocks * st.f_frsize
-        used = (st.f_blocks - st.f_bfree) * st.f_frsize
-        free = st.f_bavail * st.f_frsize
-        
-        print(
-        "[+] Storage Status\n",
-        f"Total Storage: {str(total/1024/1024/1024)[0:5]} GB\n",
-        f"Used Storage: {str(used/1024/1024/1024)[0:5]} GB\n",
-        f"Free Storage: {str(free/1024/1024/1024)[0:5]} GB\n",
-    )
-    get_st_disk()
-    
-    
-    global ORDER, VERBOSE_DEC_INFO, VERBOSE_ENC_INFO
-    set_seed(21)
-    start = time.time()
     is_cuda = torch.cuda.is_available()
+    checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
+    options = Flags(checkpoint["configs"]).get()
+    set_seed(options.seed)
+
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
-    tmp_dir = "./tmp_enc_results"
-    tmp_export_dir = "./tmp_outputs"
-    export_dir = parser.output_dir
-    os.makedirs(tmp_dir, exist_ok=True)
-    os.makedirs(tmp_export_dir, exist_ok=True)
-    os.makedirs(export_dir, exist_ok=True)
-    remove_all_files_in_dir(tmp_dir) # NOTE: 실행시 임시 추론 폴더 내 모든 파일이 삭제됨
-    remove_all_files_in_dir(tmp_export_dir) # NOTE: 실행시 임시 추론 폴더 내 모든 파일이 삭제됨
+    print("--------------------------------")
+    print("Running {} on device {}\n".format(options.network, device))
 
-    # NOTE: Load Test Data
+    model_checkpoint = checkpoint["model"]
+    if model_checkpoint:
+        print(
+            "[+] Checkpoint\n",
+            "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
+        )
+
+    transformed = get_valid_transforms(
+        height=options.input_size.height, width=options.input_size.width
+    )
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
+
     root = os.path.join(os.path.dirname(parser.file_path), "images")
     with open(parser.file_path, "r") as fd:
         reader = csv.reader(fd, delimiter="\t")
         data = list(reader)
+
     test_data = [[os.path.join(root, x[0]), x[0], dummy_gt] for x in data]
-
-#     df = pd.read_csv("./configs/data_info.txt") # NOTE: when use train data
-#     test_image_names = set(df["image_name"].values)
-#     test_image_names = set(df[df["fold"] == 4]["image_name"].head(1000).values)
-#     with open(os.path.join(os.path.dirname(parser.file_path), "gt.txt"), "r") as fd:
-#         data = []
-#         for line in fd:
-#             data.append(line.strip().split("\t"))
-#         dataset_len = round(len(data) * 1.0)
-#         data = data[:dataset_len]
-#     test_data = [
-#         [os.path.join(root, x[0]), x[0], dummy_gt]
-#         for x in data
-#         if x[0] in test_image_names
-#     ]
-    print(f'{"="*20} Load Data {"="*20}')
-    
-    # NOTE: Compose DataLoaders
-    enc_dataloaders = [None] * 3  # [SATRN, SWIN, ASTER] - 모델 고유 순서를 바탕으로 채워짐
-    token_to_id_ = None
-    id_to_token_ = None
-
-    for parser_checkpoint in parser.checkpoint:
-        checkpoint = load_checkpoint(parser_checkpoint, cuda=is_cuda)
-        model_name = checkpoint["network"]
-        height = checkpoint["configs"]["input_size"]["height"]
-        width = checkpoint["configs"]["input_size"]["width"]
-
-        if token_to_id_ is None and id_to_token_ is None:
-            token_to_id_ = checkpoint["token_to_id"]
-            id_to_token_ = checkpoint["id_to_token"]
-
-        assert token_to_id_ is not None
-        assert id_to_token_ is not None
-
-        loader_idx = ORDER[model_name]
-        if enc_dataloaders[loader_idx] is None:  # 모델별 데이터로더가 생성되지 않을 때만 생성하도록
-            dataloader = compose_test_dataloader(
-                test_data=test_data,
-                batch_size=parser.batch_size,
-                token_to_id=token_to_id_,
-                id_to_token=id_to_token_,
-                height=height,
-                width=width,
-                # num_workers=parser.num_workers
-                num_workers=0,
-            )
-            enc_dataloaders[loader_idx] = dataloader
-
-        assert enc_dataloaders[loader_idx] is not None  # NOTE: FOR DEBUG
-
-    print_gpu_status() # NOTE: GPU 메모리 확인
-    print_ram_status() # NOTE: 램 사용량 확인
-    ORDER = remap_model_idx(ORDER, enc_dataloaders)  # 모델ID 업데이트
-    enc_dataloaders = [
-        l for l in enc_dataloaders if l is not None
-    ]  # data_loaders에서 None 원소 제외
-
-    loading_time = (time.time() - start) / 60
-    print(
-        "[+] Time Check\n",
-        f"Data Loading Time(min) : {loading_time:.2f}\n",
+    test_dataset = LoadEvalDataset(
+        test_data,
+        checkpoint["token_to_id"],
+        checkpoint["id_to_token"],
+        crop=False,
+        transform=transformed,
+        rgb=options.data.rgb,
     )
-    time_ckpt = time.time()
+    test_data_loader = DataLoader(
+        test_dataset,
+        batch_size=parser.batch_size,
+        shuffle=False,
+        num_workers=options.num_workers,
+        collate_fn=collate_eval_batch,
+    )
 
-    print(f"{'='*20} Inference {'='*20}")
+    print(
+        "[+] Data\n",
+        "The number of test samples : {}\n".format(len(test_dataset)),
+    )
+    manager = (
+        get_decoding_manager(
+            tokens_path="./configs/tokens.txt", batch_size=parser.batch_size
+        )
+        if parser.decoding_manager
+        else None
+    )
+
+    model = get_network(
+        model_type=options.network,
+        FLAGS=options,
+        model_checkpoint=model_checkpoint,
+        device=device,
+        dataset=test_dataset,
+        decoding_manager=manager,
+    )
+    model.eval()
+
+    print("[+] Decoding Type:", parser.decode_type)
+    results = []
     with torch.no_grad():
-        current_num_batches = 0
-        need_enc_loading = True
-        output_id = 0
-        total_steps = len(enc_dataloaders[0])
-        
-        for step, d in tqdm(enumerate(zip(*enc_dataloaders)), desc="[Inference]"):
-            file_path = d[0]["file_path"]
+        for d in tqdm(test_data_loader):
+            input = d["image"].float().to(device)
+            expected = d["truth"]["encoded"].to(device)
+            sequence = decode(
+                model=model,
+                input=input,
+                data_loader=test_data_loader,
+                expected=expected,
+                method=parser.decode_type,
+                beam_width=parser.beam_width,
+            )
+            sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
 
-            if need_enc_loading:
-                enc_models = load_encoder_models(
-                    checkpoints=parser.checkpoint, 
-                    dataset=enc_dataloaders[0].dataset, 
-                    is_cuda=is_cuda, 
-                    device=device,
-                    verbose=VERBOSE_ENC_INFO
-                )
-                need_enc_loading = False
+            for path, predicted in zip(d["file_path"], sequence_str):
+                results.append((path, predicted))
 
-                if VERBOSE_ENC_INFO:
-                    print(f"*** Encoder Loading Status ***")
-                    print_gpu_status()
-                    print_ram_status()
-
-            encoder_values = make_encoder_values(
-                models=enc_models, d=d, device=device, model_order=ORDER
-            )  # list
-
-            batch_result = (file_path, encoder_values)
-            torch.save(
-                batch_result, os.path.join(tmp_dir, f"batch{current_num_batches:0>4d}")
-            )  # (Paths, tensor([BATCH_SIZE, X, X]))
-            current_num_batches += 1
-            if VERBOSE_ENC_INFO: VERBOSE_ENC_INFO = False
-
-            if parser.max_cache <= current_num_batches or step == total_steps - 1:  # 디코딩으로 넘어감
-                gc.collect()
-                torch.cuda.empty_cache()
-                if VERBOSE_DEC_INFO: 
-                    print('*** Encoder Truncation Status ***')
-                    print_ram_status()
-                truncate_aligned_models(enc_models, VERBOSE_DEC_INFO)
-                need_enc_loading = True
-
-                dec_models = load_decoder_models(
-                    checkpoints=parser.checkpoint, 
-                    dataset=enc_dataloaders[0].dataset, 
-                    is_cuda=is_cuda, 
-                    device=device,
-                    verbose=VERBOSE_DEC_INFO
-                )
-                if VERBOSE_DEC_INFO:
-                    print(f"*** Decoder Loading Status ***")
-                    print_gpu_status()
-                    print_ram_status()
-
-                # NOTE: compose decoding manager
-                manager = (
-                    get_decoding_manager(
-                        tokens_path=parser.tokens_path, batch_size=parser.batch_size
-                    )
-                    if parser.decoding_manager
-                    else None
-                )
-
-                # NOTE: load decoding dataset
-                decoding_dataset = DecoderDataset(tmp_dir)
-                dec_dataloader = DataLoader(
-                    decoding_dataset,
-                    batch_size=4,  # NOTE: batch_size = encoder batch size * decoder batch size
-                    shuffle=False,
-                    drop_last=False,
-                    collate_fn=decoding_dataset.collate_fn,
-                )
-
-                results_de = make_decoder_values(
-                    models=dec_models, 
-                    parser=parser, 
-                    enc_dataloader=enc_dataloaders[0],
-                    dec_dataloader=dec_dataloader,
-                    manager=manager,
-                    device=device,
-                    weight_list=parser.weight_list,
-                )
-                with open(os.path.join(tmp_export_dir, f"output{output_id:0>5d}.csv"), "w") as w:
-                    for path, predicted in results_de:
-                        w.write(path + "\t" + predicted + "\n")
-
-                remove_all_files_in_dir(tmp_dir)
-                gc.collect()
-                torch.cuda.empty_cache()
-                if VERBOSE_DEC_INFO: 
-                    print('*** Decoder Truncation Status ***')
-                    print_ram_status()
-                truncate_aligned_models(dec_models, verbose=VERBOSE_DEC_INFO)
-                current_num_batches = 0 # 배치 넘버링 초기화
-                output_id += 1 # 추론 결과 넘버링 갱신
-                
-                if VERBOSE_DEC_INFO:
-                    loading_time = (time.time() - time_ckpt) / 60
-                    print(
-                        "[+] Time Check\n",
-                        f"Data Loading Time(min) : {loading_time:.2f}\n",
-                    )
-                    VERBOSE_DEC_INFO = False
-
-
-    # NOTE: Export final output
-    output_list = sorted(glob(os.path.join(tmp_export_dir, '*')))
-    output = []
-    for  o in output_list:
-        temp_output = pd.read_csv(o, sep='\t', header=None)
-        temp_output.columns = ['path', 'predicted']
-        output.append(temp_output)
-
-    output = pd.concat(output, axis=0, ignore_index=True)
-    with open(os.path.join(export_dir, "output.csv"), "w") as w:
-        for _, row in output.iterrows():
-            path = row.path
-            predicted = row.predicted
+    os.makedirs(parser.output_dir, exist_ok=True)
+    with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
+        for path, predicted in results:
             w.write(path + "\t" + predicted + "\n")
-
-    loading_time = (time.time() - start) / 60
-    print(
-        "[+] Time Check\n",
-        f"Total Inference Time(min) : {loading_time:.2f}\n",
-    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--checkpoint",
-        dest="checkpoint",
-        default=[
-            "./log/aster-fold-0-0.7878.pth",
-            "./log/aster-fold-1-0.7869.pth",
-            "./log/aster-fold-2-0.7900.pth",
-            "./log/aster-fold-3-0.7861.pth",
-            "./log/aster-fold-4-0.7846.pth",
-            "./log/satrn-fold-0-0.8148.pth",
-            "./log/satrn-fold-1-0.8149.pth",
-            "./log/satrn-fold-2-0.8171.pth",
-            "./log/satrn-fold-3-0.8136.pth",
-            "./log/satrn-fold-4-0.8131.pth",
-            "./log/swin-fold-2-0.8322.pth",
-            "./log/swin-fold-3-0.8315.pth",
-            "./log/swin-fold-4-0.8311.pth",
-        ],
-        nargs="*",
-        help="Path of checkpoint file",
+        "--inference_type",
+        default="single",
+        type=str,
+        help="추론 방법 설정 'single(단일모델추론)', 'ensemble앙상블()'",
     )
     parser.add_argument(
-    "--weight_list",
-    dest="weight_list",
-    default=[
-        1,1,1,1,1,1,1,1,1,1,1,1,1
-    ],
-    type=list,
-    help="weight list for ensemble",
+        "--checkpoint",
+        dest="checkpoint",
+        default="./log/my_satrn_v2/checkpoints/(f3 8136)MySATRN_best_model.pth",
+        type=str,
+        help="Path of checkpoint file",
     )
     parser.add_argument(
         "--max_sequence",
@@ -325,14 +133,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=32,
+        default=128,
         type=int,
         help="batch size when doing inference",
     )
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default="greedy",
+        default="greedy",  # 'greedy'로 설정하면 기존과 동일하게 inference
         type=str,
         help="디코딩 방식 설정. 'greedy', 'beam'",
     )
@@ -344,20 +152,10 @@ if __name__ == "__main__":
         help="빔서치 사용 시 스텝별 후보 수 설정",
     )
     parser.add_argument(
-        "--decoding_manager", 
-        default=True, 
-        help="DecodingManager 사용 여부 결정"
+        "--decoding_manager", default=False, type=bool, help="DecodingManager 활용 여부 설정"
     )
-    parser.add_argument(
-        "--tokens_path",
-        default="/opt/ml/code/configs/tokens.txt",
-        help="DecodingManager 사용시 활용할 토큰 파일 경로",
-    )
-    parser.add_argument(
-        "--max_cache", type=int, default=50, help="최대 몇 개의 피클 파일을 저장할 지 결정"
-    )
-    eval_dir = os.environ.get("SM_CHANNEL_EVAL", "../input/data/")
-    file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
+    eval_dir = os.environ.get("SM_CHANNEL_EVAL", "/opt/ml/input/data/")
+    file_path = os.path.join(eval_dir, "eval_dataset/input.txt")
     parser.add_argument(
         "--file_path",
         dest="file_path",
@@ -365,7 +163,6 @@ if __name__ == "__main__":
         type=str,
         help="file path when doing inference",
     )
-
     output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "submit")
     parser.add_argument(
         "--output_dir",
@@ -374,6 +171,6 @@ if __name__ == "__main__":
         type=str,
         help="output directory",
     )
+
     parser = parser.parse_args()
-    
     main(parser)
