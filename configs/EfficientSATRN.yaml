@@ -1,0 +1,51 @@
+network: EfficientSATRN
+input_size:
+  height: 256
+  width: 512
+SATRN:
+  encoder:
+    hidden_dim: 512
+    filter_dim: 512
+    layer_num: 2
+    head_num: 8
+  decoder:
+    src_dim: 512
+    hidden_dim: 256
+    filter_dim: 1024
+    layer_num: 3
+    head_num: 8
+checkpoint: ""
+prefix: "./log/efficient_satrn"
+
+data:
+  train:
+    - "/opt/ml/input/data/train_dataset/gt.txt"
+  test:
+    - ""
+  token_paths:
+    - "/opt/ml/input/data/train_dataset/tokens.txt"  # 241 tokens
+  fold: 0
+  crop: True
+  rgb: 3   # 3 for color, 1 for greyscale
+  
+batch_size: 16
+num_workers: 8
+num_epochs: 30
+print_epochs: 1
+dropout_rate: 0.1
+teacher_forcing_ratio:
+  tf_max: 0.8
+  tf_min: 0.3
+max_grad_norm: 2.0
+seed: 21
+scheduler:
+  scheduler: "CustomCosine"
+  cycle: 1
+  warmup_ratio: 0.1
+optimizer:
+  optimizer: 'AdamW' # Adam, Adadelta
+  lr: 5e-4 # for train_single_opt.py
+  weight_decay: 1e-6
+  is_cycle: True
+  enc_lr: 5e-4 # for train_dual_opt.py
+  dec_lr: 5e-4 # for train_dual_opt.py
