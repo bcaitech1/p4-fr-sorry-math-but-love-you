@@ -64,8 +64,8 @@ pip install tensorboardX tqdm pyyaml psutil
 │	└── SWIN.py
 │
 ├── postprocessing/
-│	├── (decoding).py
-│	└── (postprocessing).py
+│	├── decoding.py
+│	└── postprocessing.py
 │
 ├── schedulers/
 │	├── circular_lr.py
