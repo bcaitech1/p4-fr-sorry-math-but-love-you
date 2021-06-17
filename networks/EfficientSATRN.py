@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import timm
 import sys
+
 sys.path.append("../")
 from data.dataset import START, PAD
 from postprocessing.decoding import BeamSearchNode
@@ -867,7 +868,9 @@ class EfficientSATRN(nn.Module):
 
 
 class EfficientSATRN_encoder(nn.Module):
-    def __init__(self, FLAGS, train_dataset, checkpoint=None): # NOTE: 수정 - CrossEntropyLoss 제거
+    def __init__(
+        self, FLAGS, train_dataset, checkpoint=None
+    ):  # NOTE: 수정 - CrossEntropyLoss 제거
         super(EfficientSATRN_encoder, self).__init__()
 
         self.encoder = SATRNEncoder(
@@ -884,7 +887,9 @@ class EfficientSATRN_encoder(nn.Module):
             self.load_state_dict(checkpoint)
 
     # def forward(self, input, expected, is_train, teacher_forcing_ratio):
-    def forward(self, input): # NOTE: 수정 - 불필요한 argument 제거(expected, is_train, teacher_forcing_ratio)
+    def forward(
+        self, input
+    ):  # NOTE: 수정 - 불필요한 argument 제거(expected, is_train, teacher_forcing_ratio)
         enc_result = self.encoder(input)
         return enc_result
 

@@ -1,34 +1,58 @@
 import os
+import sys
 import random
 import psutil
+from typing import List
 from psutil import virtual_memory
 from datetime import datetime
+import warnings
 import numpy as np
 import torch
-import torch.optim as optim
-import sys
+from torch import optim, nn
+from torch.utils.data import Dataset
+
 sys.path.append("../")
-from networks.EfficientSATRN import EfficientSATRN, EfficientSATRN_encoder, EfficientSATRN_decoder
+from flags import Flags
+from networks.EfficientSATRN import (
+    EfficientSATRN,
+    EfficientSATRN_encoder,
+    EfficientSATRN_decoder,
+)
 from networks.SWIN import SWIN, SWIN_encoder, SWIN_decoder
 from networks.EfficientASTER import ASTER, ASTER_encoder, ASTER_decoder
-import warnings
 
 
-def get_network( # NOTE: 수정 - ASTER 관련 모델 추가
-    model_type,
-    FLAGS,
-    model_checkpoint,
+def get_network(
+    model_type: str,
+    FLAGS: Flags,
+    model_checkpoint: str,
     device,
-    train_dataset,
+    train_dataset: Dataset,
     decoding_manager=None,
-):
+) -> nn.Module:
+    """모델을 불러오는 함수
+
+    Args:
+        model_type (str): 불러올 모델 아키텍쳐
+        FLAGS (Flags): 모델 configuration 정보
+        model_checkpoint (str): 사전 학습한 weigt를 불러올 경우 해당 경로 입력
+        device:
+        train_dataset (Dataset): 학습 데이터셋
+        decoding_manager (optional): 후처리 클래스 DecodingManager 사용시 입력
+    """
     model = None
     if model_type == "EfficientSATRN" or model_type == "MySATRN":
-        model = EfficientSATRN(FLAGS, train_dataset, model_checkpoint, decoding_manager).to(device)
+        model = EfficientSATRN(
+            FLAGS, train_dataset, model_checkpoint, decoding_manager
+        ).to(device)
     elif model_type == "EfficientSATRN_encoder" or model_type == "MySATRN_encoder":
-        model = EfficientSATRN_encoder(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = EfficientSATRN_encoder(FLAGS, train_dataset, model_checkpoint).to(
+            device
+        )
     elif model_type == "EfficientSATRN_decoder" or model_type == "MySATRN_decoder":
-        model = EfficientSATRN_decoder(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = EfficientSATRN_decoder(FLAGS, train_dataset, model_checkpoint).to(
+            device
+        )
     elif model_type == "SWIN":
         model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == "SWIN_encoder":
@@ -36,7 +60,9 @@ def get_network( # NOTE: 수정 - ASTER 관련 모델 추가
     elif model_type == "SWIN_decoder":
         model = SWIN_decoder(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == "EfficientASTER" or model_type == "ASTER":
-        model = ASTER(FLAGS, train_dataset, model_checkpoint, decoding_manager).to(device)
+        model = ASTER(FLAGS, train_dataset, model_checkpoint, decoding_manager).to(
+            device
+        )
     elif model_type == "ASTER_encoder":
         model = ASTER_encoder(FLAGS, model_checkpoint).to(device)
     elif model_type == "ASTER_decoder":
@@ -46,7 +72,10 @@ def get_network( # NOTE: 수정 - ASTER 관련 모델 추가
     return model
 
 
-def get_optimizer(optimizer, params, lr, weight_decay=None):
+def get_optimizer(
+    optimizer: str, params: List[torch.Tensor], lr: float, weight_decay: float = None
+):
+    """옵티마이저를 리턴하는 함수"""
     if optimizer == "Adam":
         optimizer = optim.Adam(params, lr=lr)
     elif optimizer == "Adadelta":
@@ -58,22 +87,23 @@ def get_optimizer(optimizer, params, lr, weight_decay=None):
     return optimizer
 
 
-# NOTE: 수정 - GPU 메모리 체크를 위한 함수 추가
 def print_gpu_status() -> None:
-    total_mem = round(torch.cuda.get_device_properties(0).total_memory / 1024**3, 3)
-    reserved = round(torch.cuda.memory_reserved(0) / 1024**3, 3)
-    allocated = round(torch.cuda.memory_allocated(0) / 1024**3, 3)
+    """GPU 이용 상태를 출력"""
+    total_mem = round(torch.cuda.get_device_properties(0).total_memory / 1024 ** 3, 3)
+    reserved = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 3)
+    allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 3)
     free = round(reserved - allocated, 3)
     print(
         "[+] GPU Status\n",
         f"Total: {total_mem} GB\n",
         f"Reserved: {reserved} GB\n",
         f"Allocated: {allocated} GB\n",
-        f"Residue: {free} GB\n"
+        f"Residue: {free} GB\n",
     )
 
 
 def print_system_envs():
+    """시스템 환경을 출력"""
     num_gpus = torch.cuda.device_count()
     num_cpus = os.cpu_count()
     mem_size = virtual_memory().available // (1024 ** 3)
@@ -86,16 +116,15 @@ def print_system_envs():
 
 
 def print_ram_status():
-    # current process RAM usage
+    """램 이용 상태를 출력"""
     p = psutil.Process()
-    rss = p.memory_info().rss / 2 ** 20 # Bytes to MB
-    print(
-        f"[+] Memory Status\n",
-        f"Usage: {rss: 10.5f} MB\n"
-        )
+    rss = p.memory_info().rss / 2 ** 20  # Bytes to MB
+    print(f"[+] Memory Status\n", f"Usage: {rss: 10.5f} MB\n")
+
 
 # Fixed version of id_to_string
 def id_to_string(tokens, data_loader, do_eval=0):
+    """디코더를 통해 얻은 추론 결과를 문자열로 구성된 수식으로 복원하는 함수"""
     result = []
     if do_eval:
         eos_id = data_loader.dataset.token_to_id["<EOS>"]
@@ -127,8 +156,8 @@ def id_to_string(tokens, data_loader, do_eval=0):
     return result
 
 
-
 def set_seed(seed: int = 21):
+    """시드값을 고정하는 함수. 실험 재현을 위해 사용"""
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)

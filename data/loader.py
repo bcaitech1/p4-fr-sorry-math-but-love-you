@@ -2,9 +2,11 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from typing import Tuple
 import sys
+
 sys.path.append("../")
 from utils.data_utils import split_gt
 from .dataset import LoadDataset, LoadEvalDataset
+
 
 def collate_batch(data):
     max_len = max([len(d["truth"]["encoded"]) for d in data])
@@ -23,6 +25,7 @@ def collate_batch(data):
         },
     }
 
+
 def collate_eval_batch(data):
     max_len = max([len(d["truth"]["encoded"]) for d in data])
     # Padding with -1, will later be replaced with the PAD token
@@ -39,6 +42,7 @@ def collate_eval_batch(data):
             "encoded": torch.tensor(padded_encoded),
         },
     }
+
 
 def dataset_loader(
     options, train_transform, valid_transform, fold

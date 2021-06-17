@@ -9,6 +9,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import sys
+
 sys.path.append("../")
 from .utils import id_to_string, get_network, print_gpu_status, print_ram_status
 from .flags import Flags
@@ -17,7 +18,20 @@ from .checkpoint import load_checkpoint
 from postprocessing.postprocessing import DecodingManager
 
 
-def make_encoder_values(models, d, device, model_order: dict) -> List[torch.Tensor]:
+def make_encoder_values(
+    models: List[nn.Module], d: List[torch.Tensor], device, model_order: dict
+) -> List[torch.Tensor]:
+    """인코더 모델의 추론 결과를 리턴하는 함수
+
+    Args:
+        models (List[nn.Module]): 앙상블에 활용할 인코더 모델 리스트
+        d (List[torch.Tensor]): 미니 배치 데이터
+        device ([type]): 연산에 활용할 디바이스
+        model_order (dict): 모델별 ID. 앙상블 수행 시 할당됨
+
+    Returns:
+        List[torch.Tensor]: 모델별 추론 결과 리스트
+    """
     encoder_values = []
     for model_name, model in models:
         d_idx = model_order.get(model_name, None)
@@ -36,11 +50,22 @@ def make_decoder_values(
     manager: DecodingManager,
     device,
 ) -> List[str]:
+    """디코더 모델의 추론 결과를 리턴하는 함수
+
+    Args:
+        models (List[nn.Module]): 앙상블에 활용할 인코더 모델 리스트
+        parser ([type]): 앙상블 구동 시 입력한 parser
+        enc_dataloader (DataLoader): 인코더 데이터로더
+        dec_dataloader (DataLoader): 디코더 데이터로더
+        manager (DecodingManager): 생성 과정 중 후처리에 활용할 DecodingManager
+        device ([type]): 연산에 활용할 디바이스
+
+    Returns:
+        List[str]: 디코딩 결과를 문자열 형태의 수식으로 복원한 추론 결과 리스트
+    """
     st_id = models[0].decoder.st_id
-    # print(f"{'='*20} DECODING {'='*20}")
     results_de = []
     num_steps = parser.max_sequence + 1
-    ensemble_weights = []
     with torch.no_grad():
         for step, (paths, predicteds) in tqdm(
             enumerate(dec_dataloader), desc="[Decoding]"
@@ -96,6 +121,7 @@ def make_decoder_values(
 
 
 def remap_model_idx(model_order, data_loaders: list):
+    """모델 ID를 리맵핑. 모델 아키텍처 수에 관계 없이 앙상블이 가능하도록 하기 위한 함수임"""
     if all(data_loaders) is not True:
         idx2name = {i: name for name, i in model_order.items()}
         remapped_order = dict()
@@ -112,11 +138,13 @@ def remap_model_idx(model_order, data_loaders: list):
 
 
 def remap_test_dataloaders(test_data_loaders) -> List[DataLoader]:
+    """데이터 로더를 리맵핑. 모델 아키텍처 수에 관계 없이 앙상블이 가능하도록 하기 위한 함수임"""
     test_data_loaders = [l for l in test_data_loaders if l is not None]
     return test_data_loaders
 
 
 def truncate_aligned_models(models: List[nn.Module], verbose: bool) -> None:
+    """입력된 모델을 kill하는 함수. 한정된 GPU 자원의 과부하 방지를 위해 사용"""
     for _ in range(len(models)):
         del models[0]
     gc.collect()
@@ -128,12 +156,13 @@ def truncate_aligned_models(models: List[nn.Module], verbose: bool) -> None:
 def load_encoder_models(
     checkpoints: List[str], dataset: Dataset, is_cuda, device, verbose: bool = False
 ) -> List[nn.Module]:
+    """인코더 모델을 불러오는 함수"""
     enc_models = []
     enc_total_params = 0
     for c in checkpoints:
         ckpt = load_checkpoint(c, cuda=is_cuda)
-        network_type = ckpt['network']
-        param_dict = ckpt['model']
+        network_type = ckpt["network"]
+        param_dict = ckpt["model"]
 
         # load model weights
         enc = OrderedDict()
@@ -164,12 +193,13 @@ def load_encoder_models(
 def load_decoder_models(
     checkpoints: dict, dataset: Dataset, is_cuda, device, verbose: bool = False
 ) -> List[nn.Module]:
+    """디코더 모델을 불러오는 함수"""
     dec_models = []
     dec_total_params = 0
     for c in checkpoints:
         ckpt = load_checkpoint(c, cuda=is_cuda)
         network_type = ckpt["network"]
-        param_dict = ckpt['model']
+        param_dict = ckpt["model"]
 
         # compose model checkpoint weights
         dec = OrderedDict()
@@ -196,7 +226,8 @@ def load_decoder_models(
         )
     return dec_models
 
-def remove_all_files_in_dir(dir):
-    for fpath in glob(os.path.join(dir, '*')):
-        os.remove(fpath)
 
+def remove_all_files_in_dir(dir):
+    """앙상블 과정 중 활용되는 임시폴더 내 파일을 모두 제거"""
+    for fpath in glob(os.path.join(dir, "*")):
+        os.remove(fpath)

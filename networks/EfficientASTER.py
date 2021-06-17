@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import timm
 import sys
+
 sys.path.append("../")
 from postprocessing.decoding import BeamSearchNode
 
@@ -570,7 +571,6 @@ class ASTER_decoder(nn.Module):
         self.hidden = None
         if checkpoint:
             self.load_state_dict(checkpoint)
-
 
     def forward(
         self,

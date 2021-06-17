@@ -1,6 +1,7 @@
 from albumentations.pytorch import ToTensorV2
 import albumentations as A
 
+
 def get_train_transforms(height, width):
     aug_prob = 0.3
     return A.Compose(
@@ -21,6 +22,7 @@ def get_train_transforms(height, width):
         ],
         p=1.0,
     )
+
 
 def get_valid_transforms(height, width):
     return A.Compose(
