@@ -32,7 +32,7 @@ pip install -r requirments.txt
 
 ```shell
 # Attach single optimizer for model
-$ python train.py --train_type single './configs/EfficientSATRN.yaml'
+$ python train.py --train_type single --config_file './configs/EfficientSATRN.yaml'
 
 # Attach two individual optimizer for encoder/decoder of model
 $ python train.py --train_type 

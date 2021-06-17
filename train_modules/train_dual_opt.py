@@ -45,6 +45,7 @@ def _train_one_epoch(
     max_grad_norm,
     device,
     tf_scheduler,  # Teacher Forcing Scheduler
+    is_logging: bool
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -124,13 +125,15 @@ def _train_one_epoch(
             enc_lr_scheduler.step()
             dec_lr_scheduler.step()
 
-            wandb.log(
-                {
-                    "enc_lr": enc_lr_scheduler.get_lr()[0],
-                    "dec_lr": dec_lr_scheduler.get_last_lr()[0],
-                    "tf_ratio": tf_ratio,
-                }
-            )
+            # Weight & Bias logging
+            if is_logging:
+                wandb.log(
+                    {
+                        "enc_lr": enc_lr_scheduler.get_lr()[0],
+                        "dec_lr": dec_lr_scheduler.get_last_lr()[0],
+                        "tf_ratio": tf_ratio,
+                    }
+                )
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -218,11 +221,11 @@ def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
     return result
 
 
-def main(config_file):
-    """
-    Train math formula recognition model
-    """
+def main(parser):
+    config_file = parser.config_file
     options = Flags(config_file).get()
+    is_logging = True if parser.project_name is not None else False
+
     # set random seed
     set_seed(seed=options.seed)
 
@@ -374,7 +377,8 @@ def main(config_file):
     )
 
     # Log for W&B
-    wandb.config.update(dict(options._asdict()))  # logging to W&B
+    if is_logging:
+        wandb.config.update(dict(options._asdict()))  # logging to W&B
 
     # Log for tensorboard
     if not os.path.exists(options.prefix):
@@ -409,7 +413,6 @@ def main(config_file):
             pad=len(str(options.num_epochs)),
         )
 
-        # NOTE
         train_result = _train_one_epoch(
             data_loader=train_data_loader,
             model=model,
@@ -422,6 +425,7 @@ def main(config_file):
             max_grad_norm=options.max_grad_norm,
             device=device,
             tf_scheduler=tf_scheduler,
+            is_logging=is_logging
         )
 
         train_losses.append(train_result["loss"])
@@ -538,34 +542,21 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
-            write_tensorboard(
-                writer=writer,
-                epoch=start_epoch + epoch + 1,
-                grad_norm=train_result["grad_norm"],
-                train_loss=train_result["loss"],
-                train_symbol_accuracy=train_epoch_symbol_accuracy,
-                train_sentence_accuracy=train_epoch_sentence_accuracy,
-                train_wer=train_epoch_wer,
-                validation_loss=validation_result["loss"],
-                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer,
-                model=model,
-            )
-            write_wandb(
-                epoch=start_epoch + epoch + 1,
-                grad_norm=train_result["grad_norm"],
-                train_loss=train_result["loss"],
-                train_symbol_accuracy=train_epoch_symbol_accuracy,
-                train_sentence_accuracy=train_epoch_sentence_accuracy,
-                train_wer=train_epoch_wer,
-                train_score=train_epoch_score,
-                validation_loss=validation_result["loss"],
-                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer,
-                validation_score=validation_epoch_score,
-            )
+            if is_logging:
+                write_wandb(
+                    epoch=start_epoch + epoch + 1,
+                    grad_norm=train_result["grad_norm"],
+                    train_loss=train_result["loss"],
+                    train_symbol_accuracy=train_epoch_symbol_accuracy,
+                    train_sentence_accuracy=train_epoch_sentence_accuracy,
+                    train_wer=train_epoch_wer,
+                    train_score=train_epoch_score,
+                    validation_loss=validation_result["loss"],
+                    validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                    validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                    validation_wer=validation_epoch_wer,
+                    validation_score=validation_epoch_score,
+                )
 
 
 # if __name__ == "__main__":

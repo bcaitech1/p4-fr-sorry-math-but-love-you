@@ -50,6 +50,7 @@ def _train_one_epoch(
     device,
     scaler,
     tf_scheduler,
+    is_logging: bool
 ):
     torch.set_grad_enabled(True)
     model.train()
@@ -110,17 +111,18 @@ def _train_one_epoch(
             pbar.update(curr_batch_size)
             lr_scheduler.step()
 
-            # lr logging
-            if isinstance(lr_scheduler.get_lr(), float) or isinstance(
-                lr_scheduler.get_lr(), int
-            ):
-                wandb.log(
-                    {"learning_rate": lr_scheduler.get_lr(), "tf_ratio": tf_ratio}
-                )
-            else:
-                wandb.log(
-                    {"learning_rate": lr_scheduler.get_lr()[0], "tf_ratio": tf_ratio}
-                )
+            # Weight & Bias
+            if is_logging:
+                if isinstance(lr_scheduler.get_lr(), float) or isinstance(
+                    lr_scheduler.get_lr(), int
+                ):
+                    wandb.log(
+                        {"learning_rate": lr_scheduler.get_lr(), "tf_ratio": tf_ratio}
+                    )
+                else:
+                    wandb.log(
+                        {"learning_rate": lr_scheduler.get_lr()[0], "tf_ratio": tf_ratio}
+                    )
 
     expected = id_to_string(expected, data_loader)
     sequence = id_to_string(sequence, data_loader)
@@ -210,9 +212,10 @@ def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
     return result
 
 
-def main(config_file):
+def main(parser):
+    config_file = parser.config_file
     options = Flags(config_file).get()
-    timestamp = get_timestamp()
+    is_logging = True if parser.project_name is not None else False
 
     # set random seed
     set_seed(seed=options.seed)
@@ -386,7 +389,8 @@ def main(config_file):
         lr_scheduler.load_state_dict(checkpoint["scheduler"])
 
     # Log for W&B
-    wandb.config.update(dict(options._asdict()))  # logging to W&B
+    if is_logging:
+        wandb.config.update(dict(options._asdict()))  # logging to W&B
 
     if not os.path.exists(options.prefix):
         os.makedirs(options.prefix)
@@ -431,7 +435,8 @@ def main(config_file):
             max_grad_norm=options.max_grad_norm,
             device=device,
             scaler=scaler,
-            tf_scheduler=tf_scheduler,  # NOTE. Teacher Forcing Scheduler
+            tf_scheduler=tf_scheduler,
+            is_logging=is_logging
         )
 
         train_losses.append(train_result["loss"])
@@ -546,20 +551,21 @@ def main(config_file):
             print(output_string)
             log_file.write(output_string + "\n")
 
-            write_wandb(
-                epoch=start_epoch + epoch + 1,
-                grad_norm=train_result["grad_norm"],
-                train_loss=train_result["loss"],
-                train_symbol_accuracy=train_epoch_symbol_accuracy,
-                train_sentence_accuracy=train_epoch_sentence_accuracy,
-                train_wer=train_epoch_wer,
-                train_score=train_epoch_score,
-                validation_loss=validation_result["loss"],
-                validation_symbol_accuracy=validation_epoch_symbol_accuracy,
-                validation_sentence_accuracy=validation_epoch_sentence_accuracy,
-                validation_wer=validation_epoch_wer,
-                validation_score=validation_epoch_score,
-            )
+            if is_logging:
+                write_wandb(
+                    epoch=start_epoch + epoch + 1,
+                    grad_norm=train_result["grad_norm"],
+                    train_loss=train_result["loss"],
+                    train_symbol_accuracy=train_epoch_symbol_accuracy,
+                    train_sentence_accuracy=train_epoch_sentence_accuracy,
+                    train_wer=train_epoch_wer,
+                    train_score=train_epoch_score,
+                    validation_loss=validation_result["loss"],
+                    validation_symbol_accuracy=validation_epoch_symbol_accuracy,
+                    validation_sentence_accuracy=validation_epoch_sentence_accuracy,
+                    validation_wer=validation_epoch_wer,
+                    validation_score=validation_epoch_score,
+                )
 
 
 # if __name__ == "__main__":
