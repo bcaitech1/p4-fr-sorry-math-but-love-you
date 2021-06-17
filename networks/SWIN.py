@@ -853,11 +853,7 @@ class SWIN(nn.Module):
         super(SWIN, self).__init__()
 
         # self.encoder = SwinTransformer(ape=True)
-        self.encoder = SwinTransformer(img_size=384, patch_size=4, in_chans=3,
-            embed_dim=128, depths=[2, 2, 18, 2], num_heads=[4, 8, 16, 32],
-            window_size=12, mlp_ratio=4.,num_classes=21841,
-            drop_path_rate=0.5, ape=True,) 
-            
+        self.encoder = timm.create_model('swin_base_patch4_window12_384_in22k', pretrained=True, ape=True)
         self.decoder = TransformerDecoder(
             num_classes=len(train_dataset.id_to_token),
             src_dim=FLAGS.SATRN.decoder.src_dim,
@@ -873,9 +869,6 @@ class SWIN(nn.Module):
             nn.CrossEntropyLoss(ignore_index=train_dataset.token_to_id[PAD])
         )  # without ignore_index=train_dataset.token_to_id[PAD]
 
-        self.step_idx = 0
-        self.features = [None] * self.decoder.layer_num
-
         if checkpoint:
             self.load_state_dict(checkpoint)
 
@@ -890,30 +883,6 @@ class SWIN(nn.Module):
         )
         return dec_result
 
-    def step_forward(self, src, expected, target):
-        enc_result = self.encoder(src)
-
-        num_step = expected.size(1) - 1
-        target = target.unsqueeze(1) # b, 1
-        tgt = self.decoder.text_embedding(target) # b, t+1, 128
-        tgt = self.decoder.pos_encoder(tgt, point=self.step_idx) # b, t+1, 128
-        tgt_mask = self.decoder.order_mask(self.step_idx + 1) # 1,t+1,t+1
-        tgt_mask = tgt_mask[:, -1].unsqueeze(1)  # [1,1,t+1]
-        for l, layer in enumerate(self.decoder.attention_layers):
-            tgt = layer(tgt, self.features[l], enc_result, tgt_mask)
-            self.features[l] = (
-                tgt if self.features[l] == None else torch.cat([self.features[l], tgt], 1)
-            )
-        _out = self.decoder.generator(tgt)  # [b, 1, c]
-        self.step_idx += 1
-        if self.step_idx == num_step:
-            self.reset_status()
-        return _out
-
-    def reset_status(self):
-        self.step_idx = 0
-        self.features = [None] * self.decoder.layer_num    
-        
 class SWIN_encoder(nn.Module):
     def __init__(self, FLAGS, train_dataset, checkpoint=None): # NOTE: 수정 - CrossEntropyLoss 제거
         super(SWIN_encoder, self).__init__()
@@ -959,8 +928,7 @@ class SWIN_decoder(nn.Module):
         return dec_result
 
     # NOTE: 수정 - reset_state가 ensemble.py에서 발생함 & num_step을 외부(ensemble.py)에서 통제함
-    def step_forward(self, src, expected, target):
-        num_step = expected.size(1) - 1
+    def step_forward(self, src, target):
         target = target.unsqueeze(1) # b, 1
         tgt = self.decoder.text_embedding(target) # b, t+1, 128
         tgt = self.decoder.pos_encoder(tgt, point=self.step_idx) # b, t+1, 128
@@ -973,8 +941,6 @@ class SWIN_decoder(nn.Module):
             )
         _out = self.decoder.generator(tgt)  # [b, 1, c]
         self.step_idx += 1
-        if self.step_idx == num_step:
-            self.reset_status()
         return _out
 
     def reset_status(self):
