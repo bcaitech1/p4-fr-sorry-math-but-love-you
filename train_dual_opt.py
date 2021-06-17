@@ -582,7 +582,7 @@ if __name__ == "__main__":
         "-c",
         "--config_file",
         dest="config_file",
-        default="./configs/My_SATRN.yaml",
+        default="./configs/EfficientSATRN.yaml",
         type=str,
         help="Path of configuration file",
     )

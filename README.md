@@ -1,95 +1,68 @@
-# 업스테이지 수학 수식 OCR 모델
+# 🏆To be Modellers and Beyond!
 
-## Requirements
+![logo2](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\logo2.png)
 
-- Python 3
-- [PyTorch][pytorch]
+## Summary
 
-All dependencies can be installed with PIP.
+- 본 대회의 주제는 수식인식이었습니다. 어쩌고 저쩌고 해가지고 이랬다
 
-```sh
-pip install tensorboardX tqdm pyyaml psutil
+![example3](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\example3.png)
+
+
+
+#### 대회 결과
+
+* 12팀 중 1위
+
+* Public LB Score: 0.8574 / Private LB Score: 0.6288
+
+
+
+## Usage
+
+### Requirements
+
+```shell
+pip install -r requirments.txt
 ```
 
-현재 검증된 GPU 개발환경으로는
-- `Pytorch 1.0.0 (CUDA 10.1)`
-- `Pytorch 1.4.0 (CUDA 10.0)`
-- `Pytorch 1.7.1 (CUDA 11.0)`
 
 
-## Supported Models
+### Train
 
-- [CRNN][arxiv-zhang18]
-- [SATRN](https://github.com/clovaai/SATRN)
-- [ASTER](https://github.com/bgshih/aster)
-- [EfficientNetV2](https://github.com/google/automl/tree/master/efficientnetv2)
-- [Swin-Transformer](https://github.com/microsoft/Swin-Transformer)
+```shell
+# Train with integrated optimizer for Encoder and Decoder
+$ python train.py --config_name './configs/EfficientSATRN.yaml'
 
-
-## Supported Data
-- [Aida][Aida] (synthetic handwritten)
-- [CROHME][CROHME] (online handwritten)
-- [IM2LATEX][IM2LATEX] (pdf, synthetic handwritten)
-- [Upstage][Upstage] (print, handwritten)
-
-
-모든 데이터는 팀 저장소에서 train-ready 포맷으로 다운 가능하다.
-```
-[dataset]/
-├── gt.txt
-├── tokens.txt
-└── images/
-    ├── *.jpg
-    ├── ...     
-    └── *.jpg
+# Train with allocating individual lr for Encoder and Decoder
+$ python train_dual_opt.py --config_name './configs/EfficientSATRN.yaml'
 ```
 
-폴더 구조
-```
+
+
+### Inference
+
+
+
+
+
+
+
+```shell
 [folder]
 │
 ├── configs/
-│	├── EfficientASTER.yaml
-│	├── EfficientSATRN.yaml
-│	├── SATRN.yaml
-│	├── SWIN.yaml
-│	├── data_info.txt
-│	└── tokens.txt
-│
 ├── data_tools/
-│	├── augmentations.py
-│	├── dataset.py
-│	└── loader.py
-│
 ├── networks/
-│	├── EfficientASTER.py
-│	├── EfficientSATRN.py
-│	└── SWIN.py
-│
 ├── postprocessing/
-│	├── decoding.py
-│	└── postprocessing.py
-│
 ├── schedulers/
-│	├── circular_lr.py
-│	├── cosineannealing.py
-│	└── tf_scheduler.py
-│
 ├── utils/
-│	├── checkpoint.py
-│	├── ensemble_utils.py
-│	├── data_utils.py
-│	├── flags.py
-│	├── metrics.py
-│	└── utils.py
-│
 ├── README.md
 ├── requirements.txt
 ├── train.py
 ├── train_dual_opt.py
-├── ensemble_v2.py
+├── ensemble.py
 └── inference.py
-
 ```
 
 ## Usage

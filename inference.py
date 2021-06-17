@@ -111,17 +111,11 @@ def main(parser):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--inference_type",
-        default="single",
-        type=str,
-        help="추론 방법 설정 'single(단일모델추론)', 'ensemble앙상블()'",
-    )
-    parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/my_satrn_v2/checkpoints/(f3 8136)MySATRN_best_model.pth",
+        default=None,
         type=str,
-        help="Path of checkpoint file",
+        help="불러올 모델 경로",
     )
     parser.add_argument(
         "--max_sequence",
@@ -140,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default="greedy",  # 'greedy'로 설정하면 기존과 동일하게 inference
+        default="greedy",
         type=str,
         help="디코딩 방식 설정. 'greedy', 'beam'",
     )
@@ -149,27 +143,24 @@ if __name__ == "__main__":
         dest="beam_width",
         default=3,
         type=int,
-        help="빔서치 사용 시 스텝별 후보 수 설정",
+        help="빔서치 사용 시 Beam Size 설정",
     )
     parser.add_argument(
         "--decoding_manager", default=False, type=bool, help="DecodingManager 활용 여부 설정"
     )
-    eval_dir = os.environ.get("SM_CHANNEL_EVAL", "/opt/ml/input/data/")
-    file_path = os.path.join(eval_dir, "eval_dataset/input.txt")
     parser.add_argument(
         "--file_path",
         dest="file_path",
-        default=file_path,
+        default=None,
         type=str,
-        help="file path when doing inference",
+        help="추론할 데이터 경로. 이미지명이 기록된 txt 파일 형식",
     )
-    output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "submit")
     parser.add_argument(
         "--output_dir",
         dest="output_dir",
-        default=output_dir,
+        default='output_sigle_model',
         type=str,
-        help="output directory",
+        help="추론 결과를 저장할 경로",
     )
 
     parser = parser.parse_args()
