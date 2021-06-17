@@ -22,6 +22,7 @@ pip install tensorboardX tqdm pyyaml psutil
 - [CRNN][arxiv-zhang18]
 - [SATRN](https://github.com/clovaai/SATRN)
 - [ASTER](https://github.com/bgshih/aster)
+- [EfficientNetV2](https://github.com/google/automl/tree/master/efficientnetv2)
 - [Swin-Transformer](https://github.com/microsoft/Swin-Transformer)
 
 
