@@ -31,11 +31,11 @@ pip install -r requirments.txt
 ### Train
 
 ```shell
-# Train with integrated optimizer for Encoder and Decoder
-$ python train.py --config_name './configs/EfficientSATRN.yaml'
+# Attach single optimizer for model
+$ python train.py --train_type single './configs/EfficientSATRN.yaml'
 
-# Train with allocating individual lr for Encoder and Decoder
-$ python train_dual_opt.py --config_name './configs/EfficientSATRN.yaml'
+# Attach two individual optimizer for encoder/decoder of model
+$ python train.py --train_type 
 ```
 
 
@@ -43,8 +43,11 @@ $ python train_dual_opt.py --config_name './configs/EfficientSATRN.yaml'
 ### Inference
 
 ```shell
-# Inference with single model
-$ python inference.py  
+# Singular model inference
+$ python inference.py --inference_type singular --checkpoint <MODELPATH.pth>
+
+# Ensemble model inference
+$ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <MODEL2PATH.pth> ...
 ```
 
 

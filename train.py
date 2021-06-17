@@ -1,4 +1,5 @@
 import argparse
+import warnings
 from importlib import import_module
 import wandb
 
@@ -16,11 +17,11 @@ if __name__ == '__main__':
         """
     )
     parser.add_argument(
-        '--project_name', default="[프로젝트명]", help="Weight & Bias에 표시될 프로젝트명"
+        '--project_name', default=None, help="Weight & Bias에 표시될 프로젝트명"
     )
     parser.add_argument(
         "--exp_name",
-        default="[실험명]",
+        default=None,
         help="Weight & Bias에 표시될 실험명",
     )
     parser.add_argument(
@@ -32,9 +33,15 @@ if __name__ == '__main__':
     parser = parser.parse_args()
 
     
-    # initilaize Weight & Bias
-    run = wandb.init(project=parser.project_name, name=parser.exp_name)
-    
+    if parser.project_name is not None:
+        if parser.exp_name is None:
+            raise ValueError("You must insert 'exp_name' when you want to training log at Weight & Bias")
+        # initilaize Weight & Bias
+        run = wandb.init(project=parser.project_name, name=parser.exp_name)
+    else:
+        warnings.warn('Train will be start without Weight & Bias logging')
+        parser.exp_name = None
+
     # run train
     print('='*100)
     print(parser)
@@ -43,5 +50,5 @@ if __name__ == '__main__':
     train_module = getattr(import_module(f"train_modules.train_{parser.train_type}"), 'main')
     train_module(parser)
 
-    # finish Weight & Bias
-    run.finish()
+    if parser.project_name is not None:
+        run.finish() # finish Weight & Bias
