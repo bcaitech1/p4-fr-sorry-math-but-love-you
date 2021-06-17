@@ -6,14 +6,17 @@ import csv
 import torch
 from torch.utils.data import DataLoader
 
-from metrics import word_error_rate, sentence_acc, final_metric
-from checkpoint import load_checkpoint
-from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
-from train import get_valid_transforms
-from flags import Flags
-from utils import id_to_string, get_network, get_optimizer, set_seed
-from decoding import decode
-from postprocessing import get_decoding_manager
+from utils.metrics import word_error_rate, sentence_acc, final_metric
+from utils.checkpoint import load_checkpoint
+from utils.flags import Flags
+from utils.utils import id_to_string, get_network, get_optimizer, set_seed
+
+from data.dataset import LoadEvalDataset, START, PAD
+from data.loader import collate_eval_batch
+from data.augmentations import get_valid_transforms
+
+from postprocessing.decoding import decode
+from postprocessing.postprocessing import get_decoding_manager
 
 
 def main(parser):
@@ -119,7 +122,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="./log/my_satrn_v2/checkpoints/(f3 8136)MySATRN_best_model.pth",
+        default="/opt/ml/code/models/satrn-fold-0-0.8148.pth",
         type=str,
         help="Path of checkpoint file",
     )
