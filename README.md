@@ -6,7 +6,7 @@
 
 - 본 대회의 주제는 수식인식이었습니다. 어쩌고 저쩌고 해가지고 이랬다
 
-![example3](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example3.png?raw=true)
+![example3](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example4.png?raw=true)
 
 
 
