@@ -12,7 +12,7 @@ prefix: "./log/aster"
 
 data:
   train:
-    - "/content/data/train_dataset/gt.txt"
+    - "/content/data/train_dataset/gt.txt" # Train data ground truth
   test:
     - ""
   token_paths:

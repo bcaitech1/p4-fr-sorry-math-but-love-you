@@ -6,6 +6,7 @@ import torch
 import os
 import numpy as np
 import sys
+
 sys.path.append("../")
 from utils.data_utils import encode_truth, load_vocab
 
@@ -55,7 +56,7 @@ class LoadDataset(Dataset):
             }
             for p, truth in groundtruth
         ]
-    
+
     def __len__(self):
         return len(self.data)
 
@@ -68,11 +69,11 @@ class LoadDataset(Dataset):
             image = image.convert("L")
         else:
             raise NotImplementedError
-        
+
         if self.crop:
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
-        
+
         if self.transform:
             w, h = image.size
             if h / w > 2:
@@ -81,6 +82,7 @@ class LoadDataset(Dataset):
             image = self.transform(image=image)["image"]
 
         return {"path": item["path"], "truth": item["truth"], "image": image}
+
 
 class LoadEvalDataset(Dataset):
     def __init__(
@@ -105,7 +107,7 @@ class LoadEvalDataset(Dataset):
             {
                 "path": p,
                 "file_path": p1,
-                "truth":{
+                "truth": {
                     "text": truth,
                     "encoded": [
                         self.token_to_id[START],
@@ -129,11 +131,11 @@ class LoadEvalDataset(Dataset):
             image = image.convert("L")
         else:
             raise NotImplementedError
-        
+
         if self.crop:
             bounding_box = ImageOps.invert(image).getbbox()
             image = image.crop(bounding_box)
-        
+
         if self.transform:
             w, h = image.size
             if h / w > 2:
@@ -148,7 +150,11 @@ class LoadEvalDataset(Dataset):
             "image": image,
         }
 
+
 class DecoderDataset(Dataset):
+    """앙상블 과정 중 디코딩에 활용되는 디코더 데이터셋
+    인코더를 거쳐 임시폴더에 저장된 텐서를 불러옴
+    """
     def __init__(self, tmp_dir: str):
         self.paths = sorted(glob(os.path.join(tmp_dir, "*")))
 
@@ -161,6 +167,7 @@ class DecoderDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
+        """디코더에 입력할 데이터를 iterating하는 과정에서 사용될 collate function."""
         paths_aggregated = []
         batch_aggregated = None
 

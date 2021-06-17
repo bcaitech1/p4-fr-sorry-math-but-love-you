@@ -31,14 +31,14 @@ from utils.ensemble_utils import (
     remap_model_idx,
     remap_test_dataloaders,
     truncate_aligned_models,
-    remove_all_files_in_dir
+    remove_all_files_in_dir,
 )
 
 NO_TEACHER_FORCING = 0.0
 SATRN_IDX = 0
 SWIN_IDX = 1
 ASTER_IDX = 2
-ORDER = dict(MySATRN=SATRN_IDX, SWIN=SWIN_IDX, ASTER=ASTER_IDX) # 디폴트 모델별 ID
+ORDER = dict(MySATRN=SATRN_IDX, SWIN=SWIN_IDX, ASTER=ASTER_IDX)  # 디폴트 모델별 ID
 VERBOSE_DEC_INFO = True
 VERBOSE_ENC_INFO = True
 
@@ -56,8 +56,8 @@ def main(parser):
     os.makedirs(tmp_dir, exist_ok=True)
     os.makedirs(tmp_export_dir, exist_ok=True)
     os.makedirs(export_dir, exist_ok=True)
-    remove_all_files_in_dir(tmp_dir) # NOTE: 실행시 임시 추론 폴더 내 모든 파일이 삭제됨
-    remove_all_files_in_dir(tmp_export_dir) # NOTE: 실행시 임시 추론 폴더 내 모든 파일이 삭제됨
+    remove_all_files_in_dir(tmp_dir)  # NOTE: 실행시 임시 추론 폴더 내 모든 파일이 삭제됨
+    remove_all_files_in_dir(tmp_export_dir)  # NOTE: 실행시 임시 추론 폴더 내 모든 파일이 삭제됨
 
     # NOTE: Load Test Data
     dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
@@ -95,14 +95,14 @@ def main(parser):
                 id_to_token=id_to_token_,
                 # num_workers=parser.num_workers
                 num_workers=0,
-                transforms=get_test_transforms(height, width)
+                transforms=get_test_transforms(height, width),
             )
             enc_dataloaders[loader_idx] = dataloader
 
         assert enc_dataloaders[loader_idx] is not None  # NOTE: FOR DEBUG
 
-    print_gpu_status() # NOTE: GPU 메모리 확인
-    print_ram_status() # NOTE: 램 사용량 확인
+    print_gpu_status()  # NOTE: GPU 메모리 확인
+    print_ram_status()  # NOTE: 램 사용량 확인
     ORDER = remap_model_idx(ORDER, enc_dataloaders)  # 모델ID 업데이트
     enc_dataloaders = [
         l for l in enc_dataloaders if l is not None
@@ -121,17 +121,17 @@ def main(parser):
         need_enc_loading = True
         output_id = 0
         total_steps = len(enc_dataloaders[0])
-        
+
         for step, d in tqdm(enumerate(zip(*enc_dataloaders)), desc="[Inference]"):
             file_path = d[0]["file_path"]
 
             if need_enc_loading:
                 enc_models = load_encoder_models(
-                    checkpoints=parser.checkpoint, 
-                    dataset=enc_dataloaders[0].dataset, 
-                    is_cuda=is_cuda, 
+                    checkpoints=parser.checkpoint,
+                    dataset=enc_dataloaders[0].dataset,
+                    is_cuda=is_cuda,
                     device=device,
-                    verbose=VERBOSE_ENC_INFO
+                    verbose=VERBOSE_ENC_INFO,
                 )
                 need_enc_loading = False
 
@@ -149,23 +149,26 @@ def main(parser):
                 batch_result, os.path.join(tmp_dir, f"batch{current_num_batches:0>4d}")
             )  # (Paths, tensor([BATCH_SIZE, X, X]))
             current_num_batches += 1
-            if VERBOSE_ENC_INFO: VERBOSE_ENC_INFO = False
+            if VERBOSE_ENC_INFO:
+                VERBOSE_ENC_INFO = False
 
-            if parser.max_cache <= current_num_batches or step == total_steps - 1:  # 디코딩으로 넘어감
+            if (
+                parser.max_cache <= current_num_batches or step == total_steps - 1
+            ):  # 디코딩으로 넘어감
                 gc.collect()
                 torch.cuda.empty_cache()
-                if VERBOSE_DEC_INFO: 
-                    print('*** Encoder Truncation Status ***')
+                if VERBOSE_DEC_INFO:
+                    print("*** Encoder Truncation Status ***")
                     print_ram_status()
                 truncate_aligned_models(enc_models, VERBOSE_DEC_INFO)
                 need_enc_loading = True
 
                 dec_models = load_decoder_models(
-                    checkpoints=parser.checkpoint, 
-                    dataset=enc_dataloaders[0].dataset, 
-                    is_cuda=is_cuda, 
+                    checkpoints=parser.checkpoint,
+                    dataset=enc_dataloaders[0].dataset,
+                    is_cuda=is_cuda,
                     device=device,
-                    verbose=VERBOSE_DEC_INFO
+                    verbose=VERBOSE_DEC_INFO,
                 )
                 if VERBOSE_DEC_INFO:
                     print(f"*** Decoder Loading Status ***")
@@ -192,27 +195,29 @@ def main(parser):
                 )
 
                 results_de = make_decoder_values(
-                    models=dec_models, 
-                    parser=parser, 
+                    models=dec_models,
+                    parser=parser,
                     enc_dataloader=enc_dataloaders[0],
                     dec_dataloader=dec_dataloader,
                     manager=manager,
-                    device=device
+                    device=device,
                 )
-                with open(os.path.join(tmp_export_dir, f"output{output_id:0>5d}.csv"), "w") as w:
+                with open(
+                    os.path.join(tmp_export_dir, f"output{output_id:0>5d}.csv"), "w"
+                ) as w:
                     for path, predicted in results_de:
                         w.write(path + "\t" + predicted + "\n")
 
                 remove_all_files_in_dir(tmp_dir)
                 gc.collect()
                 torch.cuda.empty_cache()
-                if VERBOSE_DEC_INFO: 
-                    print('*** Decoder Truncation Status ***')
+                if VERBOSE_DEC_INFO:
+                    print("*** Decoder Truncation Status ***")
                     print_ram_status()
                 truncate_aligned_models(dec_models, verbose=VERBOSE_DEC_INFO)
-                current_num_batches = 0 # 배치 넘버링 초기화
-                output_id += 1 # 추론 결과 넘버링 갱신
-                
+                current_num_batches = 0  # 배치 넘버링 초기화
+                output_id += 1  # 추론 결과 넘버링 갱신
+
                 if VERBOSE_DEC_INFO:
                     loading_time = (time.time() - time_ckpt) / 60
                     print(
@@ -221,13 +226,12 @@ def main(parser):
                     )
                     VERBOSE_DEC_INFO = False
 
-
     # NOTE: Export final output
-    output_list = sorted(glob(os.path.join(tmp_export_dir, '*')))
+    output_list = sorted(glob(os.path.join(tmp_export_dir, "*")))
     output = []
-    for  o in output_list:
-        temp_output = pd.read_csv(o, sep='\t', header=None)
-        temp_output.columns = ['path', 'predicted']
+    for o in output_list:
+        temp_output = pd.read_csv(o, sep="\t", header=None)
+        temp_output.columns = ["path", "predicted"]
         output.append(temp_output)
 
     output = pd.concat(output, axis=0, ignore_index=True)
@@ -262,7 +266,7 @@ if __name__ == "__main__":
             "/opt/ml/ensemble/log/aster-fold-4-0.7846.pth",
             "/opt/ml/ensemble/log/swin-fold-2-0.8322.pth",
             "/opt/ml/ensemble/log/swin-fold-3-0.8315.pth",
-            "/opt/ml/ensemble/log/swin-fold-4-0.8311.pth"
+            "/opt/ml/ensemble/log/swin-fold-4-0.8311.pth",
         ],
         nargs="*",
         help="Path of checkpoint file",
@@ -307,7 +311,7 @@ if __name__ == "__main__":
         "--max_cache", type=int, default=50, help="최대 몇 개의 피클 파일을 저장할 지 결정"
     )
     eval_dir = os.environ.get("SM_CHANNEL_EVAL", "../input/data/")
-    file_path = os.path.join(eval_dir, 'eval_dataset/input.txt')
+    file_path = os.path.join(eval_dir, "eval_dataset/input.txt")
     parser.add_argument(
         "--file_path",
         dest="file_path",

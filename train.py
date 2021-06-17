@@ -19,20 +19,15 @@ from utils import (
     save_checkpoint,
     write_wandb,
     Flags,
-    set_seed, 
-    print_system_envs, 
-    get_optimizer, 
-    get_network, 
+    set_seed,
+    print_system_envs,
+    get_optimizer,
+    get_network,
     id_to_string,
     get_timestamp,
-    load_vocab
+    load_vocab,
 )
-from data import (
-    get_train_transforms, 
-    get_valid_transforms,
-    dataset_loader,
-    START, 
-    PAD)
+from data import get_train_transforms, get_valid_transforms, dataset_loader, START, PAD
 from schedulers import (
     CircularLRBeta,
     CustomCosineAnnealingWarmUpRestarts,
@@ -148,9 +143,7 @@ def _train_one_epoch(
     return result
 
 
-def _valid_one_epoch(
-    data_loader, model, epoch_text, criterion, device
-):
+def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
     model.eval()
 
     losses = []
@@ -348,7 +341,7 @@ def main(config_file):
             T_up=t_up,
             gamma=0.8,
         )
-        
+
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps,
             tf_max=options.teacher_forcing_ratio.tf_max,
@@ -361,7 +354,6 @@ def main(config_file):
             f"TF-MAX: {options.teacher_forcing_ratio.tf_max}\n",
             f"TF-MIN: {options.teacher_forcing_ratio.tf_min}\n",
         )
-        
 
     else:
         optimizer = get_optimizer(

@@ -2,6 +2,7 @@ import math
 import numpy as np
 import warnings
 
+
 class CircularLRBeta:
     def __init__(
         self, optimizer, lr_max, lr_divider, cut_point, step_size, momentum=None

@@ -13,7 +13,11 @@ from torch.utils.data import Dataset
 
 sys.path.append("../")
 from flags import Flags
-from networks.EfficientSATRN import EfficientSATRN, EfficientSATRN_encoder, EfficientSATRN_decoder
+from networks.EfficientSATRN import (
+    EfficientSATRN,
+    EfficientSATRN_encoder,
+    EfficientSATRN_decoder,
+)
 from networks.SWIN import SWIN, SWIN_encoder, SWIN_decoder
 from networks.EfficientASTER import ASTER, ASTER_encoder, ASTER_decoder
 
@@ -38,11 +42,17 @@ def get_network(
     """
     model = None
     if model_type == "EfficientSATRN" or model_type == "MySATRN":
-        model = EfficientSATRN(FLAGS, train_dataset, model_checkpoint, decoding_manager).to(device)
+        model = EfficientSATRN(
+            FLAGS, train_dataset, model_checkpoint, decoding_manager
+        ).to(device)
     elif model_type == "EfficientSATRN_encoder" or model_type == "MySATRN_encoder":
-        model = EfficientSATRN_encoder(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = EfficientSATRN_encoder(FLAGS, train_dataset, model_checkpoint).to(
+            device
+        )
     elif model_type == "EfficientSATRN_decoder" or model_type == "MySATRN_decoder":
-        model = EfficientSATRN_decoder(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = EfficientSATRN_decoder(FLAGS, train_dataset, model_checkpoint).to(
+            device
+        )
     elif model_type == "SWIN":
         model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == "SWIN_encoder":
@@ -50,7 +60,9 @@ def get_network(
     elif model_type == "SWIN_decoder":
         model = SWIN_decoder(FLAGS, train_dataset, model_checkpoint).to(device)
     elif model_type == "EfficientASTER" or model_type == "ASTER":
-        model = ASTER(FLAGS, train_dataset, model_checkpoint, decoding_manager).to(device)
+        model = ASTER(FLAGS, train_dataset, model_checkpoint, decoding_manager).to(
+            device
+        )
     elif model_type == "ASTER_encoder":
         model = ASTER_encoder(FLAGS, model_checkpoint).to(device)
     elif model_type == "ASTER_decoder":
@@ -60,7 +72,9 @@ def get_network(
     return model
 
 
-def get_optimizer(optimizer: str, params: List[torch.Tensor], lr: float, weight_decay: float=None):
+def get_optimizer(
+    optimizer: str, params: List[torch.Tensor], lr: float, weight_decay: float = None
+):
     """옵티마이저를 리턴하는 함수"""
     if optimizer == "Adam":
         optimizer = optim.Adam(params, lr=lr)
@@ -72,18 +86,19 @@ def get_optimizer(optimizer: str, params: List[torch.Tensor], lr: float, weight_
         raise NotImplementedError
     return optimizer
 
+
 def print_gpu_status() -> None:
     """GPU 이용 상태를 출력"""
-    total_mem = round(torch.cuda.get_device_properties(0).total_memory / 1024**3, 3)
-    reserved = round(torch.cuda.memory_reserved(0) / 1024**3, 3)
-    allocated = round(torch.cuda.memory_allocated(0) / 1024**3, 3)
+    total_mem = round(torch.cuda.get_device_properties(0).total_memory / 1024 ** 3, 3)
+    reserved = round(torch.cuda.memory_reserved(0) / 1024 ** 3, 3)
+    allocated = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 3)
     free = round(reserved - allocated, 3)
     print(
         "[+] GPU Status\n",
         f"Total: {total_mem} GB\n",
         f"Reserved: {reserved} GB\n",
         f"Allocated: {allocated} GB\n",
-        f"Residue: {free} GB\n"
+        f"Residue: {free} GB\n",
     )
 
 
@@ -103,11 +118,9 @@ def print_system_envs():
 def print_ram_status():
     """램 이용 상태를 출력"""
     p = psutil.Process()
-    rss = p.memory_info().rss / 2 ** 20 # Bytes to MB
-    print(
-        f"[+] Memory Status\n",
-        f"Usage: {rss: 10.5f} MB\n"
-        )
+    rss = p.memory_info().rss / 2 ** 20  # Bytes to MB
+    print(f"[+] Memory Status\n", f"Usage: {rss: 10.5f} MB\n")
+
 
 # Fixed version of id_to_string
 def id_to_string(tokens, data_loader, do_eval=0):
@@ -143,8 +156,7 @@ def id_to_string(tokens, data_loader, do_eval=0):
     return result
 
 
-
-def set_seed(seed: int=21):
+def set_seed(seed: int = 21):
     """시드값을 고정하는 함수. 실험 재현을 위해 사용"""
     torch.manual_seed(seed)
     np.random.seed(seed)
