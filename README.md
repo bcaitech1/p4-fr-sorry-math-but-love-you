@@ -42,6 +42,11 @@ $ python train_dual_opt.py --config_name './configs/EfficientSATRN.yaml'
 
 ### Inference
 
+```shell
+# Inference with single model
+$ python inference.py  
+```
+
 
 
 
