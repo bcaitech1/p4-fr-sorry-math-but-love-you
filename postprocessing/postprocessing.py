@@ -156,7 +156,7 @@ RULES = {
 }
 
 
-def get_decoding_manager(tokens_path: str, batch_size: int = 128) -> DecodingManager:
+def get_decoding_manager(tokens_path: str, batch_size: int = 128):
     """DecodingManager를 구성하는 함수
 
     Args:
@@ -242,7 +242,7 @@ class DecodingManager:
 
     def _initialize_memories(
         self, batch_size: int, rules: dict, tokens: list, sequence_length: int
-    ) -> List[MemoryNode]:
+    ):
         memories = [
             MemoryNode(
                 id=idx, rules=rules, tokens=tokens, sequence_length=sequence_length
@@ -261,7 +261,7 @@ class DecodingManager:
             node.record(t.item())
 
     @staticmethod
-    def _mask(node: MemoryNode, vocab_size: int) -> torch.Tensor:
+    def _mask(node, vocab_size: int) -> torch.Tensor:
         """MemoryNode의 blacklist 정보를 바탕으로 마스킹 텐서를 생성하는 함수
         마스킹 텐서는 다음 스텝에 활용되어서는 안되는 토큰을 걸러내기 위해 사용
 
