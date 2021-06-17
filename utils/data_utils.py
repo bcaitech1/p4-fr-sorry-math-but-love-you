@@ -8,8 +8,9 @@ END = "<EOS>"
 PAD = "<PAD>"
 SPECIAL_TOKENS = [START, END, PAD]
 
-def encode_truth(truth, token_to_id):
 
+def encode_truth(truth: str, token_to_id: dict):
+    """입력한 수식 문자열을 인코딩하는 함수"""
     truth_tokens = truth.split()
     for token in truth_tokens:
         if token not in token_to_id:
@@ -18,6 +19,7 @@ def encode_truth(truth, token_to_id):
     if "" in truth_tokens:
         truth_tokens.remove("")
     return truth_tokens
+
 
 def load_vocab(tokens_paths: str) -> Tuple[Dict[str, int], Dict[int, str]]:
     """Generation 과정에서 활용할 토큰을 불러와 vocab에 추가하는 함수
