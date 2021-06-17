@@ -568,31 +568,31 @@ def main(config_file):
             )
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--project_name", default="REFACTORING-TEST", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
-    )
-    parser.add_argument(
-        "--exp_name",
-        default="train_dual_opt.py(SATRN)",
-        help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
-    )
-    parser.add_argument(
-        "-c",
-        "--config_file",
-        dest="config_file",
-        default="./configs/EfficientSATRN.yaml",
-        type=str,
-        help="Path of configuration file",
-    )
-    parser = parser.parse_args()
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument(
+#         "--project_name", default="REFACTORING-TEST", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
+#     )
+#     parser.add_argument(
+#         "--exp_name",
+#         default="train_dual_opt.py(SATRN)",
+#         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
+#     )
+#     parser.add_argument(
+#         "-c",
+#         "--config_file",
+#         dest="config_file",
+#         default="./configs/EfficientSATRN.yaml",
+#         type=str,
+#         help="Path of configuration file",
+#     )
+#     parser = parser.parse_args()
 
-    # initilaize W&B
-    run = wandb.init(project=parser.project_name, name=parser.exp_name)
+#     # initilaize W&B
+#     run = wandb.init(project=parser.project_name, name=parser.exp_name)
 
-    # train
-    main(parser.config_file)
+#     # train
+#     main(parser.config_file)
 
-    # fishe W&B
-    run.finish()
+#     # fishe W&B
+#     run.finish()
