@@ -104,7 +104,7 @@ python train.py
 ### Evaluation
 
 ```sh
-python evaluate.py
+python inference.py
 ```
 
 [arxiv-zhang18]: https://arxiv.org/pdf/1801.03530.pdf
