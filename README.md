@@ -21,6 +21,8 @@ pip install tensorboardX tqdm pyyaml psutil
 
 - [CRNN][arxiv-zhang18]
 - [SATRN](https://github.com/clovaai/SATRN)
+- [ASTER](https://github.com/bgshih/aster)
+- [Swin-Transformer](https://github.com/microsoft/Swin-Transformer)
 
 
 ## Supported Data
