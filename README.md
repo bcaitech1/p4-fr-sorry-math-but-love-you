@@ -66,25 +66,25 @@ pip install -r requirments.txt
 
 ## Train
 
-##### 단일 옵티마이저 활용 학습
+#### 단일 옵티마이저 활용 학습
 
 ```shell
 $ python train.py --train_type single_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-##### 인코더와 디코더에 옵티마이저를 개별 부여한 학습
+#### 인코더와 디코더에 옵티마이저를 개별 부여한 학습
 
 ```shell
 $ python train.py --train_type dual_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-##### Weight & Bias 로깅 툴을 활용한 학습
+#### Weight & Bias 로깅 툴을 활용한 학습
 
 ```shell
 $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_name <EXPNAME> --config_file './configs/EfficientSATRN.yaml'
 ```
 
-### Arguments
+#### Arguments
 
 ##### `train_type (str)`: 학습 방식
 
@@ -100,23 +100,23 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 
 ##### `exp_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용할 실험명
 
-
+---
 
 ## Inference
 
-##### 단일 모델 추론
+#### 단일 모델 추론
 
 ```shell
 $ python inference.py --inference_type singular --checkpoint <MODELPATH.pth>
 ```
 
-##### 앙상블 모델 추론
+#### 앙상블 모델 추론
 
 ```shell
 $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <MODEL2PATH.pth> ...
 ```
 
-### Arguments
+#### Arguments
 
 ##### `inference_type (str)`: 추론 방식
 
