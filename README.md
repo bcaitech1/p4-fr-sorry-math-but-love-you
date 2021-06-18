@@ -1,12 +1,12 @@
-# 🏆To be Modellers and Beyond!
+# 🏆수식 인식: To be Modelers and Beyond!
 
 ![logo2](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\logo2.png)
 
 # Summary
 
-- 본 대회의 주제는 수식인식이었습니다. 어쩌고 저쩌고 해가지고 이랬다
+##### 대회 주제
 
-![example3](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example4.png?raw=true)
+본 대회의 주제는
 
 
 
@@ -18,9 +18,9 @@
 
 
 
-# Usage
+# 🤓Usage
 
-## Installation
+## ✔Installation
 
 ```shell
 # clone repository
@@ -30,23 +30,23 @@ git clone https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you.git
 pip install -r requirments.txt
 ```
 
-## Train
+## ✔Train
 
 ### Command Line Interface
 
-##### Train with single optimizer
+##### 단일 옵티마이저 활용 학습
 
 ```shell
 $ python train.py --train_type single_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-##### Train with two individual optimizers for encoder and decoder
+##### 인코더와 디코더에 옵티마이저를 개별 부여한 학습
 
 ```shell
 $ python train.py --train_type dual_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-##### Train with Weight & Bias logging tool
+##### Weight & Bias 로깅 툴을 활용한 학습
 
 ```shell
 $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_name <EXPNAME> --config_file './configs/EfficientSATRN.yaml'
@@ -62,22 +62,23 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 ##### `config_file (str)`: 학습 모델의 configuration 파일 경로를 입력합니다.
 
 - 모델 configuration은 아키텍처별로 상이하며, [이곳](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/configs/EfficientASTER.yaml)에서 해당 예시를 보실 수 있습니다.
+- 학습 가능한 모델은 ***[EfficientSATRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientSATRN.py#L664)***, ***[EfficientASTER](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientASTER.py#L333)***, ***[SwinTRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/SWIN.py#L1023)***입니다.
 
 ##### `project_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용될 프로젝트명입니다.
 
 ##### `exp_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용될 실험명입니다.
 
-## Inference
+## ✔Inference
 
 ### Command Line interface
 
-##### Singular model inference
+##### 단일 모델 추론
 
 ```shell
 $ python inference.py --inference_type singular --checkpoint <MODELPATH.pth>
 ```
 
-##### Ensemble model inference
+##### 앙상블 모델 추론
 
 ```shell
 $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <MODEL2PATH.pth> ...
@@ -117,43 +118,20 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 
 
-
+### ✔Structure
 
 ```shell
 [folder]
-│
-├── configs/
-├── data_tools/
-├── networks/
-├── postprocessing/
-├── schedulers/
-├── utils/
+├── configs/ # configuration files
+├── data_tools/ # modules for dataset
+├── networks/ # modules for model architecture
+├── postprocessing/ # modules for postprocessing during inference
+├── schedulers/ # scheduler for learning rate, teacher forcing ratio
+├── utils/ # useful utilities
+├── inference_modules/ # modules for inference
+├── train_modules/ # modules for train
 ├── README.md
 ├── requirements.txt
 ├── train.py
-├── train_dual_opt.py
-├── ensemble.py
 └── inference.py
 ```
-
-## Usage
-
-### Training
-
-```sh
-python train.py
-```
-
-
-### Evaluation
-
-```sh
-python evaluate.py
-```
-
-[arxiv-zhang18]: https://arxiv.org/pdf/1801.03530.pdf
-[CROHME]: https://www.isical.ac.in/~crohme/
-[Aida]: https://www.kaggle.com/aidapearson/ocr-data
-[Upstage]: https://www.upstage.ai/
-[IM2LATEX]: http://lstm.seas.harvard.edu/latex/
-[pytorch]: https://pytorch.org/
