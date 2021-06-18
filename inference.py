@@ -41,6 +41,11 @@ if __name__ == '__main__':
         "--decoding_manager", default=True, help="DecodingManager 사용 여부 결정"
     )
     parser.add_argument(
+        "--tokens_path",
+        default="./configs/tokens.txt",
+        help="DecodingManager 사용시 활용할 토큰 파일 경로",
+    )
+    parser.add_argument(
         "--max_cache", type=int, default=50, help="최대 몇 개의 피클 파일을 저장할 지 결정. NOTE: 앙상블 추론(ensemble)에서만 사용됨"
     )
     parser.add_argument(
