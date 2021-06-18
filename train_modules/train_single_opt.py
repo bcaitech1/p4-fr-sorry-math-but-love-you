@@ -334,7 +334,7 @@ def main(parser):
 
         total_steps = len(train_data_loader) * options.num_epochs  # 전체 스텝 수
         t_0 = total_steps // 1  # 주기를 1로 설정
-        t_up = int(t_0 * options.optimizer.warmup_ratio)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
+        t_up = int(t_0 * options.scheduler.warmup_ratio)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,

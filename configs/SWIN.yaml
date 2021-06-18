@@ -19,11 +19,11 @@ prefix: "./log/swin"
 
 data:
   train:
-    - "/opt/ml/input/data/train_dataset/gt.txt"
+    - "../input/data/train_dataset/gt.txt"
   test:
     - ""
   token_paths:
-    - "/opt/ml/input/data/train_dataset/tokens.txt"  # 241 tokens
+    - "../input/data/train_dataset/tokens.txt"  # 241 tokens
   fold: 0
   crop: True
   rgb: 3    # 3 for color, 1 for greyscale
