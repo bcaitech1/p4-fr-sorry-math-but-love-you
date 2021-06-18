@@ -2,7 +2,7 @@
 
 ![logo2](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\logo2.png)
 
-## Summary
+# Summary
 
 - 본 대회의 주제는 수식인식이었습니다. 어쩌고 저쩌고 해가지고 이랬다
 
@@ -18,9 +18,9 @@
 
 
 
-## Usage
+# Usage
 
-### Installation
+## Installation
 
 ```shell
 # clone repository
@@ -30,60 +30,60 @@ git clone https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you.git
 pip install -r requirments.txt
 ```
 
-### Train
+## Train
 
-#### Command Line Interface
+### Command Line Interface
 
-- Train with single optimizer
+##### Train with single optimizer
 
-  ```shell
-  $ python train.py --train_type single_opt --config_file './configs/EfficientSATRN.yaml'
-  ```
+```shell
+$ python train.py --train_type single_opt --config_file './configs/EfficientSATRN.yaml'
+```
 
-- Train with two individual optimizers for encoder and decoder
+##### Train with two individual optimizers for encoder and decoder
 
-  ```shell
-  $ python train.py --train_type dual_opt --config_file './configs/EfficientSATRN.yaml'
-  ```
+```shell
+$ python train.py --train_type dual_opt --config_file './configs/EfficientSATRN.yaml'
+```
 
-- Train with Weight & Bias logging tool
+##### Train with Weight & Bias logging tool
 
-  ```shell
-  $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_name <EXPNAME> --config_file './configs/EfficientSATRN.yaml'
-  ```
+```shell
+$ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_name <EXPNAME> --config_file './configs/EfficientSATRN.yaml'
+```
 
-#### Arguments
+### Arguments
 
-`train_type (str)`: 학습 형태를 설정합니다.
+##### `train_type (str)`: 학습 형태를 설정합니다.
 
 * `'single_opt'`: 단일 optimizer를 활용한 학습을 진행합니다.
 * `'dual_opt'`: 인코더, 디코더에 optimizer가 개별 부여된 학습을 진행합니다.
 
-`config_file (str)`: 학습 모델의 configuration 파일 경로를 입력합니다.
+##### `config_file (str)`: 학습 모델의 configuration 파일 경로를 입력합니다.
 
 - 모델 configuration은 아키텍처별로 상이하며, [이곳](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/configs/EfficientASTER.yaml)에서 해당 예시를 보실 수 있습니다.
 
-`project_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용될 프로젝트명입니다.
+##### `project_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용될 프로젝트명입니다.
 
-`exp_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용될 실험명입니다.
+##### `exp_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용될 실험명입니다.
 
-### Inference
+## Inference
 
-#### Command Line interface
+### Command Line interface
 
-- Singular model inference
+##### Singular model inference
 
-  ```shell
-  $ python inference.py --inference_type singular --checkpoint <MODELPATH.pth>
-  ```
+```shell
+$ python inference.py --inference_type singular --checkpoint <MODELPATH.pth>
+```
 
-- Ensemble model inference
+##### Ensemble model inference
 
-  ```shell
-  $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <MODEL2PATH.pth> ...
-  ```
+```shell
+$ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <MODEL2PATH.pth> ...
+```
 
-#### Arguments
+### Arguments
 
 ##### `inference_type (str)`: 추론 방식을 설정합니다.
 
