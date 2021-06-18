@@ -1,4 +1,4 @@
-from .dataset import LoadDataset, LoadEvalDataset, DecoderDataset, START, PAD
+from .dataset import LoadDataset, LoadEvalDataset, DecoderDataset, START, PAD, END, SPECIAL_TOKENS
 from .loader import dataset_loader, compose_test_dataloader, collate_batch, collate_eval_batch
 from .augmentations import (
     get_train_transforms,

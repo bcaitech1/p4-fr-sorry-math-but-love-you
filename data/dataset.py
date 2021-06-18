@@ -7,8 +7,7 @@ import os
 import numpy as np
 import sys
 
-sys.path.append("../")
-from utils.data_utils import encode_truth, load_vocab
+from utils import encode_truth, load_vocab
 
 START = "<SOS>"
 END = "<EOS>"

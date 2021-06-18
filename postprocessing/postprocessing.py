@@ -7,8 +7,7 @@ import torch
 import torch.nn.functional as F
 import sys
 
-sys.path.append("../")
-from data.dataset import SPECIAL_TOKENS
+from data import SPECIAL_TOKENS
 
 RULES = {
     # 한번도 첫번째로 등장한 적이 없는 토큰
