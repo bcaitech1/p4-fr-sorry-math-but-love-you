@@ -6,8 +6,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--inference_type",
-        default='singular',
-        help="추론 방식을 설정. 'singular(단일 모델 추론)', 'ensemble(다중 모델 추론)'",
+        default='single',
+        help="추론 방식을 설정. 'single(단일 모델 추론)', 'ensemble(다중 모델 추론)'",
     )
     parser.add_argument(
         "--checkpoint",
