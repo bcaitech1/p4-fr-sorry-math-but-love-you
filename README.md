@@ -2,21 +2,42 @@
 
 ![logo2](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\logo2.png)
 
-# Summary
+# Task Description
 
-##### 대회 주제
+### Subject
 
-본 대회의 주제는
+본 대회의 주제는 수식 이미지를 [LaTex](https://ko.wikipedia.org/wiki/LaTeX) 포맷의 텍스트로 변환하는 문제였습니다. LaTex은 논문 및 기술 문서 작성 포맷으로, 자연 과학 분야에서 널리 사용됩니다. 일반적인 광학 문자 인식(optical character recognition)과 달리 수식인식은 multi-line recognition을 필요로 합니다.
 
+![task_intro](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\task_intro.png)
 
+일반적 문장과 달리 수식은 분수의 분자·분모, 극한의 구간 표현 등 다차원적 관계 파악이 필요합니다. 따라서 수식인식 문제는 일반적인 single line recognition 기반의 OCR이 아닌 multi line recognition을 이용하는 OCR 문제로 바라볼 수 있습니다. Multi line recognition의 관점에서 수식 인식은 기존 OCR과 차별화되는 task라고 할 수 있습니다.
 
-#### 대회 결과
+### Data
+
+- 학습 데이터: 출력물 수식 이미지 5만 장, 손글씨 수식 이미지 5만 장, 총 10만 장의 수식 이미지
+- 테스트 데이터: 출력물 수식 이미지 6천 장, 손글씨 수식 이미지 6천 장
+
+![task_intro2](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\task_intro2.png)
+
+### Metric
+
+- 평가 척도: 0.9 × 문장 단위 정확도 + 0.1 × (1 - 단어 오류율)
+
+- 문장 단위 정확도(Sentence Accuracy): 전체 추론 결과 중 몇 개의 수식이 정답과 정확히 일치하는 지를 나타낸 척도입니다.
+
+  ![sa](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\sa.png)
+
+- 단어 오류율(Word Error Rate, WER): 추론 결과를 정답에 일치하도록 수정하는 데 단어의 삽입, 삭제, 대체가 총 몇 회 발생하는 지를 측정하는 척도입니다.
+
+![wer](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\wer.png)
+
+# Project Result
 
 * 12팀 중 1위
 
 * Public LB Score: 0.8574 / Private LB Score: 0.6288
 
-
+  
 
 # Installation
 
