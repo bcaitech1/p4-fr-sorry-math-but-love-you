@@ -64,7 +64,8 @@ def split_gt(
     root = os.path.join(os.path.dirname(groundtruth), "images")
     df = pd.read_csv(os.path.join(os.path.dirname(groundtruth), "data_info.txt"))
     val_image_names = set(df[df["fold"] == fold]["image_name"].values)
-    train_image_names = set(df[df["fold"] != fold]["image_name"].values)
+    # train_image_names = set(df[df["fold"] != fold]["image_name"].values)
+    train_image_names = set(df["image_name"].values)
     with open(groundtruth, "r") as fd:
         data = []
         for line in fd:

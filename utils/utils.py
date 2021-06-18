@@ -11,15 +11,18 @@ import torch
 from torch import optim, nn
 from torch.utils.data import Dataset
 
-sys.path.append("../")
 from .flags import Flags
-from networks.EfficientSATRN import (
+from networks import (
     EfficientSATRN,
     EfficientSATRN_encoder,
     EfficientSATRN_decoder,
+    SWIN, 
+    SWIN_encoder, 
+    SWIN_decoder,
+    ASTER, 
+    ASTER_encoder, 
+    ASTER_decoder
 )
-from networks.SWIN import SWIN, SWIN_encoder, SWIN_decoder
-from networks.EfficientASTER import ASTER, ASTER_encoder, ASTER_decoder
 
 
 def get_network(

@@ -3,8 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 from typing import Tuple
 import sys
 
-sys.path.append("../")
-from utils.data_utils import split_gt
+from utils import split_gt
 from .dataset import LoadDataset, LoadEvalDataset
 
 
