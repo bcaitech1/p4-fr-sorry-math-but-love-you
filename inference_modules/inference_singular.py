@@ -6,14 +6,26 @@ import csv
 import torch
 from torch.utils.data import DataLoader
 
-from metrics import word_error_rate, sentence_acc, final_metric
-from checkpoint import load_checkpoint
-from dataset import LoadEvalDataset, collate_eval_batch, START, PAD
-from train import get_valid_transforms
-from flags import Flags
-from utils import id_to_string, get_network, get_optimizer, set_seed
-from decoding import decode
-from postprocessing import get_decoding_manager
+from utils import (
+    word_error_rate,
+    sentence_acc,
+    final_metric,
+    load_checkpoint,
+    Flags,
+    id_to_string,
+    get_network,
+    get_optimizer,
+    set_seed
+)
+from data import (
+    LoadEvalDataset,
+    collate_eval_batch,
+    START,
+    PAD,
+    get_valid_transforms
+)
+from postprocessing import decode, get_decoding_manager
+
 
 
 def main(parser):
@@ -106,62 +118,3 @@ def main(parser):
     with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
         for path, predicted in results:
             w.write(path + "\t" + predicted + "\n")
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument(
-#         "--checkpoint",
-#         dest="checkpoint",
-#         default=None,
-#         type=str,
-#         help="불러올 모델 경로",
-#     )
-#     parser.add_argument(
-#         "--max_sequence",
-#         dest="max_sequence",
-#         default=230,
-#         type=int,
-#         help="maximun sequence when doing inference",
-#     )
-#     parser.add_argument(
-#         "--batch_size",
-#         dest="batch_size",
-#         default=128,
-#         type=int,
-#         help="batch size when doing inference",
-#     )
-#     parser.add_argument(
-#         "--decode_type",
-#         dest="decode_type",
-#         default="greedy",
-#         type=str,
-#         help="디코딩 방식 설정. 'greedy', 'beam'",
-#     )
-#     parser.add_argument(
-#         "--beam_width",
-#         dest="beam_width",
-#         default=3,
-#         type=int,
-#         help="빔서치 사용 시 Beam Size 설정",
-#     )
-#     parser.add_argument(
-#         "--decoding_manager", default=False, type=bool, help="DecodingManager 활용 여부 설정"
-#     )
-#     parser.add_argument(
-#         "--file_path",
-#         dest="file_path",
-#         default=None,
-#         type=str,
-#         help="추론할 데이터 경로. 이미지명이 기록된 txt 파일 형식",
-#     )
-#     parser.add_argument(
-#         "--output_dir",
-#         dest="output_dir",
-#         default='output_sigle_model',
-#         type=str,
-#         help="추론 결과를 저장할 경로",
-#     )
-
-#     parser = parser.parse_args()
-#     inference_singular(parser)
