@@ -12,7 +12,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default=["/opt/ml/ensemble/log/swin-fold-4-0.8311.pth"],
+        default=["/opt/ml/ensemble/log/satrn_fold-0-0.8148.pth"],
         nargs="*",
         help="추론에 활용할 학습 모델 파일 경로",
     )
@@ -35,7 +35,14 @@ if __name__ == '__main__':
         dest="decode_type",
         default="greedy",
         type=str,
-        help="디코딩 방식 설정. 'greedy(그리디 디코딩)', 'beam(빔서치)'. NOTE: 빔서치는 단일 모델 추론(singular)에서만 작동함",
+        help="디코딩 방식 설정. 'greedy(그리디 디코딩)', 'beam(빔서치)'. NOTE: 빔서치는 단일 모델 추론(singular)에서만 작동, SwinTRN 사용불가",
+    )
+    parser.add_argument(
+        "--beam_width",
+        dest="beam_width",
+        default=3,
+        type=int,
+        help="빔서치 사용 시 Beam Size 설정",
     )
     parser.add_argument(
         "--decoding_manager", default=True, help="DecodingManager 사용 여부 결정"

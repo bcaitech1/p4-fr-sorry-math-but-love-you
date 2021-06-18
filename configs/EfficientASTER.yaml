@@ -12,17 +12,18 @@ prefix: "./log/aster" # directory to save model checkpoint
 
 data: # 데이터셋
   train:
-    - "/content/data/train_dataset/gt.txt" # ground truth path of train data
+    - "../input/data/train_dataset/gt.txt" # ground truth path of train data
   test:
     - "" # ground truth path of test data
   token_paths:
-    - "/content/data/train_dataset/tokens.txt"  # token file for LaTex symbols (241 tokens in default)
+    - "../input/data/train_dataset/tokens.txt"  # token file for LaTex symbols (241 tokens in default)
   dataset_proportions:  # proportion of data used during train
     - 1.0
   random_split: True
   test_proportions: 0.2 # proportion of data used for validation
   crop: True 
   rgb: 3  
+  fold: 0
   
 batch_size: 16
 num_workers: 0

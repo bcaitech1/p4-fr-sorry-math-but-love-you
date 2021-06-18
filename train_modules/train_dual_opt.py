@@ -10,24 +10,26 @@ import torch
 from torch import nn, optim
 from transformers import get_constant_schedule_with_warmup
 import wandb
-from checkpoint import (
+from utils import (
     default_checkpoint,
     load_checkpoint,
     save_checkpoint,
-    init_tensorboard,
-    write_tensorboard,
     write_wandb,
+    set_seed,
+    print_system_envs,
+    get_optimizer,
+    get_network,
+    id_to_string,
+    Flags,
+    load_vocab
 )
-from flags import Flags
-from utils import set_seed, print_system_envs, get_optimizer, get_network, id_to_string
-from augmentations import get_train_transforms, get_valid_transforms  # NOTE
-from dataset import dataset_loader, START, PAD, load_vocab
-from scheduler import (
+from data import get_train_transforms, get_valid_transforms, dataset_loader, START, PAD  # NOTE
+from schedulers import (
     CircularLRBeta,
     CustomCosineAnnealingWarmUpRestarts,
     TeacherForcingScheduler,
 )
-from metrics import word_error_rate, sentence_acc, final_metric
+from utils.metrics import word_error_rate, sentence_acc, final_metric
 
 os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
@@ -279,6 +281,7 @@ def main(parser):
         valid_transform=get_valid_transforms(
             height=options.input_size.height, width=options.input_size.width
         ),
+        fold=options.data.fold,
     )
 
     print(
@@ -387,7 +390,6 @@ def main(parser):
     shutil.copy(config_file, os.path.join(options.prefix, "train_config.yaml"))
     if options.print_epochs is None:
         options.print_epochs = options.num_epochs
-    writer = init_tensorboard(name=options.prefix.strip("-"))
     start_epoch = checkpoint["epoch"]
     train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
     train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
