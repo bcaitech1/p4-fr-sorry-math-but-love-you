@@ -140,7 +140,7 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 #### 단일 모델 추론
 
 ```shell
-$ python inference.py --inference_type singular --checkpoint <MODELPATH.pth>
+$ python inference.py --inference_type single --checkpoint <MODELPATH.pth>
 ```
 
 #### 앙상블 모델 추론
@@ -153,7 +153,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 ##### `inference_type (str)`: 추론 방식
 
-- `singular`: 단일 모델을 불러와 추론을 진행합니다.
+- `single`: 단일 모델을 불러와 추론을 진행합니다.
 - `ensemble`: 여러 모델을 불러와 앙상블 추론을 진행합니다.
 
 ##### `checkpoint (str)`: 불러올 모델 경로
