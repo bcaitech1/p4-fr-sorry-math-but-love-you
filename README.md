@@ -18,9 +18,7 @@
 
 
 
-# Usage
-
-## Installation
+# Installation
 
 ```shell
 # clone repository
@@ -62,9 +60,11 @@ pip install -r requirments.txt
 └── inference.py
 ```
 
-## Command Line Interface
 
-### Train
+
+# Command Line Interface
+
+## Train
 
 ##### 단일 옵티마이저 활용 학습
 
@@ -102,7 +102,7 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 
 
 
-### Inference
+## Inference
 
 ##### 단일 모델 추론
 
