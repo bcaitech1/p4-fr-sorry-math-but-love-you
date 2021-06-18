@@ -12,6 +12,8 @@
 
 ![task_intro](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro.png?raw=true)
 
+
+
 일반적 문장과 달리 수식은 분수의 분자·분모, 극한의 구간 표현 등 다차원적 관계 파악이 필요합니다. 따라서 수식인식 문제는 일반적인 single line recognition 기반의 OCR이 아닌 multi line recognition을 이용하는 OCR 문제로 바라볼 수 있습니다. Multi line recognition의 관점에서 수식 인식은 기존 OCR과 차별화되는 task라고 할 수 있습니다.
 
 ### Data
@@ -23,6 +25,8 @@
 
 ![task_intro2](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro2.png?raw=true)
 
+
+
 ### Metric
 
 - 평가 척도: 0.9 × 문장 단위 정확도 + 0.1 × (1 - 단어 오류율)
@@ -33,11 +37,15 @@
 
   ![sa](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/sa.png?raw=true)
 
+  
+
 - 단어 오류율(Word Error Rate, WER): 추론 결과를 정답에 일치하도록 수정하는 데 단어의 삽입, 삭제, 대체가 총 몇 회 발생하는 지를 측정하는 척도입니다.
 
 
 
 ![wer](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/wer.png?raw=true)
+
+
 
 # Project Result
 
