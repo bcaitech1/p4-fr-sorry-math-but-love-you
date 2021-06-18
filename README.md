@@ -1,6 +1,6 @@
 # 🏆수식 인식: To be Modelers and Beyond!
 
-![logo2](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\logo2.png)
+![logo2](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/logo2.png?raw=true)
 
 # Task Description
 
@@ -36,11 +36,10 @@
 
 - 문장 단위 정확도(Sentence Accuracy): 전체 추론 결과 중 몇 개의 수식이 정답과 정확히 일치하는 지를 나타낸 척도입니다.
 
-  
+![sa](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/sa.png?raw=true)
 
-  ![sa](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/sa.png?raw=true)
 
-  
+
 
 - 단어 오류율(Word Error Rate, WER): 추론 결과를 정답에 일치하도록 수정하는 데 단어의 삽입, 삭제, 대체가 총 몇 회 발생하는 지를 측정하는 척도입니다.
 
