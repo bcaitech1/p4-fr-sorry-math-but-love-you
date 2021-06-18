@@ -1,4 +1,4 @@
-# 🏆수식 인식: To be Modelers and Beyond!
+# 🏆수식 인식: To be Modeler and Beyond!
 
 ![logo2](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/logo2.png?raw=true)
 
@@ -7,12 +7,6 @@
 ### Subject
 
 본 대회의 주제는 수식 이미지를 [LaTex](https://ko.wikipedia.org/wiki/LaTeX) 포맷의 텍스트로 변환하는 문제였습니다. LaTex은 논문 및 기술 문서 작성 포맷으로, 자연 과학 분야에서 널리 사용됩니다. 일반적인 광학 문자 인식(optical character recognition)과 달리 수식인식은 multi-line recognition을 필요로 합니다.
-
-
-
-![example](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example.png?raw=true)
-
-
 
 
 
@@ -36,16 +30,12 @@
 
 - 문장 단위 정확도(Sentence Accuracy): 전체 추론 결과 중 몇 개의 수식이 정답과 정확히 일치하는 지를 나타낸 척도입니다.
 
-![sa](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/sa.png?raw=true)
-
-
-
 
 - 단어 오류율(Word Error Rate, WER): 추론 결과를 정답에 일치하도록 수정하는 데 단어의 삽입, 삭제, 대체가 총 몇 회 발생하는 지를 측정하는 척도입니다.
 
+  
 
-
-![wer](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/wer.png?raw=true)
+![metric](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\metric.png)
 
 
 
@@ -54,6 +44,12 @@
 * 12팀 중 1위
 
 * Public LB Score: 0.8574 / Private LB Score: 0.6288
+
+* 1등 솔루션 발표 자료는 [이곳](https://drive.google.com/file/d/1aXhJ7-cEXDKa1Y_9vOBdydOdIfACZrVG/view)에서 확인하실 수 있습니다.
+
+* 수식 인식 결과 예시
+
+  ![example](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example.png?raw=true)
 
   
 
@@ -194,4 +190,8 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 ##### `output_dir (str)`: 추론 결과를 저장할 디렉토리 경로 (default: `'./result/'`)
 
 
+
+# Team SMBLY
+
+- 고지형
 
