@@ -1025,10 +1025,6 @@ class SWIN(nn.Module):
     def __init__(self, FLAGS, train_dataset, checkpoint=True):
         super(SWIN, self).__init__()
 
-        # self.encoder = SwinTransformer(ape=True)
-        # self.encoder = timm.create_model(
-        #     "swin_base_patch4_window12_384_in22k", pretrained=False, ape=True
-        # )
         self.encoder = SwinTransformer(img_size=384, patch_size=4, in_chans=3,
             embed_dim=128, depths=[2, 2, 18, 2], num_heads=[4, 8, 16, 32],
             window_size=12, mlp_ratio=4.,num_classes=21841,
