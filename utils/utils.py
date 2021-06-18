@@ -12,7 +12,7 @@ from torch import optim, nn
 from torch.utils.data import Dataset
 
 sys.path.append("../")
-from flags import Flags
+from .flags import Flags
 from networks.EfficientSATRN import (
     EfficientSATRN,
     EfficientSATRN_encoder,
@@ -27,7 +27,7 @@ def get_network(
     FLAGS: Flags,
     model_checkpoint: str,
     device,
-    train_dataset: Dataset,
+    dataset: Dataset,
     decoding_manager=None,
 ) -> nn.Module:
     """모델을 불러오는 함수
@@ -37,36 +37,36 @@ def get_network(
         FLAGS (Flags): 모델 configuration 정보
         model_checkpoint (str): 사전 학습한 weigt를 불러올 경우 해당 경로 입력
         device:
-        train_dataset (Dataset): 학습 데이터셋
+        dataset (Dataset): 데이터셋
         decoding_manager (optional): 후처리 클래스 DecodingManager 사용시 입력
     """
     model = None
     if model_type == "EfficientSATRN" or model_type == "MySATRN":
         model = EfficientSATRN(
-            FLAGS, train_dataset, model_checkpoint, decoding_manager
+            FLAGS, dataset, model_checkpoint, decoding_manager
         ).to(device)
     elif model_type == "EfficientSATRN_encoder" or model_type == "MySATRN_encoder":
-        model = EfficientSATRN_encoder(FLAGS, train_dataset, model_checkpoint).to(
+        model = EfficientSATRN_encoder(FLAGS, dataset, model_checkpoint).to(
             device
         )
     elif model_type == "EfficientSATRN_decoder" or model_type == "MySATRN_decoder":
-        model = EfficientSATRN_decoder(FLAGS, train_dataset, model_checkpoint).to(
+        model = EfficientSATRN_decoder(FLAGS, dataset, model_checkpoint).to(
             device
         )
     elif model_type == "SWIN":
-        model = SWIN(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = SWIN(FLAGS, dataset, model_checkpoint).to(device)
     elif model_type == "SWIN_encoder":
-        model = SWIN_encoder(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = SWIN_encoder(FLAGS, dataset, model_checkpoint).to(device)
     elif model_type == "SWIN_decoder":
-        model = SWIN_decoder(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = SWIN_decoder(FLAGS, dataset, model_checkpoint).to(device)
     elif model_type == "EfficientASTER" or model_type == "ASTER":
-        model = ASTER(FLAGS, train_dataset, model_checkpoint, decoding_manager).to(
+        model = ASTER(FLAGS, dataset, model_checkpoint, decoding_manager).to(
             device
         )
     elif model_type == "ASTER_encoder":
         model = ASTER_encoder(FLAGS, model_checkpoint).to(device)
     elif model_type == "ASTER_decoder":
-        model = ASTER_decoder(FLAGS, train_dataset, model_checkpoint).to(device)
+        model = ASTER_decoder(FLAGS, dataset, model_checkpoint).to(device)
     else:
         raise NotImplementedError
     return model
