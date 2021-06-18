@@ -1,8 +1,6 @@
 # 🏆수식 인식: To be Modeler and Beyond!
 
-
-
-![logo2](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/logo2.png?raw=true)
+<div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/logo2.png?raw=true /></div>
 
 
 
@@ -12,9 +10,7 @@
 
 본 대회의 주제는 수식 이미지를 [LaTex](https://ko.wikipedia.org/wiki/LaTeX) 포맷의 텍스트로 변환하는 문제였습니다. LaTex은 논문 및 기술 문서 작성 포맷으로, 자연 과학 분야에서 널리 사용됩니다. 일반적인 광학 문자 인식(optical character recognition)과 달리 수식인식은 multi-line recognition을 필요로 합니다.
 
-
-
-![task_intro](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro.png?raw=true)
+<div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro.png?raw=true /></div>
 
 
 
@@ -37,9 +33,7 @@
 
 - 단어 오류율(Word Error Rate, WER): 추론 결과를 정답에 일치하도록 수정하는 데 단어의 삽입, 삭제, 대체가 총 몇 회 발생하는 지를 측정하는 척도입니다.
 
-  
-
-![metric](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/metric.png?raw=true)
+  <div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/metric.png?raw=true /></div>
 
 
 
@@ -53,7 +47,7 @@
 
 * 수식 인식 결과 예시
 
-  ![example](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example.png?raw=true)
+  <div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example.png?raw=true /></div>
 
   
 
