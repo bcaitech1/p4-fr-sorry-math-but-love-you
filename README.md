@@ -33,7 +33,7 @@
 
 - 단어 오류율(Word Error Rate, WER): 추론 결과를 정답에 일치하도록 수정하는 데 단어의 삽입, 삭제, 대체가 총 몇 회 발생하는 지를 측정하는 척도입니다.
 
-<div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/metric.png?raw=true /></div>
+  ![](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/metric.png?raw=true)
 
 
 
