@@ -10,7 +10,9 @@
 
 
 
-![example](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\example.png)
+![example](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example.png?raw=true)
+
+
 
 
 
