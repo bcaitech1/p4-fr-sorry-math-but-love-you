@@ -1,6 +1,10 @@
 # 🏆수식 인식: To be Modeler and Beyond!
 
+
+
 ![logo2](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/logo2.png?raw=true)
+
+
 
 # Task Description
 
@@ -35,7 +39,7 @@
 
   
 
-![metric](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\metric.png)
+![metric](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/metric.png?raw=true)
 
 
 
@@ -194,4 +198,9 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 # Team SMBLY
 
 - 고지형
+- 김준철
+- 김형민
+- 송누리
+- 이주영
+- 최준구
 
