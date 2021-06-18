@@ -10,6 +10,10 @@
 
 
 
+![example](C:\Users\iloveslowfood\Documents\workspace\p4-fr-sorry-math-but-love-you\images\example.png)
+
+
+
 ![task_intro](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro.png?raw=true)
 
 
@@ -19,13 +23,10 @@
 ### Data
 
 - 학습 데이터: 출력물 수식 이미지 5만 장, 손글씨 수식 이미지 5만 장, 총 10만 장의 수식 이미지
+
 - 테스트 데이터: 출력물 수식 이미지 6천 장, 손글씨 수식 이미지 6천 장
 
-
-
-![task_intro2](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro2.png?raw=true)
-
-
+  
 
 ### Metric
 
