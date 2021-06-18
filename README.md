@@ -20,25 +20,39 @@
 
 ## Usage
 
-### Requirements
+### Installation
 
 ```shell
+# clone repository
+git clone https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you.git
+
+# install necessary tools
 pip install -r requirments.txt
 ```
 
-
-
 ### Train
 
-```shell
-# Attach single optimizer for model
-$ python train.py --train_type single --config_file './configs/EfficientSATRN.yaml'
+##### Train with single optimizer
 
-# Attach two individual optimizer for encoder/decoder of model
-$ python train.py --train_type 
+```shell
+$ python train.py --train_type single_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
+##### Train with two optimizers for encoder and decoder
 
+```shell
+$ python train.py --train_type dual_opt --config_file './configs/EfficientSATRN.yaml'
+```
+
+##### Attach Weight & Bias logging tool
+
+```shell
+$ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_name <EXPNAME> --config_file './configs/EfficientSATRN.yaml'
+```
+
+##### Arguments
+
+- 모델별 configuration 파일
 
 ### Inference
 
@@ -49,10 +63,6 @@ $ python inference.py --inference_type singular --checkpoint <MODELPATH.pth>
 # Ensemble model inference
 $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <MODEL2PATH.pth> ...
 ```
-
-
-
-
 
 
 
