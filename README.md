@@ -18,9 +18,9 @@
 
 
 
-# 🤓Usage
+# Usage
 
-## ✔Installation
+## Installation
 
 ```shell
 # clone repository
@@ -30,9 +30,41 @@ git clone https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you.git
 pip install -r requirments.txt
 ```
 
-## ✔Train
+## Structure
 
-### Command Line Interface
+#### Dataset
+
+```shell
+[dataset]/
+├── gt.txt
+├── tokens.txt
+└── images/
+    ├── *.jpg
+    ├── ...     
+    └── *.jpg
+```
+
+#### Code
+
+```shell
+[code]
+├── configs/ # configuration files
+├── data_tools/ # modules for dataset
+├── networks/ # modules for model architecture
+├── postprocessing/ # modules for postprocessing during inference
+├── schedulers/ # scheduler for learning rate, teacher forcing ratio
+├── utils/ # useful utilities
+├── inference_modules/ # modules for inference
+├── train_modules/ # modules for train
+├── README.md
+├── requirements.txt
+├── train.py
+└── inference.py
+```
+
+## Command Line Interface
+
+### Train
 
 ##### 단일 옵티마이저 활용 학습
 
@@ -68,9 +100,9 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 
 ##### `exp_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용할 실험명
 
-## ✔Inference
 
-### Command Line interface
+
+### Inference
 
 ##### 단일 모델 추론
 
@@ -110,6 +142,10 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 ##### `decoding_manager (bool)`: DecodingManager 사용 여부
 
+##### `tokens_path (str)`: 토큰 파일 경로
+
+- ***NOTE.*** DecodingManager를 사용할 경우에만 활용됩니다.
+
 ##### `max_cache (int)`: 앙상블(`'ensemble'`) 추론 시 인코더 추론 결과를 임시 저장할 배치 수
 
 - ***NOTE.*** 높은 값을 지정할 수록 추론 속도가 빨라지만, 일시적으로 많은 저장 공간을 차지합니다.
@@ -120,20 +156,3 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 
 
-### ✔Structure
-
-```shell
-[folder]
-├── configs/ # configuration files
-├── data_tools/ # modules for dataset
-├── networks/ # modules for model architecture
-├── postprocessing/ # modules for postprocessing during inference
-├── schedulers/ # scheduler for learning rate, teacher forcing ratio
-├── utils/ # useful utilities
-├── inference_modules/ # modules for inference
-├── train_modules/ # modules for train
-├── README.md
-├── requirements.txt
-├── train.py
-└── inference.py
-```
