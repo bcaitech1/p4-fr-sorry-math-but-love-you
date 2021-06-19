@@ -38,6 +38,11 @@ class ShallowCNN(nn.Module):
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
+        self.conv3 = nn.Conv2d(hidden_size, hidden_size, 3, bias=False, padding=1)
+        self.batch_norm3 = nn.BatchNorm2d(hidden_size)
+        self.relu3 = nn.ReLU()
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
+
         torch.nn.init.xavier_normal_(self.conv0.weight)
         torch.nn.init.xavier_normal_(self.conv1.weight)
         torch.nn.init.xavier_normal_(self.conv2.weight)
@@ -57,6 +62,11 @@ class ShallowCNN(nn.Module):
         x = self.batch_norm2(x)
         x = self.relu2(x)
         x = self.pool2(x)
+
+        x = self.conv3(x)
+        x = self.batch_norm3(x)
+        x = self.relu3(x)
+        x = self.pool3(x)
         return x  # (batch, hidden_size, h/8, w/8)
 
 class PositionalEncoding(nn.Module):
@@ -269,7 +279,7 @@ class SATRNEncoder(nn.Module):
         super(SATRNEncoder, self).__init__()
         self.shallow_cnn = ShallowCNN(input_channel, hidden_size)
         self.positional_encoding = PositionalEncoding(
-            hidden_size, h=input_height // 8, w=input_width // 8, dropout=dropout_rate
+            hidden_size, h=input_height // 16, w=input_width // 16, dropout=dropout_rate
         )
         self.attention_layers = nn.ModuleList(
             [

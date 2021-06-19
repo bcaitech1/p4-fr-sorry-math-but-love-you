@@ -18,9 +18,9 @@ SPECIAL_TOKENS = [START, END, PAD]
 class LoadDataset(Dataset):
     def __init__(
         self,
-        groundtruth,
-        tokens_file,
-        crop=False,
+        groundtruth: str,
+        tokens_file: str,
+        crop: bool = False,
         preprocessing=True,
         transform=None,
         rgb=3,
@@ -154,6 +154,7 @@ class DecoderDataset(Dataset):
     """앙상블 과정 중 디코딩에 활용되는 디코더 데이터셋
     인코더를 거쳐 임시폴더에 저장된 텐서를 불러옴
     """
+
     def __init__(self, tmp_dir: str):
         self.paths = sorted(glob(os.path.join(tmp_dir, "*")))
 

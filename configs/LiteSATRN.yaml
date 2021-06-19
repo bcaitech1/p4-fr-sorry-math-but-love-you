@@ -1,7 +1,7 @@
 network: LiteSATRN
 input_size:
-  height: 256
-  width: 512
+  height: 128
+  width: 256
 SATRN:
   encoder:
     hidden_dim: 256
@@ -10,9 +10,9 @@ SATRN:
     head_num: 4
   decoder:
     src_dim: 256
-    hidden_dim: 256
-    filter_dim: 256
-    layer_num: 1
+    hidden_dim: 128
+    filter_dim: 512
+    layer_num: 2
     head_num: 4
 checkpoint: ""
 prefix: "./log/litesatrn-noteacher"

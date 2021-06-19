@@ -106,3 +106,80 @@ def compose_test_dataloader(
         collate_fn=collate_eval_batch,
     )
     return test_dataloader
+
+
+def get_distillation_dataset_loader(
+    student_options,
+    teacher_options,
+    student_transform,
+    teacher_transform,
+    valid_transform,
+    fold: int,
+) -> Tuple[DataLoader, DataLoader, DataLoader, Dataset, Dataset, Dataset]:
+
+    # Read data
+    train_data, valid_data = [], []
+
+    for path in student_options.data.train:
+        train, valid = split_gt(path, fold)
+        train_data += train
+        valid_data += valid
+
+    # Load data
+    student_dataset = LoadDataset(
+        train_data,
+        student_options.data.token_paths,
+        crop=student_options.data.crop,
+        transform=student_transform,  # NOTE
+        rgb=student_options.data.rgb,
+    )
+    teacher_dataset = LoadDataset(
+        train_data,
+        teacher_options.data.token_paths,
+        crop=teacher_options.data.crop,
+        transform=teacher_transform,  # NOTE
+        rgb=teacher_options.data.rgb,
+    )
+    valid_dataset = LoadDataset(
+        valid_data,
+        student_options.data.token_paths,
+        crop=student_options.data.crop,
+        transform=valid_transform,
+        rgb=student_options.data.rgb,
+    )
+    student_loader = DataLoader(
+        student_dataset,
+        batch_size=student_options.batch_size,
+        shuffle=True,
+        num_workers=student_options.num_workers,
+        collate_fn=collate_batch,
+        drop_last=True,
+        pin_memory=True,
+    )
+    teacher_loader = DataLoader(
+        teacher_dataset,
+        batch_size=student_options.batch_size,
+        shuffle=True,
+        num_workers=teacher_options.num_workers,
+        collate_fn=collate_batch,
+        drop_last=True,
+        pin_memory=True,
+    )
+    valid_loader = DataLoader(
+        valid_dataset,
+        batch_size=128,
+        shuffle=False,
+        num_workers=student_options.num_workers,
+        collate_fn=collate_batch,
+        drop_last=True,
+        pin_memory=True,
+    )
+
+    return (
+        student_loader,
+        teacher_loader,
+        valid_loader,
+        student_dataset,
+        teacher_dataset,
+        valid_dataset,
+    )
