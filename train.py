@@ -17,16 +17,16 @@ if __name__ == '__main__':
         """
     )
     parser.add_argument(
-        '--project_name', default=None, help="Weight & Bias에 표시될 프로젝트명"
+        '--project_name', default='Distillation', help="Weight & Bias에 표시될 프로젝트명"
     )
     parser.add_argument(
         "--exp_name",
-        default=None,
+        default='LiteSATRN-NoTeacher',
         help="Weight & Bias에 표시될 실험명",
     )
     parser.add_argument(
         "--config_file",
-        default="./configs/EfficientSATRN.yaml",
+        default="./configs/LiteSATRN.yaml",
         type=str,
         help="모델 configuration 파일 경로",
     )

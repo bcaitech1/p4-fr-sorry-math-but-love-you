@@ -353,7 +353,7 @@ def main(parser):
         print(
             "[+] Teacher Forcing\n",
             "Type: Arctan\n",
-            f"Steps: {total_steps}\n"
+            f"Steps: {total_steps}\n",
             f"TF-MAX: {options.teacher_forcing_ratio.tf_max}\n",
             f"TF-MIN: {options.teacher_forcing_ratio.tf_min}\n",
         )
