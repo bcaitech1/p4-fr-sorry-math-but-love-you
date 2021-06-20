@@ -4,15 +4,15 @@
 
 # Contents
 
-#### &nbsp;&nbsp;**[🧐Task Description](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#task-description-1)**
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[🧐Task Description](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#task-description-1)**
 
-#### &nbsp;&nbsp;**[🏆Project Result](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#project-result-1)**
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[🏆Project Result](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#project-result-1)**
 
-#### &nbsp;&nbsp;**[⚙Installation](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#installation-1)**
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[⚙Installation](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#installation-1)**
 
-#### &nbsp;&nbsp;**[🕹Command Line Interface](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#command-line-interface-1)**
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[🕹Command Line Interface](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#command-line-interface-1)**
 
-#### &nbsp;&nbsp;**[👩‍👦‍👦Who Are We?](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#who-are-we-team-smbly)**
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[👩‍👦‍👦Who Are We?](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#who-are-we-1)**
 
 # Task Description
 
