@@ -56,8 +56,7 @@ def loss_fn_kd(
 
 
 def _train_one_epoch(
-    student_loader,
-    teacher_loader,
+    distillation_loader,
     student_model,
     teacher_model,
     epoch_text,
@@ -82,14 +81,14 @@ def _train_one_epoch(
 
     with tqdm(
         desc=f"{epoch_text} Train",
-        total=len(student_loader.dataset),
+        total=len(distillation_loader.dataset),
         dynamic_ncols=True,
         leave=False,
     ) as pbar:
-        for d_student, d_teacher in zip(student_loader, teacher_loader):
-            student_input = d_student["image"].to(device).float()
-            expected = d_student["truth"]["encoded"].to(device)
-            expected[expected == -1] = student_loader.dataset.token_to_id[PAD]
+        for d in distillation_loader:
+            student_input = d["student_image"].to(device).float()
+            expected = d["truth"]["encoded"].to(device)
+            expected[expected == -1] = distillation_loader.dataset.token_to_id[PAD]
             tf_ratio = tf_scheduler.step()  # Teacher Forcing Scheduler
             curr_batch_size = len(student_input)
 
@@ -106,7 +105,7 @@ def _train_one_epoch(
 
             # get teacher output
             with torch.no_grad():
-                teacher_input = d_teacher["image"].to(device).float()
+                teacher_input = d["teacher_image"].to(device).float()
                 teacher_output = teacher_model(
                     teacher_input, expected, False, 0.0
                 )  # [B, MAX_LEN, VOCAB_SIZE]
@@ -130,9 +129,9 @@ def _train_one_epoch(
             optimizer.step()
             losses.append(loss.item())
 
-            expected[expected == student_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, student_loader, do_eval=1)
-            sequence_str = id_to_string(sequence, student_loader, do_eval=1)
+            expected[expected == distillation_loader.dataset.token_to_id[PAD]] = -1
+            expected_str = id_to_string(expected, distillation_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, distillation_loader, do_eval=1)
             wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
             sent_acc += sentence_acc(sequence_str, expected_str)
@@ -159,8 +158,8 @@ def _train_one_epoch(
                         }
                     )
 
-    expected = id_to_string(expected, student_loader)
-    sequence = id_to_string(sequence, student_loader)
+    expected = id_to_string(expected, distillation_loader)
+    sequence = id_to_string(sequence, distillation_loader)
 
     result = {
         "loss": np.mean(losses),
@@ -309,7 +308,7 @@ def main(parser):
         student_options.input_size.width,
     )
 
-    student_loader, teacher_loader, valid_loader = get_distillation_dataloaders(
+    distillation_loader, valid_loader = get_distillation_dataloaders(
         student_options=student_options,
         teacher_options=teacher_options,
         student_transform=student_transform,
@@ -319,9 +318,9 @@ def main(parser):
     )
     print(
         "[+] Data\n",
-        "The number of train samples : {}\n".format(len(student_loader.dataset)),
+        "The number of train samples : {}\n".format(len(distillation_loader.dataset)),
         "The number of validation samples : {}\n".format(len(valid_loader.dataset)),
-        "The number of classes : {}\n".format(len(student_loader.dataset.token_to_id)),
+        "The number of classes : {}\n".format(len(distillation_loader.dataset.token_to_id)),
     )
 
     # define model
@@ -330,7 +329,7 @@ def main(parser):
         FLAGS=student_options,
         model_checkpoint=model_checkpoint,
         device=device,
-        dataset=student_loader.dataset,
+        dataset=distillation_loader.dataset,
     )
     student_model.train()
     criterion = student_model.criterion
@@ -340,7 +339,7 @@ def main(parser):
         FLAGS=teacher_options,
         model_checkpoint=teacher_ckpt["model"],
         device=device,
-        dataset=student_loader.dataset,
+        dataset=distillation_loader.dataset,
     )
     teacher_model.eval()
 
@@ -382,7 +381,7 @@ def main(parser):
         # T_up: 한 주기 내에서 warm-up을 할 스텝 수
         # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
-        total_steps = len(student_loader) * student_options.num_epochs  # 전체 스텝 수
+        total_steps = len(distillation_loader) * student_options.num_epochs  # 전체 스텝 수
         t_0 = total_steps // 1  # 주기를 1로 설정
         t_up = int(
             t_0 * student_options.scheduler.warmup_ratio
@@ -433,7 +432,7 @@ def main(parser):
         elif student_options.scheduler.scheduler == "Cycle":
             for param_group in optimizer.param_groups:
                 param_group["initial_lr"] = student_options.optimizer.lr
-            cycle = len(student_loader) * student_options.num_epochs
+            cycle = len(distillation_loader) * student_options.num_epochs
             lr_scheduler = CircularLRBeta(
                 optimizer, student_options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
@@ -476,8 +475,7 @@ def main(parser):
         )
 
         train_result = _train_one_epoch(
-            student_loader=student_loader,
-            teacher_loader=teacher_loader,
+            distillation_loader=distillation_loader,
             student_model=student_model,
             teacher_model=teacher_model,
             epoch_text=epoch_text,
