@@ -2,7 +2,17 @@
 
 <div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/logo2.png?raw=true /></div>
 
+# INDEX
 
+##### **[🧐Task Description](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#task-description)**
+
+##### **[🏆Project Result](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#project-result)**
+
+##### **[⚙Installation](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#installation)**
+
+##### **[🕹Command Line Interface](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#command-line-interface)**
+
+##### **[👩‍👦‍👦Who Are We?](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#team-smbly)**
 
 # Task Description
 
@@ -196,7 +206,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 
 
-# Team SMBLY
+# Who Are WE: Team SMBLY
 
 - 고지형
 - 김준철
