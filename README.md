@@ -10,7 +10,7 @@
 
 본 대회의 주제는 수식 이미지를 [LaTex](https://ko.wikipedia.org/wiki/LaTeX) 포맷의 텍스트로 변환하는 문제였습니다. LaTex은 논문 및 기술 문서 작성 포맷으로, 자연 과학 분야에서 널리 사용됩니다. 일반적인 광학 문자 인식(optical character recognition)과 달리 수식인식은 multi-line recognition을 필요로 합니다.
 
-<div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro.png?raw=true /></div>
+![](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro1_2.png?raw=true)
 
 
 
@@ -47,7 +47,7 @@
 
 * 수식 인식 결과 예시
 
-<div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example.png?raw=true /></div>
+![](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example1_2.png?raw=true)
 
   
 
