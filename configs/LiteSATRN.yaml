@@ -15,7 +15,7 @@ SATRN:
     layer_num: 2
     head_num: 4
 checkpoint: ""
-prefix: "./log/litesatrn-noteacher"
+prefix: "./log/litesatrn-yesteacher"
 
 data:
   train:

@@ -46,7 +46,7 @@ os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
 
-def loss_fn_kd(outputs, labels, teacher_outputs, T=5, alpha=0.1): # NOTE: popular choice - 0.9*CE + 0.1*KD
+def loss_fn_kd(outputs, labels, teacher_outputs, T=10, alpha=0.1): # NOTE: popular choice - 0.9*CE + 0.1*KD
     KD_loss = nn.KLDivLoss(reduction="batchmean")(
         F.log_softmax(outputs / T, dim=1), F.softmax(teacher_outputs / T, dim=1)
     ) * (alpha * T * T) + F.cross_entropy(outputs, labels) * (1.0 - alpha)
@@ -553,15 +553,15 @@ def main(parser):
                     "validation_wer": validation_wer,
                     "lr": epoch_lr,
                     "grad_norm": grad_norms,
-                    "model": model.state_dict(),
+                    "model": student_model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "configs": option_dict,
-                    "token_to_id": train_data_loader.dataset.token_to_id,
-                    "id_to_token": train_data_loader.dataset.id_to_token,
-                    "network": options.network,
+                    "token_to_id": student_loader.dataset.token_to_id,
+                    "id_to_token": student_loader.dataset.id_to_token,
+                    "network": student_options.network,
                     "scheduler": lr_scheduler.state_dict(),
                 },
-                prefix=options.prefix,
+                prefix=student_options.prefix,
             )
             best_score = final_metric(
                 sentence_acc=validation_epoch_sentence_accuracy,
@@ -573,7 +573,7 @@ def main(parser):
         # Summary
         elapsed_time = time.time() - start_time
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
-        if epoch % options.print_epochs == 0 or epoch == options.num_epochs - 1:
+        if epoch % student_options.print_epochs == 0 or epoch == student_options.num_epochs - 1:
             output_string = (
                 "{epoch_text}: "
                 "Train Symbol Accuracy = {train_symbol_accuracy:.5f}, "
