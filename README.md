@@ -99,19 +99,25 @@ pip install -r requirments.txt
 
 ## Train
 
-#### 단일 옵티마이저 활용 학습
+#### Train model with single optimizer
 
 ```shell
 $ python train.py --train_type single_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-#### 인코더와 디코더에 옵티마이저를 개별 부여한 학습
+#### Train model with two individual optimizers for encoder and decoder
 
 ```shell
 $ python train.py --train_type dual_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-#### Weight & Bias 로깅 툴을 활용한 학습
+#### Knowledge Distillation Training
+
+```shell
+$ python train.py --train_type distillation --config_file './configs/LiteSATRN.yaml' --teacher_ckpt 'TEACHER-MODEL_CKPT_PATH'
+```
+
+#### Train model with Weight & Bias logging tool
 
 ```shell
 $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_name <EXPNAME> --config_file './configs/EfficientSATRN.yaml'
@@ -123,11 +129,14 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 
 * `'single_opt'`: 단일 optimizer를 활용한 학습을 진행합니다.
 * `'dual_opt'`: 인코더, 디코더에 optimizer가 개별 부여된 학습을 진행합니다.
+* `'distillation'`: Knowledge Distillation 학습을 진행합니다.
 
 ##### `config_file (str)`: 학습 모델의 configuration 파일 경로
 
 - 모델 configuration은 아키텍처별로 상이하며, [이곳](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/configs/EfficientASTER.yaml)에서 해당 예시를 보실 수 있습니다.
 - 학습 가능한 모델은 ***[EfficientSATRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientSATRN.py#L664)***, ***[EfficientASTER](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientASTER.py#L333)***, ***[SwinTRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/SWIN.py#L1023)***입니다.
+
+##### `teacher_ckpt (str)`: Knowledge Distillation 학습 시 불러올 Teacher 모델 checkpoint 경로
 
 ##### `project_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용할 프로젝트명
 
