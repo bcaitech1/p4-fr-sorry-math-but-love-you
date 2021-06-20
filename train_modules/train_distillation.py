@@ -10,8 +10,8 @@ import multiprocessing
 import numpy as np
 import torch
 from torch import nn, optim
+import torch.nn.functional as F
 from torchvision import transforms
-from torch.cuda.amp import autocast, GradScaler
 import wandb
 from utils import (
     default_checkpoint,
@@ -27,7 +27,14 @@ from utils import (
     get_timestamp,
     load_vocab,
 )
-from data import get_train_transforms, get_valid_transforms, dataset_loader, START, PAD
+from data import (
+    get_train_transforms,
+    get_valid_transforms,
+    dataset_loader,
+    START,
+    PAD,
+    get_distillation_dataloaders,
+)
 from schedulers import (
     CircularLRBeta,
     CustomCosineAnnealingWarmUpRestarts,
@@ -39,21 +46,29 @@ os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
 
+def loss_fn_kd(
+    outputs, labels, teacher_outputs, T=10, alpha=0.1
+):  # NOTE: popular choice - 0.9*CE + 0.1*KD
+    KD_loss = nn.KLDivLoss(reduction="batchmean")(
+        F.log_softmax(outputs / T, dim=1), F.softmax(teacher_outputs / T, dim=1)
+    ) * (alpha * T * T) + F.cross_entropy(outputs, labels) * (1.0 - alpha)
+    return KD_loss
+
+
 def _train_one_epoch(
-    data_loader,
-    model,
+    distillation_loader,
+    student_model,
+    teacher_model,
     epoch_text,
-    criterion,
     optimizer,
     lr_scheduler,
     max_grad_norm,
     device,
-    scaler,
     tf_scheduler,
-    is_logging: bool
+    is_logging: bool,
 ):
     torch.set_grad_enabled(True)
-    model.train()
+    student_model.train()
 
     losses = []
     grad_norms = []
@@ -66,24 +81,41 @@ def _train_one_epoch(
 
     with tqdm(
         desc=f"{epoch_text} Train",
-        total=len(data_loader.dataset),
+        total=len(distillation_loader.dataset),
         dynamic_ncols=True,
         leave=False,
     ) as pbar:
-        for d in data_loader:
-            input = d["image"].to(device).float()
-            tf_ratio = tf_scheduler.step()  # Teacher Forcing Scheduler
-            curr_batch_size = len(input)
+        for d in distillation_loader:
+            student_input = d["student_image"].to(device).float()
             expected = d["truth"]["encoded"].to(device)
-            expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
+            expected[expected == -1] = distillation_loader.dataset.token_to_id[PAD]
+            tf_ratio = tf_scheduler.step()  # Teacher Forcing Scheduler
+            curr_batch_size = len(student_input)
 
-            output = model(input, expected, True, tf_ratio)  # [B, MAX_LEN, VOCAB_SIZE]
-
-            decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
-            _, sequence = torch.topk(decoded_values, k=1, dim=1)  # [B, 1, MAX_LEN]
+            student_output = student_model(
+                student_input, expected, True, tf_ratio
+            )  # [B, MAX_LEN, VOCAB_SIZE]
+            student_decoded_values = student_output.transpose(
+                1, 2
+            )  # [B, VOCAB_SIZE, MAX_LEN]
+            _, sequence = torch.topk(
+                student_decoded_values, k=1, dim=1
+            )  # [B, 1, MAX_LEN]
             sequence = sequence.squeeze(1)  # [B, MAX_LEN]
 
-            loss = criterion(decoded_values, expected[:, 1:])  # [SOS] 이후부터
+            # get teacher output
+            with torch.no_grad():
+                teacher_input = d["teacher_image"].to(device).float()
+                teacher_output = teacher_model(
+                    teacher_input, expected, False, 0.0
+                )  # [B, MAX_LEN, VOCAB_SIZE]
+                teacher_decoded_values = teacher_output.transpose(1, 2)
+
+            loss = loss_fn_kd(
+                outputs=student_decoded_values,
+                labels=expected[:, 1:],
+                teacher_outputs=teacher_decoded_values,
+            )
             optim_params = [
                 p
                 for param_group in optimizer.param_groups
@@ -91,16 +123,15 @@ def _train_one_epoch(
             ]
             optimizer.zero_grad()
             loss.backward()
-
             grad_norm = nn.utils.clip_grad_norm_(optim_params, max_norm=max_grad_norm)
             grad_norms.append(grad_norm)
 
             optimizer.step()
             losses.append(loss.item())
 
-            expected[expected == data_loader.dataset.token_to_id[PAD]] = -1
-            expected_str = id_to_string(expected, data_loader, do_eval=1)
-            sequence_str = id_to_string(sequence, data_loader, do_eval=1)
+            expected[expected == distillation_loader.dataset.token_to_id[PAD]] = -1
+            expected_str = id_to_string(expected, distillation_loader, do_eval=1)
+            sequence_str = id_to_string(sequence, distillation_loader, do_eval=1)
             wer += word_error_rate(sequence_str, expected_str)
             num_wer += 1
             sent_acc += sentence_acc(sequence_str, expected_str)
@@ -121,11 +152,14 @@ def _train_one_epoch(
                     )
                 else:
                     wandb.log(
-                        {"learning_rate": lr_scheduler.get_lr()[0], "tf_ratio": tf_ratio}
+                        {
+                            "learning_rate": lr_scheduler.get_lr()[0],
+                            "tf_ratio": tf_ratio,
+                        }
                     )
 
-    expected = id_to_string(expected, data_loader)
-    sequence = id_to_string(sequence, data_loader)
+    expected = id_to_string(expected, distillation_loader)
+    sequence = id_to_string(sequence, distillation_loader)
 
     result = {
         "loss": np.mean(losses),
@@ -156,8 +190,6 @@ def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
     sent_acc = 0
     num_sent_acc = 0
 
-    NO_TEACHER_FORCING = 0.0
-
     with torch.no_grad():
         with tqdm(
             desc=f"{epoch_text} Validation",
@@ -172,7 +204,7 @@ def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
                 expected = d["truth"]["encoded"].to(device)
 
                 expected[expected == -1] = data_loader.dataset.token_to_id[PAD]
-                output = model(input, expected, False, NO_TEACHER_FORCING)
+                output = model(input, expected, False, 0.0)
 
                 decoded_values = output.transpose(1, 2)  # [B, VOCAB_SIZE, MAX_LEN]
                 _, sequence = torch.topk(
@@ -214,97 +246,114 @@ def _valid_one_epoch(data_loader, model, epoch_text, criterion, device):
 
 def main(parser):
     config_file = parser.config_file
-    options = Flags(config_file).get()
+    teacher_ckpt = load_checkpoint(parser.teacher_ckpt)
+
+    student_options = Flags(config_file).get()
+    teacher_options = Flags(teacher_ckpt["configs"]).get()
+
     is_logging = True if parser.project_name is not None else False
 
     # set random seed
-    set_seed(seed=options.seed)
+    set_seed(seed=student_options.seed)
 
     is_cuda = torch.cuda.is_available()
     hardware = "cuda" if is_cuda else "cpu"
     device = torch.device(hardware)
     print("--------------------------------")
-    print("Running {} on device {}\n".format(options.network, device))
+    print("Running {} on device {}\n".format(student_options.network, device))
 
     # Print system environments
     print_system_envs()
 
     # Load checkpoint and print result
-    checkpoint = (
-        load_checkpoint(options.checkpoint, cuda=is_cuda)
-        if options.checkpoint != ""
+    student_ckpt = (
+        load_checkpoint(student_options.checkpoint, cuda=is_cuda)
+        if student_options.checkpoint != ""
         else default_checkpoint
     )
 
-    model_checkpoint = checkpoint["model"]
+    model_checkpoint = student_ckpt["model"]
     if model_checkpoint:
         print(
             "[+] Checkpoint\n",
-            "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
+            "Resuming from epoch : {}\n".format(student_ckpt["epoch"]),
             "Train Symbol Accuracy : {:.5f}\n".format(
-                checkpoint["train_symbol_accuracy"][-1]
+                student_ckpt["train_symbol_accuracy"][-1]
             ),
             "Train Sentence Accuracy : {:.5f}\n".format(
-                checkpoint["train_sentence_accuracy"][-1]
+                student_ckpt["train_sentence_accuracy"][-1]
             ),
-            "Train WER : {:.5f}\n".format(checkpoint["train_wer"][-1]),
-            "Train Loss : {:.5f}\n".format(checkpoint["train_losses"][-1]),
+            "Train WER : {:.5f}\n".format(student_ckpt["train_wer"][-1]),
+            "Train Loss : {:.5f}\n".format(student_ckpt["train_losses"][-1]),
             "Validation Symbol Accuracy : {:.5f}\n".format(
-                checkpoint["validation_symbol_accuracy"][-1]
+                student_ckpt["validation_symbol_accuracy"][-1]
             ),
             "Validation Sentence Accuracy : {:.5f}\n".format(
-                checkpoint["validation_sentence_accuracy"][-1]
+                student_ckpt["validation_sentence_accuracy"][-1]
             ),
-            "Validation WER : {:.5f}\n".format(checkpoint["validation_wer"][-1]),
-            "Validation Loss : {:.5f}\n".format(checkpoint["validation_losses"][-1]),
+            "Validation WER : {:.5f}\n".format(student_ckpt["validation_wer"][-1]),
+            "Validation Loss : {:.5f}\n".format(student_ckpt["validation_losses"][-1]),
         )
 
-    (
-        train_data_loader,
-        validation_data_loader,
-        train_dataset,
-        valid_dataset,
-    ) = dataset_loader(
-        options,
-        train_transform=get_train_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-        valid_transform=get_valid_transforms(
-            options.input_size.height, options.input_size.width
-        ),
-        fold=options.data.fold,
+    student_transform = get_train_transforms(
+        student_options.input_size.height,
+        student_options.input_size.width,
+    )
+    teacher_transform = get_train_transforms(
+        teacher_options.input_size.height,
+        teacher_options.input_size.width,
+    )
+    valid_transform = get_valid_transforms(
+        student_options.input_size.height,
+        student_options.input_size.width,
+    )
+
+    distillation_loader, valid_loader = get_distillation_dataloaders(
+        student_options=student_options,
+        teacher_options=teacher_options,
+        student_transform=student_transform,
+        teacher_transform=teacher_transform,
+        valid_transform=valid_transform,
+        fold=student_options.data.fold,
     )
     print(
         "[+] Data\n",
-        "The number of train samples : {}\n".format(len(train_dataset)),
-        "The number of validation samples : {}\n".format(len(valid_dataset)),
-        "The number of classes : {}\n".format(len(train_dataset.token_to_id)),
+        "The number of train samples : {}\n".format(len(distillation_loader.dataset)),
+        "The number of validation samples : {}\n".format(len(valid_loader.dataset)),
+        "The number of classes : {}\n".format(len(distillation_loader.dataset.token_to_id)),
     )
 
     # define model
-    model = get_network(
-        options.network,
-        options,
-        model_checkpoint,
-        device,
-        train_dataset,
+    student_model = get_network(
+        model_type=student_options.network,
+        FLAGS=student_options,
+        model_checkpoint=model_checkpoint,
+        device=device,
+        dataset=distillation_loader.dataset,
     )
-    model.train()
+    student_model.train()
+    criterion = student_model.criterion
 
-    # define loss
-    criterion = model.criterion.to(device)
+    teacher_model = get_network(
+        model_type=teacher_options.network,
+        FLAGS=teacher_options,
+        model_checkpoint=teacher_ckpt["model"],
+        device=device,
+        dataset=distillation_loader.dataset,
+    )
+    teacher_model.eval()
 
     # define optimizer
     enc_params_to_optimise = [
-        param for param in model.encoder.parameters() if param.requires_grad
+        param for param in student_model.encoder.parameters() if param.requires_grad
     ]
     dec_params_to_optimise = [
-        param for param in model.decoder.parameters() if param.requires_grad
+        param for param in student_model.decoder.parameters() if param.requires_grad
     ]
     params_to_optimise = [*enc_params_to_optimise, *dec_params_to_optimise]
     print(
         "[+] Network\n",
-        "Type: {}\n".format(options.network),
+        "Type: {}\n".format(student_options.network),
         "Encoder parameters: {}\n".format(
             sum(p.numel() for p in enc_params_to_optimise),
         ),
@@ -314,14 +363,14 @@ def main(parser):
     )
 
     # Get optimizer and optimizer
-    if options.scheduler.scheduler == "CustomCosine":
+    if student_options.scheduler.scheduler == "CustomCosine":
         optimizer = get_optimizer(
-            options.optimizer.optimizer,
+            student_options.optimizer.optimizer,
             params_to_optimise,
             lr=0,
-            weight_decay=options.optimizer.weight_decay,
+            weight_decay=student_options.optimizer.weight_decay,
         )
-        optimizer_state = checkpoint.get("optimizer")
+        optimizer_state = student_ckpt.get("optimizer")
         if optimizer_state:
             optimizer.load_state_dict(optimizer_state)
 
@@ -332,111 +381,110 @@ def main(parser):
         # T_up: 한 주기 내에서 warm-up을 할 스텝 수
         # gamma: 주기 반복마다 주기 진폭을 gamma배로 바꿈
 
-        total_steps = len(train_data_loader) * options.num_epochs  # 전체 스텝 수
+        total_steps = len(distillation_loader) * student_options.num_epochs  # 전체 스텝 수
         t_0 = total_steps // 1  # 주기를 1로 설정
-        t_up = int(t_0 * options.scheduler.warmup_ratio)  # 한 주기에서 10%의 스텝을 warm-up으로 사용
+        t_up = int(
+            t_0 * student_options.scheduler.warmup_ratio
+        )  # 한 주기에서 10%의 스텝을 warm-up으로 사용
 
         lr_scheduler = CustomCosineAnnealingWarmUpRestarts(
             optimizer,
             T_0=t_0,
             T_mult=1,
-            eta_max=options.optimizer.lr,
+            eta_max=student_options.optimizer.lr,
             T_up=t_up,
             gamma=0.8,
         )
 
         tf_scheduler = TeacherForcingScheduler(
             num_steps=total_steps,
-            tf_max=options.teacher_forcing_ratio.tf_max,
-            tf_min=options.teacher_forcing_ratio.tf_min,
+            tf_max=student_options.teacher_forcing_ratio.tf_max,
+            tf_min=student_options.teacher_forcing_ratio.tf_min,
         )
         print(
             "[+] Teacher Forcing\n",
             "Type: Arctan\n",
             f"Steps: {total_steps}\n",
-            f"TF-MAX: {options.teacher_forcing_ratio.tf_max}\n",
-            f"TF-MIN: {options.teacher_forcing_ratio.tf_min}\n",
+            f"TF-MAX: {student_options.teacher_forcing_ratio.tf_max}\n",
+            f"TF-MIN: {student_options.teacher_forcing_ratio.tf_min}\n",
         )
 
     else:
         optimizer = get_optimizer(
-            options.optimizer.optimizer,
+            student_options.optimizer.optimizer,
             params_to_optimise,
-            lr=options.optimizer.lr,
-            weight_decay=options.optimizer.weight_decay,
+            lr=student_options.optimizer.lr,
+            weight_decay=student_options.optimizer.weight_decay,
         )
-        optimizer_state = checkpoint.get("optimizer")
+        optimizer_state = student_ckpt.get("optimizer")
         if optimizer_state:
             optimizer.load_state_dict(optimizer_state)
-        if options.scheduler.scheduler == "ReduceLROnPlateau":
+        if student_options.scheduler.scheduler == "ReduceLROnPlateau":
             lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, patience=options.schduler.patience
+                optimizer, patience=student_options.schduler.patience
             )
-        elif options.scheduler.scheduler == "StepLR":
+        elif student_options.scheduler.scheduler == "StepLR":
             lr_scheduler = optim.lr_scheduler.StepLR(
                 optimizer,
-                step_size=options.optimizer.lr_epochs,
-                gamma=options.optimizer.lr_factor,
+                step_size=student_options.optimizer.lr_epochs,
+                gamma=student_options.optimizer.lr_factor,
             )
-        elif options.scheduler.scheduler == "Cycle":
+        elif student_options.scheduler.scheduler == "Cycle":
             for param_group in optimizer.param_groups:
-                param_group["initial_lr"] = options.optimizer.lr
-            cycle = len(train_data_loader) * options.num_epochs
+                param_group["initial_lr"] = student_options.optimizer.lr
+            cycle = len(distillation_loader) * student_options.num_epochs
             lr_scheduler = CircularLRBeta(
-                optimizer, options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
+                optimizer, student_options.optimizer.lr, 10, 10, cycle, [0.95, 0.85]
             )
-    if checkpoint["scheduler"]:
-        lr_scheduler.load_state_dict(checkpoint["scheduler"])
+    if student_ckpt["scheduler"]:
+        lr_scheduler.load_state_dict(student_ckpt["scheduler"])
 
     # Log for W&B
     if is_logging:
-        wandb.config.update(dict(options._asdict()))  # logging to W&B
+        wandb.config.update(dict(student_options._asdict()))  # logging to W&B
 
-    if not os.path.exists(options.prefix):
-        os.makedirs(options.prefix)
-    log_file = open(os.path.join(options.prefix, "log.txt"), "w")
-    shutil.copy(config_file, os.path.join(options.prefix, "train_config.yaml"))
-    if options.print_epochs is None:
-        options.print_epochs = options.num_epochs
-    start_epoch = checkpoint["epoch"]
-    train_symbol_accuracy = checkpoint["train_symbol_accuracy"]
-    train_sentence_accuracy = checkpoint["train_sentence_accuracy"]
-    train_wer = checkpoint["train_wer"]
-    train_losses = checkpoint["train_losses"]
-    validation_symbol_accuracy = checkpoint["validation_symbol_accuracy"]
-    validation_sentence_accuracy = checkpoint["validation_sentence_accuracy"]
-    validation_wer = checkpoint["validation_wer"]
-    validation_losses = checkpoint["validation_losses"]
-    learning_rates = checkpoint["lr"]
-    grad_norms = checkpoint["grad_norm"]
-
-    scaler = GradScaler()
+    if not os.path.exists(student_options.prefix):
+        os.makedirs(student_options.prefix)
+    log_file = open(os.path.join(student_options.prefix, "log.txt"), "w")
+    shutil.copy(config_file, os.path.join(student_options.prefix, "train_config.yaml"))
+    if student_options.print_epochs is None:
+        student_options.print_epochs = student_options.num_epochs
+    start_epoch = student_ckpt["epoch"]
+    train_symbol_accuracy = student_ckpt["train_symbol_accuracy"]
+    train_sentence_accuracy = student_ckpt["train_sentence_accuracy"]
+    train_wer = student_ckpt["train_wer"]
+    train_losses = student_ckpt["train_losses"]
+    validation_symbol_accuracy = student_ckpt["validation_symbol_accuracy"]
+    validation_sentence_accuracy = student_ckpt["validation_sentence_accuracy"]
+    validation_wer = student_ckpt["validation_wer"]
+    validation_losses = student_ckpt["validation_losses"]
+    learning_rates = student_ckpt["lr"]
+    grad_norms = student_ckpt["grad_norm"]
 
     best_score = 0.0
 
     # Train
-    for epoch in range(options.num_epochs):
+    for epoch in range(student_options.num_epochs):
         start_time = time.time()
 
         epoch_text = "[{current:>{pad}}/{end}] Epoch {epoch}".format(
             current=epoch + 1,
-            end=options.num_epochs,
+            end=student_options.num_epochs,
             epoch=start_epoch + epoch + 1,
-            pad=len(str(options.num_epochs)),
+            pad=len(str(student_options.num_epochs)),
         )
 
         train_result = _train_one_epoch(
-            data_loader=train_data_loader,
-            model=model,
+            distillation_loader=distillation_loader,
+            student_model=student_model,
+            teacher_model=teacher_model,
             epoch_text=epoch_text,
-            criterion=criterion,
             optimizer=optimizer,
             lr_scheduler=lr_scheduler,
-            max_grad_norm=options.max_grad_norm,
+            max_grad_norm=student_options.max_grad_norm,
             device=device,
-            scaler=scaler,
             tf_scheduler=tf_scheduler,
-            is_logging=is_logging
+            is_logging=is_logging,
         )
 
         train_losses.append(train_result["loss"])
@@ -457,8 +505,8 @@ def main(parser):
         )
         epoch_lr = lr_scheduler.get_lr()  # cycle
         validation_result = _valid_one_epoch(
-            data_loader=validation_data_loader,
-            model=model,
+            data_loader=valid_loader,
+            model=student_model,
             epoch_text=epoch_text,
             criterion=criterion,
             device=device,
@@ -502,15 +550,15 @@ def main(parser):
                     "validation_wer": validation_wer,
                     "lr": epoch_lr,
                     "grad_norm": grad_norms,
-                    "model": model.state_dict(),
+                    "model": student_model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "configs": option_dict,
-                    "token_to_id": train_data_loader.dataset.token_to_id,
-                    "id_to_token": train_data_loader.dataset.id_to_token,
-                    "network": options.network,
+                    "token_to_id": distillation_loader.dataset.token_to_id,
+                    "id_to_token": distillation_loader.dataset.id_to_token,
+                    "network": student_options.network,
                     "scheduler": lr_scheduler.state_dict(),
                 },
-                prefix=options.prefix,
+                prefix=student_options.prefix,
             )
             best_score = final_metric(
                 sentence_acc=validation_epoch_sentence_accuracy,
@@ -522,7 +570,10 @@ def main(parser):
         # Summary
         elapsed_time = time.time() - start_time
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
-        if epoch % options.print_epochs == 0 or epoch == options.num_epochs - 1:
+        if (
+            epoch % student_options.print_epochs == 0
+            or epoch == student_options.num_epochs - 1
+        ):
             output_string = (
                 "{epoch_text}: "
                 "Train Symbol Accuracy = {train_symbol_accuracy:.5f}, "
@@ -566,33 +617,3 @@ def main(parser):
                     validation_wer=validation_epoch_wer,
                     validation_score=validation_epoch_score,
                 )
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument(
-#         "--project_name", default="REFACTORING-TEST", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
-#     )
-#     parser.add_argument(
-#         "--exp_name",
-#         default="train.py - SATRN",
-#         help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
-#     )
-#     parser.add_argument(
-#         "-c",
-#         "--config_file",
-#         dest="config_file",
-#         default="./configs/EfficientSATRN.yaml",
-#         type=str,
-#         help="Path of configuration file",
-#     )
-#     parser = parser.parse_args()
-
-#     # initilaize W&B
-#     run = wandb.init(project=parser.project_name, name=parser.exp_name)
-
-#     # train
-#     main(parser.config_file)
-
-#     # fishe W&B
-#     run.finish()

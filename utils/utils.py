@@ -16,6 +16,7 @@ from networks import (
     EfficientSATRN,
     EfficientSATRN_encoder,
     EfficientSATRN_decoder,
+    LiteSATRN,
     SWIN, 
     SWIN_encoder, 
     SWIN_decoder,
@@ -46,6 +47,10 @@ def get_network(
     model = None
     if model_type == "EfficientSATRN" or model_type == "MySATRN":
         model = EfficientSATRN(
+            FLAGS, dataset, model_checkpoint, decoding_manager
+        ).to(device)
+    elif model_type == "LiteSATRN":
+        model = LiteSATRN(
             FLAGS, dataset, model_checkpoint, decoding_manager
         ).to(device)
     elif model_type == "EfficientSATRN_encoder" or model_type == "MySATRN_encoder":
