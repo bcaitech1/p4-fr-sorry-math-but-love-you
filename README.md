@@ -2,7 +2,17 @@
 
 <div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/logo2.png?raw=true /></div>
 
+# Contents
 
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[🧐Task Description](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#task-description-1)**
+
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[🏆Project Result](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#project-result-1)**
+
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[⚙Installation](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#installation-1)**
+
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[🕹Command Line Interface](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#command-line-interface-1)**
+
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[👩‍👦‍👦Who Are We?](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#who-are-we-1)**
 
 # Task Description
 
@@ -10,7 +20,7 @@
 
 본 대회의 주제는 수식 이미지를 [LaTex](https://ko.wikipedia.org/wiki/LaTeX) 포맷의 텍스트로 변환하는 문제였습니다. LaTex은 논문 및 기술 문서 작성 포맷으로, 자연 과학 분야에서 널리 사용됩니다. 일반적인 광학 문자 인식(optical character recognition)과 달리 수식인식은 multi-line recognition을 필요로 합니다.
 
-<div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro.png?raw=true /></div>
+![](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/task_intro1_2.png?raw=true)
 
 
 
@@ -47,7 +57,7 @@
 
 * 수식 인식 결과 예시
 
-<div style="text-align:center"><img src=https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example.png?raw=true /></div>
+![](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/master/images/example1_2.png?raw=true)
 
   
 
@@ -61,9 +71,7 @@ git clone https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you.git
 pip install -r requirments.txt
 ```
 
-## Structure
-
-#### Dataset
+### Dataset Structure
 
 ```shell
 [dataset]/
@@ -75,7 +83,7 @@ pip install -r requirments.txt
     └── *.jpg
 ```
 
-#### Code
+### Code Structure
 
 ```shell
 [code]
@@ -99,19 +107,25 @@ pip install -r requirments.txt
 
 ## Train
 
-#### 단일 옵티마이저 활용 학습
+#### Train with single optimizer
 
 ```shell
 $ python train.py --train_type single_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-#### 인코더와 디코더에 옵티마이저를 개별 부여한 학습
+#### Train with two optimizers for encoder and decoder
 
 ```shell
 $ python train.py --train_type dual_opt --config_file './configs/EfficientSATRN.yaml'
 ```
 
-#### Weight & Bias 로깅 툴을 활용한 학습
+#### Knowledge distillation training
+
+```shell
+$ python train.py --train_type distillation --config_file './configs/LiteSATRN.yaml' --teacher_ckpt 'TEACHER-MODEL_CKPT_PATH'
+```
+
+#### Train with Weight & Bias logging tool
 
 ```shell
 $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_name <EXPNAME> --config_file './configs/EfficientSATRN.yaml'
@@ -123,11 +137,14 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 
 * `'single_opt'`: 단일 optimizer를 활용한 학습을 진행합니다.
 * `'dual_opt'`: 인코더, 디코더에 optimizer가 개별 부여된 학습을 진행합니다.
+* `'distillation'`: Knowledge Distillation 학습을 진행합니다.
 
 ##### `config_file (str)`: 학습 모델의 configuration 파일 경로
 
 - 모델 configuration은 아키텍처별로 상이하며, [이곳](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/configs/EfficientASTER.yaml)에서 해당 예시를 보실 수 있습니다.
-- 학습 가능한 모델은 ***[EfficientSATRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientSATRN.py#L664)***, ***[EfficientASTER](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientASTER.py#L333)***, ***[SwinTRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/SWIN.py#L1023)***입니다.
+- 학습 가능한 모델은 ***[EfficientSATRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientSATRN.py#L664)***, ***[EfficientASTER](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/EfficientASTER.py#L333)***, ***[SwinTRN](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/7502ec98b49999eaf19eed3bc05a57e0d712dfde/networks/SWIN.py#L1023)***,    ***[LiteSATRN](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you/blob/3ffa06229659505fc2b4ef2ec652168b4ff7857b/networks/LiteSATRN.py#L548)*** 입니다.
+
+##### `teacher_ckpt (str)`: Knowledge Distillation 학습 시 불러올 Teacher 모델 checkpoint 경로
 
 ##### `project_name (str)`: (optional) 학습 중 [Weight & Bias](https://wandb.ai/site) 로깅 툴을 활용할 경우 사용할 프로젝트명
 
@@ -137,13 +154,13 @@ $ python train.py --train_type single_opt --project_name <PROJECTNAME> --exp_nam
 
 ## Inference
 
-#### 단일 모델 추론
+#### Inference with single model
 
 ```shell
 $ python inference.py --inference_type single --checkpoint <MODELPATH.pth>
 ```
 
-#### 앙상블 모델 추론
+#### Ensemble inference
 
 ```shell
 $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <MODEL2PATH.pth> ...
@@ -189,7 +206,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 
 
-# Team SMBLY
+# Who Are We?
 
 - 고지형
 - 김준철
