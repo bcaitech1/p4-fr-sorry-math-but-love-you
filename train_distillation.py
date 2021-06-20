@@ -33,7 +33,7 @@ from data import (
     dataset_loader,
     START,
     PAD,
-    get_distillation_dataset_loader,
+    get_distillation_dataloaders,
 )
 from schedulers import (
     CircularLRBeta,
@@ -46,7 +46,9 @@ os.environ["WANDB_LOG_MODEL"] = "true"
 os.environ["WANDB_WATCH"] = "all"
 
 
-def loss_fn_kd(outputs, labels, teacher_outputs, T=10, alpha=0.1): # NOTE: popular choice - 0.9*CE + 0.1*KD
+def loss_fn_kd(
+    outputs, labels, teacher_outputs, T=10, alpha=0.1
+):  # NOTE: popular choice - 0.9*CE + 0.1*KD
     KD_loss = nn.KLDivLoss(reduction="batchmean")(
         F.log_softmax(outputs / T, dim=1), F.softmax(teacher_outputs / T, dim=1)
     ) * (alpha * T * T) + F.cross_entropy(outputs, labels) * (1.0 - alpha)
@@ -110,7 +112,11 @@ def _train_one_epoch(
                 )  # [B, MAX_LEN, VOCAB_SIZE]
                 teacher_decoded_values = teacher_output.transpose(1, 2)
 
-            loss = loss_fn_kd(outputs=student_decoded_values, labels=expected[:, 1:], teacher_outputs=teacher_decoded_values)
+            loss = loss_fn_kd(
+                outputs=student_decoded_values,
+                labels=expected[:, 1:],
+                teacher_outputs=teacher_decoded_values,
+            )
             optim_params = [
                 p
                 for param_group in optimizer.param_groups
@@ -303,14 +309,7 @@ def main(parser):
         student_options.input_size.width,
     )
 
-    (
-        student_loader,
-        teacher_loader,
-        valid_loader,
-        _,
-        _,
-        valid_dataset,
-    ) = get_distillation_dataset_loader(
+    student_loader, teacher_loader, valid_loader = get_distillation_dataloaders(
         student_options=student_options,
         teacher_options=teacher_options,
         student_transform=student_transform,
@@ -321,7 +320,7 @@ def main(parser):
     print(
         "[+] Data\n",
         "The number of train samples : {}\n".format(len(student_loader.dataset)),
-        "The number of validation samples : {}\n".format(len(valid_dataset)),
+        "The number of validation samples : {}\n".format(len(valid_loader.dataset)),
         "The number of classes : {}\n".format(len(student_loader.dataset.token_to_id)),
     )
 
@@ -339,7 +338,7 @@ def main(parser):
     teacher_model = get_network(
         model_type=teacher_options.network,
         FLAGS=teacher_options,
-        model_checkpoint=teacher_ckpt['model'],
+        model_checkpoint=teacher_ckpt["model"],
         device=device,
         dataset=student_loader.dataset,
     )
@@ -573,7 +572,10 @@ def main(parser):
         # Summary
         elapsed_time = time.time() - start_time
         elapsed_time = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
-        if epoch % student_options.print_epochs == 0 or epoch == student_options.num_epochs - 1:
+        if (
+            epoch % student_options.print_epochs == 0
+            or epoch == student_options.num_epochs - 1
+        ):
             output_string = (
                 "{epoch_text}: "
                 "Train Symbol Accuracy = {train_symbol_accuracy:.5f}, "

@@ -108,14 +108,14 @@ def compose_test_dataloader(
     return test_dataloader
 
 
-def get_distillation_dataset_loader(
+def get_distillation_dataloaders(
     student_options,
     teacher_options,
     student_transform,
     teacher_transform,
     valid_transform,
     fold: int,
-) -> Tuple[DataLoader, DataLoader, DataLoader, Dataset, Dataset, Dataset]:
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
 
     # Read data
     train_data, valid_data = [], []
@@ -175,11 +175,4 @@ def get_distillation_dataset_loader(
         pin_memory=True,
     )
 
-    return (
-        student_loader,
-        teacher_loader,
-        valid_loader,
-        student_dataset,
-        teacher_dataset,
-        valid_dataset,
-    )
+    return student_loader, teacher_loader, valid_loader

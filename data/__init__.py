@@ -12,7 +12,7 @@ from .loader import (
     compose_test_dataloader,
     collate_batch,
     collate_eval_batch,
-    get_distillation_dataset_loader,
+    get_distillation_dataloaders,
 )
 from .augmentations import (
     get_train_transforms,
