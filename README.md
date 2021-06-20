@@ -4,15 +4,15 @@
 
 # INDEX
 
-##### **[🧐Task Description](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#task-description)**
+#### **[🧐Task Description](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#task-description-1)**
 
-##### **[🏆Project Result](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#project-result)**
+#### **[🏆Project Result](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#project-result-1)**
 
-##### **[⚙Installation](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#installation)**
+#### **[⚙Installation](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#installation-1)**
 
-##### **[🕹Command Line Interface](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#command-line-interface)**
+#### **[🕹Command Line Interface](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#command-line-interface-1)**
 
-##### **[👩‍👦‍👦Who Are We?](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#team-smbly)**
+#### **[👩‍👦‍👦Who Are We?](https://github.com/iloveslowfood/p4-fr-sorry-math-but-love-you#who-are-we-team-smbly)**
 
 # Task Description
 
@@ -206,7 +206,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 
 
-# Who Are WE: Team SMBLY
+# Who Are We: Team SMBLY
 
 - 고지형
 - 김준철
