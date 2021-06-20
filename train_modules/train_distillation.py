@@ -553,8 +553,8 @@ def main(parser):
                     "model": student_model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "configs": option_dict,
-                    "token_to_id": student_loader.dataset.token_to_id,
-                    "id_to_token": student_loader.dataset.id_to_token,
+                    "token_to_id": distillation_loader.dataset.token_to_id,
+                    "id_to_token": distillation_loader.dataset.id_to_token,
                     "network": student_options.network,
                     "scheduler": lr_scheduler.state_dict(),
                 },
@@ -617,38 +617,3 @@ def main(parser):
                     validation_wer=validation_epoch_wer,
                     validation_score=validation_epoch_score,
                 )
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--project_name", default="distillation", help="W&B에 표시될 프로젝트명. 모델명으로 통일!"
-    )
-    parser.add_argument(
-        "--exp_name",
-        default="LiteSATRN-YesTeacher",
-        help="실험명(SATRN-베이스라인, SARTN-Loss변경 등)",
-    )
-    parser.add_argument(
-        "--config_file",
-        default="./configs/LiteSATRN.yaml",
-        type=str,
-        help="Path of configuration file",
-    )
-    parser.add_argument(
-        "-c",
-        "--teacher_ckpt",
-        default="./configs/satrn-fold-0-0.8148.pth",
-        type=str,
-        help="Path of configuration file",
-    )
-    parser = parser.parse_args()
-
-    # initilaize W&B
-    run = wandb.init(project=parser.project_name, name=parser.exp_name)
-
-    # train
-    main(parser)
-
-    # fishe W&B
-    run.finish()
