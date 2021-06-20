@@ -61,7 +61,7 @@ git clone https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you.git
 pip install -r requirments.txt
 ```
 
-#### Dataset Structure
+### Dataset Structure
 
 ```shell
 [dataset]/
@@ -73,7 +73,7 @@ pip install -r requirments.txt
     └── *.jpg
 ```
 
-#### Code Structure
+### Code Structure
 
 ```shell
 [code]
