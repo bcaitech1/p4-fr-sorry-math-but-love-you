@@ -205,6 +205,10 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 ##### `output_dir (str)`: 추론 결과를 저장할 디렉토리 경로 (default: `'./result/'`)
 
 
+# Collaboration Tools
+
+![](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true) ![](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/discussion.gif?raw=true)
+
 
 # Who Are We?
 
