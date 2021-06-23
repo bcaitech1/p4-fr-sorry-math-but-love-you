@@ -214,21 +214,21 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
             <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
         </td>
         <td align="center" width="350px">	
-            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="90px" width="160px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/discussions"><img height="180px" width="320px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/discussion.gif?raw=true"/></a>
             <br />
-            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/discussions">*Github Discussions*</a>
         </td>
     </tr>
-    <tr height="140px">
+    <tr height="200px">
         <td align="center" width="350px">	
-            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="100px" width="100px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/pulls?q=is%3Apr+is%3Aclosed"><img height="180px" width="320px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/pr.gif?raw=true"/></a>
             <br />
-            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/pulls?q=is%3Apr+is%3Aclosed">*Github Pull Requests*</a>
         </td>
         <td align="center" width="350px">	
-            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="100px" width="100px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
+            <a href="https://wandb.ai/smbly"><img height="100px" width="100px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/wandb.gif?raw=true"/></a>
             <br />
-            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
+            <a href="https://wandb.ai/smbly">*Github Issues*</a>
         </td>
     </tr>
 </table>
