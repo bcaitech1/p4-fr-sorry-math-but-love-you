@@ -225,6 +225,8 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
             <br />
             <a href="https://github.com/doritos0812">김형민<br />doritos2498@gmail.com</a>
         </td>
+    </tr>
+    <tr height="140px">
         <td align="center" width="130px">
             <a href="https://github.com/nureesong"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76163168?v=4"/></a>
             <br />
