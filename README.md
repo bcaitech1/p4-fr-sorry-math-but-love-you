@@ -208,10 +208,49 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 
 # Who Are We?
 
-- 고지형
-- 김준철
-- 김형민
-- 송누리
-- 이주영
-- 최준구
-
+<table>
+    <tr height="140px">
+        <td align="center" width="130px">	
+            <a href="https://github.com/iloveslowfood"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/48649606?v=4"/></a>
+            <br />
+            <a href="https://github.com/iloveslowfood">고지형, iloveslowfood</a>
+        </td>
+        <td align="center" width="130px">
+            <a href="https://github.com/Lala-chick"><img height="100px" width="100px" src="https://drive.google.com/file/d/1wyuOCs0SsX3R5BnQ_syPqZjtW9RmCdl-/view"/></a>
+            <br />
+            <a href="https://github.com/Lala-chick">이주영, Lala-chick</a>
+        </td>
+        <td align="center" width="130px">
+            <a href="https://github.com/soupbab"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/67000572?v=4"/></a>
+            <br />
+            <a href="https://github.com/soupbab">kim1109123</a>
+        </td>
+        <td align="center" width="130px">
+            <a href="https://github.com/yskim1014"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/68675162?v=4"/></a>
+            <br />
+            <a href="https://github.com/yskim1014">cola314</a>
+        </td>
+    </tr>
+    <tr height="140px">
+        <td align="center" width="130px">	
+            <a href="https://github.com/happyBeagle"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/68745983?v=4"/></a>
+            <br />
+            <a href="https://github.com/happyBeagle">gihop</a>
+        </td>
+        <td align="center" width="130px">
+            <a href="https://github.com/hunmin-hub"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/74880677?v=4"/></a>
+            <br />
+            <a href="https://github.com/hunmin-hub">iloveslowfood</a>
+        </td>
+        <td align="center" width="130px">
+            <a href="https://github.com/nureesong"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76163168?v=4"/></a>
+            <br />
+            <a href="https://github.com/nureesong">kim1109123</a>
+        </td>
+        <td align="center" width="130px">
+            <a href="https://github.com/Lala-chick"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76460750?v=4"/></a>
+            <br />
+            <a href="https://github.com/Lala-chick">cola314</a>
+        </td>
+    </tr>
+</table>
