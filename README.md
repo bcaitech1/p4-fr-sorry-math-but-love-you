@@ -213,32 +213,22 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
             <br />
             <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
         </td>
-        <td align="center" width="130px">
-            <a href="https://github.com/ahaampo5"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/60084351?v=4"/></a>
+        <td align="center" width="350px">	
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="100px" width="100px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
             <br />
-            <a href="https://github.com/ahaampo5">김준철<br />ahaampo5@gmail.com</a>
-        </td>
-        <td align="center" width="130px">
-            <a href="https://github.com/doritos0812"><img height="100px" width="100px" src="https://raw.githubusercontent.com/doritos0812/p4-fr-sorry-math-but-love-you/master/KakaoTalk_Image_2021-06-20-17-25-08.jpeg"/></a>
-            <br />
-            <a href="https://github.com/doritos0812">김형민<br />doritos2498@gmail.com</a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
         </td>
     </tr>
     <tr height="140px">
-        <td align="center" width="130px">
-            <a href="https://github.com/nureesong"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76163168?v=4"/></a>
+        <td align="center" width="350px">	
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="100px" width="100px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
             <br />
-            <a href="https://github.com/nureesong">송누리<br />nuri3136@naver.com</a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
         </td>
-        <td align="center" width="130px">
-            <a href="https://github.com/Lala-chick"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76460750?v=4"/></a>
+        <td align="center" width="350px">	
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="100px" width="100px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
             <br />
-            <a href="https://github.com/Lala-chick">이주영<br />vvvic313@gmail.com</a>
-        </td>
-        <td align="center" width="130px">
-            <a href="https://github.com/soupbab"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/67000572?v=4"/></a>
-            <br />
-            <a href="https://github.com/soupbab">최준구<br />jungu1106@naver.com</a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
         </td>
     </tr>
 </table>
