@@ -233,7 +233,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
         <td align="center" width="130px">
             <a href="https://github.com/Lala-chick"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76460750?v=4"/></a>
             <br />
-            <a href="https://github.com/Lala-chick">이주영<br />Email. vvvic313@gmail.com</a>
+            <a href="https://github.com/Lala-chick">이주영<br />vvvic313@gmail.com</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/soupbab"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/67000572?v=4"/></a>
