@@ -213,44 +213,32 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
         <td align="center" width="130px">	
             <a href="https://github.com/iloveslowfood"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/48649606?v=4"/></a>
             <br />
-            <a href="https://github.com/iloveslowfood">고지형, iloveslowfood</a>
+            <a href="https://github.com/iloveslowfood">고지형</a>
         </td>
         <td align="center" width="130px">
-            <a href="https://github.com/Lala-chick"><img height="100px" width="100px" src="https://drive.google.com/file/d/1wyuOCs0SsX3R5BnQ_syPqZjtW9RmCdl-/view"/></a>
+            <a href="https://github.com/ahaampo5"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/60084351?v=4"/></a>
             <br />
-            <a href="https://github.com/Lala-chick">이주영, Lala-chick</a>
+            <a href="https://github.com/ahaampo5">김준철</a>
         </td>
         <td align="center" width="130px">
-            <a href="https://github.com/soupbab"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/67000572?v=4"/></a>
+            <a href="https://github.com/doritos0812"><img height="100px" width="100px" src="https://raw.githubusercontent.com/doritos0812/p4-fr-sorry-math-but-love-you/master/KakaoTalk_Image_2021-06-20-17-25-08.jpeg"/></a>
             <br />
-            <a href="https://github.com/soupbab">kim1109123</a>
-        </td>
-        <td align="center" width="130px">
-            <a href="https://github.com/yskim1014"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/68675162?v=4"/></a>
-            <br />
-            <a href="https://github.com/yskim1014">cola314</a>
-        </td>
-    </tr>
-    <tr height="140px">
-        <td align="center" width="130px">	
-            <a href="https://github.com/happyBeagle"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/68745983?v=4"/></a>
-            <br />
-            <a href="https://github.com/happyBeagle">gihop</a>
-        </td>
-        <td align="center" width="130px">
-            <a href="https://github.com/hunmin-hub"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/74880677?v=4"/></a>
-            <br />
-            <a href="https://github.com/hunmin-hub">iloveslowfood</a>
+            <a href="https://github.com/doritos0812">김형민</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/nureesong"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76163168?v=4"/></a>
             <br />
-            <a href="https://github.com/nureesong">kim1109123</a>
+            <a href="https://github.com/nureesong">송누리</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/Lala-chick"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76460750?v=4"/></a>
             <br />
-            <a href="https://github.com/Lala-chick">cola314</a>
+            <a href="https://github.com/Lala-chick">이주영</a>
+        </td>
+        <td align="center" width="130px">
+            <a href="https://github.com/soupbab"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/67000572?v=4"/></a>
+            <br />
+            <a href="https://github.com/soupbab">최준구</a>
         </td>
     </tr>
 </table>
