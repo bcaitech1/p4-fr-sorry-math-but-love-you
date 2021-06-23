@@ -226,7 +226,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
             <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/pulls?q=is%3Apr+is%3Aclosed">*Github Pull Requests*</a>
         </td>
         <td align="center" width="350px">	
-            <a href="https://wandb.ai/smbly"><img height="100px" width="100px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/wandb.gif?raw=true"/></a>
+            <a href="https://wandb.ai/smbly"><img height="180px" width="320px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/wandb.gif?raw=true"/></a>
             <br />
             <a href="https://wandb.ai/smbly">*Github Issues*</a>
         </td>
