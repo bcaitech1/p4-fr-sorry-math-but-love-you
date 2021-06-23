@@ -209,7 +209,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
 <table>
     <tr height="200px">
         <td align="center" width="350px">	
-            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="90px" width="160px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
+            <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed"><img height="180px" width="320px" src="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/blob/master/images/issue.gif?raw=true"/></a>
             <br />
             <a href="https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you/issues?q=is%3Aissue+is%3Aclosed">*Github Issues*</a>
         </td>
