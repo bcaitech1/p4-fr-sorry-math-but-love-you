@@ -12,7 +12,7 @@
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;**[🕹Command Line Interface](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you#command-line-interface-1)**
 
-#### &nbsp;&nbsp;&nbsp;&nbsp;**[🤝Collaboration Tools](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you#collaboration-tools)**
+#### &nbsp;&nbsp;&nbsp;&nbsp;**[🤝Collaboration Tools](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you#collaboration-tools-1)**
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;**[👩‍👦‍👦Who Are We?](https://github.com/bcaitech1/p4-fr-sorry-math-but-love-you#who-are-we-1)**
 
