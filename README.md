@@ -213,7 +213,7 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
         <td align="center" width="130px">	
             <a href="https://github.com/iloveslowfood"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/48649606?v=4"/></a>
             <br />
-            <a href="https://github.com/iloveslowfood">고지형\n asdfasdf/a>
+            <a href="https://github.com/iloveslowfood">고지형<br />asdfasdf/a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/ahaampo5"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/60084351?v=4"/></a>
