@@ -213,32 +213,32 @@ $ python inference.py --inference_type ensemble --checkpoint <MODEL1PATH.pth> <M
         <td align="center" width="130px">	
             <a href="https://github.com/iloveslowfood"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/48649606?v=4"/></a>
             <br />
-            <a href="https://github.com/iloveslowfood">고지형<br />asdfasdf/a>
+            <a href="https://github.com/iloveslowfood">고지형<br />silkstaff@naver.com</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/ahaampo5"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/60084351?v=4"/></a>
             <br />
-            <a href="https://github.com/ahaampo5">김준철</a>
+            <a href="https://github.com/ahaampo5">김준철<br />ahaampo5@gmail.com</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/doritos0812"><img height="100px" width="100px" src="https://raw.githubusercontent.com/doritos0812/p4-fr-sorry-math-but-love-you/master/KakaoTalk_Image_2021-06-20-17-25-08.jpeg"/></a>
             <br />
-            <a href="https://github.com/doritos0812">김형민</a>
+            <a href="https://github.com/doritos0812">김형민<br />doritos2498@gmail.com</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/nureesong"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76163168?v=4"/></a>
             <br />
-            <a href="https://github.com/nureesong">송누리</a>
+            <a href="https://github.com/nureesong">송누리<br />nuri3136@naver.com</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/Lala-chick"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/76460750?v=4"/></a>
             <br />
-            <a href="https://github.com/Lala-chick">이주영</a>
+            <a href="https://github.com/Lala-chick">이주영<br />Email. vvvic313@gmail.com</a>
         </td>
         <td align="center" width="130px">
             <a href="https://github.com/soupbab"><img height="100px" width="100px" src="https://avatars.githubusercontent.com/u/67000572?v=4"/></a>
             <br />
-            <a href="https://github.com/soupbab">최준구</a>
+            <a href="https://github.com/soupbab">최준구<br />jungu1106@naver.com</a>
         </td>
     </tr>
 </table>
