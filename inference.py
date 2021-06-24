@@ -83,8 +83,8 @@ if __name__ == '__main__':
             parser.decode_type = 'greedy'
             warnings.warn("'ensemble' inference just support 'greedy'. Changed decode_type: 'beam' -> 'greedy'")
     
-    elif len(parser.checkpoint) > 1 and parser.inference_type == 'singular':
-        raise ValueError("Cannot run 'singular' inference since the number of checkpoint is greater than 1.")
+    elif len(parser.checkpoint) > 1 and parser.inference_type == 'single':
+        raise ValueError("Cannot run with 'single' inference type since the number of checkpoints is greater than 1")
 
     else:
         raise NotImplementedError
