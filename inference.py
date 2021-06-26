@@ -1,179 +1,97 @@
-import os
 import argparse
-import random
-from tqdm import tqdm
-import csv
-import torch
-from torch.utils.data import DataLoader
+import warnings
+from importlib import import_module
 
-from utils.metrics import word_error_rate, sentence_acc, final_metric
-from utils.checkpoint import load_checkpoint
-from utils.flags import Flags
-from utils.utils import id_to_string, get_network, get_optimizer, set_seed
-
-from data.dataset import LoadEvalDataset, START, PAD
-from data.loader import collate_eval_batch
-from data.augmentations import get_valid_transforms
-
-from postprocessing.decoding import decode
-from postprocessing.postprocessing import get_decoding_manager
-
-
-def main(parser):
-    is_cuda = torch.cuda.is_available()
-    checkpoint = load_checkpoint(parser.checkpoint, cuda=is_cuda)
-    options = Flags(checkpoint["configs"]).get()
-    set_seed(options.seed)
-
-    hardware = "cuda" if is_cuda else "cpu"
-    device = torch.device(hardware)
-    print("--------------------------------")
-    print("Running {} on device {}\n".format(options.network, device))
-
-    model_checkpoint = checkpoint["model"]
-    if model_checkpoint:
-        print(
-            "[+] Checkpoint\n",
-            "Resuming from epoch : {}\n".format(checkpoint["epoch"]),
-        )
-
-    transformed = get_valid_transforms(
-        height=options.input_size.height, width=options.input_size.width
-    )
-    dummy_gt = "\sin " * parser.max_sequence  # set maximum inference sequence
-
-    root = os.path.join(os.path.dirname(parser.file_path), "images")
-    with open(parser.file_path, "r") as fd:
-        reader = csv.reader(fd, delimiter="\t")
-        data = list(reader)
-
-    test_data = [[os.path.join(root, x[0]), x[0], dummy_gt] for x in data]
-    test_dataset = LoadEvalDataset(
-        test_data,
-        checkpoint["token_to_id"],
-        checkpoint["id_to_token"],
-        crop=False,
-        transform=transformed,
-        rgb=options.data.rgb,
-    )
-    test_data_loader = DataLoader(
-        test_dataset,
-        batch_size=parser.batch_size,
-        shuffle=False,
-        num_workers=options.num_workers,
-        collate_fn=collate_eval_batch,
-    )
-
-    print(
-        "[+] Data\n",
-        "The number of test samples : {}\n".format(len(test_dataset)),
-    )
-    manager = (
-        get_decoding_manager(
-            tokens_path="./configs/tokens.txt", batch_size=parser.batch_size
-        )
-        if parser.decoding_manager
-        else None
-    )
-
-    model = get_network(
-        model_type=options.network,
-        FLAGS=options,
-        model_checkpoint=model_checkpoint,
-        device=device,
-        dataset=test_dataset,
-        decoding_manager=manager,
-    )
-    model.eval()
-
-    print("[+] Decoding Type:", parser.decode_type)
-    results = []
-    with torch.no_grad():
-        for d in tqdm(test_data_loader):
-            input = d["image"].float().to(device)
-            expected = d["truth"]["encoded"].to(device)
-            sequence = decode(
-                model=model,
-                input=input,
-                data_loader=test_data_loader,
-                expected=expected,
-                method=parser.decode_type,
-                beam_width=parser.beam_width,
-            )
-            sequence_str = id_to_string(sequence, test_data_loader, do_eval=1)
-
-            for path, predicted in zip(d["file_path"], sequence_str):
-                results.append((path, predicted))
-
-    os.makedirs(parser.output_dir, exist_ok=True)
-    with open(os.path.join(parser.output_dir, "output.csv"), "w") as w:
-        for path, predicted in results:
-            w.write(path + "\t" + predicted + "\n")
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--inference_type",
-        default="single",
-        type=str,
-        help="추론 방법 설정 'single(단일모델추론)', 'ensemble앙상블()'",
+        default='single',
+        help="추론 방식을 설정. 'single(단일 모델 추론)', 'ensemble(다중 모델 추론)'",
     )
     parser.add_argument(
         "--checkpoint",
         dest="checkpoint",
-        default="/opt/ml/code/models/satrn-fold-0-0.8148.pth",
-        type=str,
-        help="Path of checkpoint file",
+        default=["/opt/ml/ensemble/log/satrn_fold-0-0.8148.pth"],
+        nargs="*",
+        help="추론에 활용할 학습 모델 파일 경로",
     )
     parser.add_argument(
         "--max_sequence",
         dest="max_sequence",
         default=230,
         type=int,
-        help="maximun sequence when doing inference",
+        help="수식 문장 최대 생성 길이",
     )
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
-        default=128,
+        default=32,
         type=int,
         help="batch size when doing inference",
     )
     parser.add_argument(
         "--decode_type",
         dest="decode_type",
-        default="greedy",  # 'greedy'로 설정하면 기존과 동일하게 inference
+        default="greedy",
         type=str,
-        help="디코딩 방식 설정. 'greedy', 'beam'",
+        help="디코딩 방식 설정. 'greedy(그리디 디코딩)', 'beam(빔서치)'. NOTE: 빔서치는 단일 모델 추론(singular)에서만 작동, SwinTRN 사용불가",
     )
     parser.add_argument(
         "--beam_width",
         dest="beam_width",
         default=3,
         type=int,
-        help="빔서치 사용 시 스텝별 후보 수 설정",
+        help="빔서치 사용 시 Beam Size 설정",
     )
     parser.add_argument(
-        "--decoding_manager", default=False, type=bool, help="DecodingManager 활용 여부 설정"
+        "--decoding_manager", default=True, help="DecodingManager 사용 여부 결정"
     )
-    eval_dir = os.environ.get("SM_CHANNEL_EVAL", "/opt/ml/input/data/")
-    file_path = os.path.join(eval_dir, "eval_dataset/input.txt")
+    parser.add_argument(
+        "--tokens_path",
+        default="./configs/tokens.txt",
+        help="DecodingManager 사용시 활용할 토큰 파일 경로",
+    )
+    parser.add_argument(
+        "--max_cache", type=int, default=50, help="최대 몇 개의 피클 파일을 저장할 지 결정. NOTE: 앙상블 추론(ensemble)에서만 사용됨"
+    )
     parser.add_argument(
         "--file_path",
         dest="file_path",
-        default=file_path,
+        default='../input/data/eval_dataset/input.txt',
         type=str,
-        help="file path when doing inference",
+        help="추론 시 활용할 데이터 경로",
     )
-    output_dir = os.environ.get("SM_OUTPUT_DATA_DIR", "submit")
     parser.add_argument(
         "--output_dir",
         dest="output_dir",
-        default=output_dir,
+        default='./result/',
         type=str,
-        help="output directory",
+        help="추론 결과를 저장할 디렉토리 경로",
     )
 
     parser = parser.parse_args()
-    main(parser)
+
+    # Singular model inference
+    if len(parser.checkpoint) == 1:
+        del parser.max_cache
+        parser.checkpoint = parser.checkpoint[0]
+
+    # Ensemble models inference
+    elif len(parser.checkpoint) > 1 and parser.inference_type == 'ensemble':
+        if parser.decode_type != 'greedy':
+            parser.decode_type = 'greedy'
+            warnings.warn("'ensemble' inference just support 'greedy'. Changed decode_type: 'beam' -> 'greedy'")
+    
+    elif len(parser.checkpoint) > 1 and parser.inference_type == 'single':
+        raise ValueError("Cannot run with 'single' inference type since the number of checkpoints is greater than 1")
+
+    else:
+        raise NotImplementedError
+
+    # run inference
+    print('='*100)
+    print(parser)
+    print('='*100)
+    inference_module = getattr(import_module(f"inference_modules.inference_{parser.inference_type}"), 'main')
+    inference_module(parser)

@@ -21,6 +21,7 @@ tensorboard/**
 *.pth
 .DS_Store
 wandb/**
+log/**
 
 # etc
 .empty/**

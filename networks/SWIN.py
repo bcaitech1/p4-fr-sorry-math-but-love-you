@@ -7,6 +7,7 @@ import random
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 import torch.utils.checkpoint as checkpoint
 from torch.utils.data import DataLoader
+from six.moves import urllib
 
 import timm
 
@@ -1021,13 +1022,17 @@ class TransformerDecoder(nn.Module):
 
 
 class SWIN(nn.Module):
-    def __init__(self, FLAGS, train_dataset, checkpoint=None):
+    def __init__(self, FLAGS, train_dataset, checkpoint=True):
         super(SWIN, self).__init__()
 
-        # self.encoder = SwinTransformer(ape=True)
-        self.encoder = timm.create_model(
-            "swin_base_patch4_window12_384_in22k", pretrained=True, ape=True
-        )
+        self.encoder = SwinTransformer(img_size=384, patch_size=4, in_chans=3,
+            embed_dim=128, depths=[2, 2, 18, 2], num_heads=[4, 8, 16, 32],
+            window_size=12, mlp_ratio=4.,num_classes=21841,
+            drop_path_rate=0.5, ape=True,) 
+        
+        state_dict = torch.hub.load_state_dict_from_url('https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_base_patch4_window12_384_22k.pth')
+        self.encoder.load_state_dict(state_dict['model'], strict=False)
+
         self.decoder = TransformerDecoder(
             num_classes=len(train_dataset.id_to_token),
             src_dim=FLAGS.SATRN.decoder.src_dim,

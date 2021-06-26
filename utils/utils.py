@@ -11,15 +11,19 @@ import torch
 from torch import optim, nn
 from torch.utils.data import Dataset
 
-sys.path.append("../")
 from .flags import Flags
-from networks.EfficientSATRN import (
+from networks import (
     EfficientSATRN,
     EfficientSATRN_encoder,
     EfficientSATRN_decoder,
+    LiteSATRN,
+    SWIN, 
+    SWIN_encoder, 
+    SWIN_decoder,
+    ASTER, 
+    ASTER_encoder, 
+    ASTER_decoder
 )
-from networks.SWIN import SWIN, SWIN_encoder, SWIN_decoder
-from networks.EfficientASTER import ASTER, ASTER_encoder, ASTER_decoder
 
 
 def get_network(
@@ -43,6 +47,10 @@ def get_network(
     model = None
     if model_type == "EfficientSATRN" or model_type == "MySATRN":
         model = EfficientSATRN(
+            FLAGS, dataset, model_checkpoint, decoding_manager
+        ).to(device)
+    elif model_type == "LiteSATRN":
+        model = LiteSATRN(
             FLAGS, dataset, model_checkpoint, decoding_manager
         ).to(device)
     elif model_type == "EfficientSATRN_encoder" or model_type == "MySATRN_encoder":

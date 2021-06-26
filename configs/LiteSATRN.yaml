@@ -1,21 +1,21 @@
-network: EfficientSATRN
+network: LiteSATRN
 input_size:
-  height: 256
-  width: 512
+  height: 128
+  width: 256
 SATRN:
   encoder:
-    hidden_dim: 512
+    hidden_dim: 256
+    filter_dim: 256
+    layer_num: 1
+    head_num: 4
+  decoder:
+    src_dim: 256
+    hidden_dim: 128
     filter_dim: 512
     layer_num: 2
-    head_num: 8
-  decoder:
-    src_dim: 512
-    hidden_dim: 256
-    filter_dim: 1024
-    layer_num: 3
-    head_num: 8
+    head_num: 4
 checkpoint: ""
-prefix: "./log/efficient_satrn"
+prefix: "./log/litesatrn-yesteacher"
 
 data:
   train:
@@ -28,7 +28,7 @@ data:
   crop: True
   rgb: 3   # 3 for color, 1 for greyscale
   
-batch_size: 16
+batch_size: 32
 num_workers: 8
 num_epochs: 30
 print_epochs: 1

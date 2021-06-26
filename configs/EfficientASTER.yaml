@@ -1,47 +1,48 @@
-network: "EfficientASTER"
+network: "EfficientASTER" # network name
 input_size:
-  height: 256
-  width: 1024
+  height: 256 
+  width: 1024 
 ASTER:
-  src_dim: 384
-  hidden_dim: 384
-  embedding_dim: 384
-  layer_num: 2
-checkpoint: ""
-prefix: "./log/aster"
+  src_dim: 384 # hidden size in CNN, encoder
+  hidden_dim: 384 # hidden size in RNN, encoder
+  embedding_dim: 384 # hidden size in RNN, decoder
+  layer_num: 2 # number of layers of RNN, decoder
+checkpoint: "" # (optional) path of checkpoint model
+prefix: "./log/aster" # directory to save model checkpoint
 
-data:
+data: # 데이터셋
   train:
-    - "/content/data/train_dataset/gt.txt" # Train data ground truth
+    - "../input/data/train_dataset/gt.txt" # ground truth path of train data
   test:
-    - ""
+    - "" # ground truth path of test data
   token_paths:
-    - "/content/data/train_dataset/tokens.txt"  # 241 tokens
-  dataset_proportions:  # proportion of data to take from train (not test)
+    - "../input/data/train_dataset/tokens.txt"  # token file for LaTex symbols (241 tokens in default)
+  dataset_proportions:  # proportion of data used during train
     - 1.0
-  random_split: True # if True, random split from train files
-  test_proportions: 0.2 # only if random_split is True
-  crop: True
-  rgb: 3   # 3 for color, 1 for greyscale
+  random_split: True
+  test_proportions: 0.2 # proportion of data used for validation
+  crop: True 
+  rgb: 3  
+  fold: 0
   
 batch_size: 16
 num_workers: 0
 num_epochs: 5
 print_epochs: 1
 dropout_rate: 0.1
-teacher_forcing_ratio:
-  tf_max: 0.8
-  tf_min: 0.4
-max_grad_norm: 2.0
+teacher_forcing_ratio: # works for TeacherForcingScheduler(Arctan)
+  tf_max: 0.8 # maximum tf ratio
+  tf_min: 0.4 # maximum tf ratio
+max_grad_norm: 2.0 # used for gradient clipping
 seed: 21
 optimizer:
   optimizer: 'Adam' # Adam, Adadelta
-  lr: 5e-4 # 1e-4
+  lr: 5e-4 # used when training with single optimizer
   weight_decay: 1e-4
   is_cycle: True
-  enc_lr: 5e-4
-  dec_lr: 5e-4
-scheduler:
+  enc_lr: 5e-4 # used when training with two individual optimizer for encoder, decoder
+  dec_lr: 5e-4 # used when training with two individual optimizer for encoder, decoder
+scheduler: # learning rate scheduler
   scheduler: "CustomCosine"
   cycle: 1
   warmup_ratio: 0.1
