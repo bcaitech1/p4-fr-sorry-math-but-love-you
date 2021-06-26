@@ -1,0 +1,58 @@
+<div id="overlay" style="top:0;left:0;background-color:rgba(0, 0, 0, 0.5); display:none; position:fixed;width: 100%;height: 100%; z-index: 2147483646;">
+    <div id="susik-box" data-activate = "false" style="border:3px dashed red; position:absolute; width: 0px; height:0px; z-index: 2147483647;display:none; ">
+    </div>
+</div>
+<div id="show-box" style="display:none; border-top:5px solid #eee; position:fixed; bottom:0px;z-index: 2147483647; width:100%; height:250px; background-color:white;    padding-bottom: 15px;">
+    <span id="susik-close" style="position: absolute;
+    right: 5px;
+    font-size: 15px;
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    border-radius: 50%;
+    border: 1px solid black;
+    text-align: center;
+    background-color: black;
+    color: white;
+    top: -16px;
+    cursor: pointer;">X</span>
+    <div style="display: flex;justify-content: space-evenly; padding:5px; text-align:center;">
+        <table border="1" style="font-size:20px; width:700px;height:120px;">
+            <tr>
+                <td style="width:120px">
+                    <p>captured<br>image</p>
+                </td>
+                <td>
+                    <img style="max-height:100px;" id="susik-image" src="">
+                </td>
+            </tr>
+        </table>
+        <table border="1" style="font-size:20px; width:700px;height:120px;">
+            <tr>
+                <td style="width:120px">
+                    <p>expected<br>latex</p>
+                </td>
+                <td>
+                    <img style="height:80%;" id="susik-output-latex" src="">
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div style="display: flex;justify-content: space-evenly; padding:5px;">
+        <table>
+            <tr>
+                <td rowspan="2" style="width:1510px;height:120px;">
+                    <textarea id="susik-output" style="font-size:30px; width:99%;height:99%;"></textarea>
+                </td>
+                <td align="center">
+                    <button id="fix-text" style="width:100%">fix</button>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <button id="copy-text">copy</button>
+                </td>
+            </tr>
+          </table>
+    </div>
+</div>
