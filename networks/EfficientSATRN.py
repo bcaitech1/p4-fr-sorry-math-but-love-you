@@ -554,7 +554,7 @@ class SATRNDecoder(nn.Module):
                     target, _out = self.manager.sift(_out[:, -1:, :])
                 else:
                     target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
-                    target = target.squeeze()  # [b]
+                    target = target.squeeze(-1)  # [b]  NOTE () -> (-1) for serve
                 out.append(_out)
 
             out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
@@ -562,6 +562,46 @@ class SATRNDecoder(nn.Module):
 
             if self.manager is not None:
                 self.manager.reset()
+
+        return out
+
+    def forward_serve(self, src, batch_max_length=50):  # NOTE decoder forward for serve
+        out = []
+        num_steps = batch_max_length - 1
+        target = (
+            torch.LongTensor(src.size(0)).fill_(self.st_id).to(device)
+        )  # [START] token
+        features = [None] * self.layer_num
+
+        if self.manager:
+            self.manager.reset(sequence_length=num_steps)
+
+        for t in range(num_steps):
+            target = target.unsqueeze(1)
+            tgt = self.text_embedding(target)
+            tgt = self.pos_encoder(tgt, point=t)
+            tgt_mask = self.order_mask(t + 1)
+            tgt_mask = tgt_mask[:, -1].unsqueeze(1)  # [1, (l+1)]
+            for l, layer in enumerate(self.attention_layers):
+                tgt = layer(tgt, features[l], src, tgt_mask)
+                features[l] = (
+                    tgt if features[l] == None else torch.cat([features[l], tgt], 1)
+                )
+
+            _out = self.generator(tgt)  # [b, 1, c]
+
+            if self.manager:
+                target, _out = self.manager.sift(_out[:, -1:, :])
+            else:
+                target = torch.argmax(_out[:, -1:, :], dim=-1)  # [b, 1]
+                target = target.squeeze(0)  # [b]
+            out.append(_out)
+
+        out = torch.stack(out, dim=1).to(device)  # [b, max length, 1, class length]
+        out = out.squeeze(2)  # [b, max length, class length]
+
+        if self.manager:
+            self.manager.reset()
 
         return out
 
@@ -1111,3 +1151,40 @@ class EfficientSATRN_decoder(nn.Module):
         outputs = torch.tensor(outputs)
 
         return outputs
+
+
+class EfficientSATRN_for_serve(nn.Module):  # NOTE EfficientSATRN for serve
+    def __init__(self, FLAGS, checkpoint=None, decoding_manager=None):
+        super(EfficientSATRN_for_serve, self).__init__()
+        self.encoder = SATRNEncoder(
+            input_height=FLAGS.input_size.height,
+            input_width=FLAGS.input_size.width,
+            input_channel=FLAGS.data.rgb,
+            hidden_size=FLAGS.SATRN.encoder.hidden_dim,
+            filter_size=FLAGS.SATRN.encoder.filter_dim,
+            head_num=FLAGS.SATRN.encoder.head_num,
+            layer_num=FLAGS.SATRN.encoder.layer_num,
+            dropout_rate=FLAGS.dropout_rate,
+        )
+
+        self.decoder = SATRNDecoder(
+            num_classes=len(checkpoint["id_to_token"]),
+            src_dim=FLAGS.SATRN.decoder.src_dim,
+            hidden_dim=FLAGS.SATRN.decoder.hidden_dim,
+            filter_dim=FLAGS.SATRN.decoder.filter_dim,
+            head_num=FLAGS.SATRN.decoder.head_num,
+            dropout_rate=FLAGS.dropout_rate,
+            pad_id=checkpoint["token_to_id"][PAD],
+            st_id=checkpoint["token_to_id"][START],
+            layer_num=FLAGS.SATRN.decoder.layer_num,
+            decoding_manager=decoding_manager,
+        )
+
+        if checkpoint["model"]:
+            self.load_state_dict(checkpoint["model"])
+
+    def forward(self, input):
+        enc_result = self.encoder(input.unsqueeze(0))
+        dec_result = self.decoder.forward_serve(src=enc_result, batch_max_length=50)
+        
+        return dec_result

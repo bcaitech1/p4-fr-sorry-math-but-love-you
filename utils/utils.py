@@ -156,6 +156,39 @@ def id_to_string(tokens, data_loader, do_eval=0):
     return result
 
 
+def id_to_string_for_serve(tokens, checkpoint, do_eval=0):  # NOTE serve용 id_to_string
+    """디코더를 통해 얻은 추론 결과를 문자열로 구성된 수식으로 복원하는 함수"""
+    result = []
+    if do_eval:
+        eos_id = checkpoint["token_to_id"]["<EOS>"]
+        special_ids = set(
+            [
+                checkpoint["token_to_id"]["<PAD>"],
+                checkpoint["token_to_id"]["<SOS>"],
+                eos_id,
+            ]
+        )
+
+    for example in tokens:
+        string = ""
+        if do_eval:
+            for token in example:
+                token = token.item()
+                if token not in special_ids:
+                    if token != -1:
+                        string += checkpoint["id_to_token"][token] + " "
+                elif token == eos_id:
+                    break
+        else:
+            for token in example:
+                token = token.item()
+                if token != -1:
+                    string += checkpoint["id_to_token"][token] + " "
+
+        result.append(string)
+    return result
+
+
 def set_seed(seed: int = 21):
     """시드값을 고정하는 함수. 실험 재현을 위해 사용"""
     torch.manual_seed(seed)

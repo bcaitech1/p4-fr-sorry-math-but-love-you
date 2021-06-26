@@ -1,0 +1,39 @@
+{
+    "name": "Boost Susik",
+    "description": "Build an Extension!",
+    "version": "1.0",
+    "manifest_version": 3,
+    "background": {
+      "service_worker": "background.js"
+    },
+    "permissions": ["storage", "activeTab", "scripting"],
+    "content_scripts": [
+        {
+          "matches": ["<all_urls>"],
+          "js": ["content.js"]
+        }
+      ],
+    "action": {
+      "default_popup": "popup.html",
+      "default_icon": {
+        "16": "/images/boostsusik16.png",
+        "32": "/images/boostsusik32.png",
+        "48": "/images/boostsusik48.png",
+        "128": "/images/boostsusik128.png"
+      }
+    },
+    "icons": {
+      "16": "/images/boostsusik16.png",
+      "32": "/images/boostsusik32.png",
+      "48": "/images/boostsusik48.png",
+      "128": "/images/boostsusik128.png"
+    },  
+    "web_accessible_resources": [
+        {
+            "resources": ["template.html"],
+            "matches": ["<all_urls>"]
+
+        }
+      ]
+    
+  }
